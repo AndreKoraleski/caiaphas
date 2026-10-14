@@ -4,7 +4,7 @@ use std::{error::Error, fmt};
 
 use crate::terminal_character::TerminalCharacter;
 
-/// A terminal string, which stands for its characters exactly as written.
+/// A terminal string stands for its characters exactly as written.
 ///
 /// It is written between two `'` or two `"`, and holds at least one terminal
 /// character.

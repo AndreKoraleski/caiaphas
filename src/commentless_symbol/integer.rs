@@ -4,7 +4,7 @@ use std::{error::Error, fmt};
 
 use crate::{gap_separator, terminal_character::TerminalCharacter};
 
-/// An integer, which counts the repetitions of a syntactic factor.
+/// An integer counts the repetitions of a syntactic factor.
 ///
 /// It is one or more decimal digits. Gaps may come between them but are not
 /// part of the number, so `1 2` is 12.

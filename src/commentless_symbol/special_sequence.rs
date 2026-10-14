@@ -1,4 +1,4 @@
-//! Special sequences of ISO/IEC 14977 EBNF, read as Unicode code points.
+//! Special sequences of ISO/IEC 14977 EBNF.
 //!
 //! The standard leaves the meaning of a special sequence to each
 //! implementation.
@@ -12,7 +12,7 @@ use crate::{
     terminal_character::{Symbol, TerminalCharacter},
 };
 
-/// A special sequence, which stands for any one character in its range.
+/// A special sequence stands for any one character in its range.
 ///
 /// A single code point is a range from that code point to itself.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

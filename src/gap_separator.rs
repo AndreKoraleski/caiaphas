@@ -1,4 +1,4 @@
-//! Gap separators of ISO/IEC 14977 EBNF, whitespace between symbols.
+//! Gap separators of ISO/IEC 14977 EBNF.
 
 #![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
 

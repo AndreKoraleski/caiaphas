@@ -4,7 +4,7 @@ use std::{error::Error, fmt};
 
 use crate::{gap_separator, terminal_character::TerminalCharacter};
 
-/// A meta identifier, which names a rule.
+/// A meta identifier names a rule.
 ///
 /// It is a letter followed by any number of letters and digits. Gaps may come
 /// between those characters but are not part of the name, so `syntax rule` and
@@ -39,8 +39,7 @@ fn is_letter(c: char) -> bool {
     )
 }
 
-/// Returns whether `c` is a meta identifier character, a letter or a decimal
-/// digit.
+/// Returns whether `c` is a letter or a decimal digit.
 fn is_meta_identifier_character(c: char) -> bool {
     matches!(
         TerminalCharacter::read(c, None),

@@ -14,7 +14,8 @@ use letter::Letter;
 use other_character::OtherCharacter;
 pub(crate) use symbol::Symbol;
 
-/// A letter, a decimal digit, a symbol or an other character.
+/// A terminal character is a letter, a decimal digit, a symbol or an other
+/// character.
 ///
 /// Some symbols, such as `(*`, are two characters long but are still a single
 /// terminal character.
@@ -60,18 +61,18 @@ impl TerminalCharacter {
         })
     }
 
-    /// Returns whether this is a first terminal character, one that may appear
-    /// in a terminal string between two `'`.
+    /// Returns whether this is a first terminal character.
     ///
-    /// That list is any terminal character but the first quote symbol.
+    /// First terminal characters may appear in a terminal string between two
+    /// `'`. They are every terminal character but the first quote symbol.
     pub(crate) fn is_first_terminal_character(self) -> bool {
         self != Self::Symbol(Symbol::FirstQuote)
     }
 
-    /// Returns whether this is a second terminal character, one that may
-    /// appear in a terminal string between two `"`.
+    /// Returns whether this is a second terminal character.
     ///
-    /// That list is any terminal character but the second quote symbol.
+    /// Second terminal characters may appear in a terminal string between two
+    /// `"`. They are every terminal character but the second quote symbol.
     pub(crate) fn is_second_terminal_character(self) -> bool {
         self != Self::Symbol(Symbol::SecondQuote)
     }
