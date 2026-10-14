@@ -136,7 +136,7 @@ mod tests {
     fn error_displays_message() {
         assert_eq!(
             ParseOtherCharacterError('a').to_string(),
-            "'a' is not a valid EBNF other-character"
+            "'a' is not a valid EBNF other character"
         );
     }
 
