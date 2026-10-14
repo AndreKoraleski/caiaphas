@@ -49,8 +49,8 @@ impl Symbol {
     /// Returns the symbol that `first` starts, and how many characters it
     /// takes, 1 or 2.
     ///
-    /// `second` is the character after `first`, if any. A symbol takes it only 
-    /// when the two form a longer symbol, so `(*` is a start comment, but 
+    /// `second` is the character after `first`, if any. A symbol takes it only
+    /// when the two form a longer symbol, so `(*` is a start comment, but
     /// `( *`, with a gap between, is a start group.
     pub(crate) fn read(
         first: char,

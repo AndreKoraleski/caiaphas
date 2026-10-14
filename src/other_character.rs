@@ -4,7 +4,7 @@
 
 use std::{error::Error, fmt};
 
-/// One of the 15 ASCII characters, space included, that may appear in terminal 
+/// One of the 15 ASCII characters, space included, that may appear in terminal
 /// strings and comments but is not a symbol of its own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum OtherCharacter {
