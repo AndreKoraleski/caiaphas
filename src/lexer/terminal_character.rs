@@ -1,7 +1,5 @@
 //! Terminal characters of ISO/IEC 14977 EBNF.
 
-#![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
-
 mod decimal_digit;
 mod letter;
 mod other_character;

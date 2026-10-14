@@ -1,7 +1,5 @@
 //! Commentless symbols of ISO/IEC 14977 EBNF.
 
-#![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
-
 mod integer;
 mod meta_identifier;
 pub(crate) mod special_sequence;

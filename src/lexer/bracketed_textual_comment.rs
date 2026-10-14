@@ -1,7 +1,5 @@
 //! Bracketed textual comments of ISO/IEC 14977 EBNF.
 
-#![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
-
 use std::{error::Error, fmt};
 
 use crate::lexer::{

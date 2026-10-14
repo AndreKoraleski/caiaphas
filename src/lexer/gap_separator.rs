@@ -1,7 +1,5 @@
 //! Gap separators of ISO/IEC 14977 EBNF.
 
-#![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
-
 /// Returns how long the gap at the start of `input` is, or 0 if there is none.
 ///
 /// A gap is any number of spaces, horizontal or vertical tabs, form feeds and
