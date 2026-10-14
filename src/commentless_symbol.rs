@@ -73,9 +73,12 @@ impl CommentlessSymbol {
                     .map_err(ParseCommentlessSymbolError::SpecialSequence)?;
                 (Self::SpecialSequence(sequence), length)
             }
-            TerminalCharacter::Symbol(
-                Symbol::StartComment | Symbol::EndComment,
-            )
+            TerminalCharacter::Symbol(Symbol::EndComment) => {
+                return Err(
+                    ParseCommentlessSymbolError::UnmatchedEndCommentSymbol,
+                );
+            }
+            TerminalCharacter::Symbol(Symbol::StartComment)
             | TerminalCharacter::OtherCharacter(_) => {
                 return Err(ParseCommentlessSymbolError::NotCommentless(
                     first,
@@ -98,6 +101,8 @@ pub(crate) enum ParseCommentlessSymbolError {
     /// The text starts with a terminal character that only belongs in a
     /// comment or a terminal string, such as an other character or `(*`.
     NotCommentless(char),
+    /// The text starts with `*)`, which only ends a comment.
+    UnmatchedEndCommentSymbol,
     /// The text starts with a decimal digit, but not a valid integer.
     Integer(ParseIntegerError),
     /// The text starts with a quote, but not a valid terminal string.
@@ -115,6 +120,9 @@ impl fmt::Display for ParseCommentlessSymbolError {
             }
             Self::NotCommentless(c) => {
                 write!(f, "{c:?} does not start an EBNF commentless symbol")
+            }
+            Self::UnmatchedEndCommentSymbol => {
+                f.write_str("`*)` without a matching `(*`")
             }
             Self::Integer(_) => f.write_str("invalid EBNF integer"),
             Self::TerminalString(_) => {
@@ -241,12 +249,19 @@ mod tests {
     }
 
     #[test]
-    fn rejects_comment_symbols() {
-        for input in ["(* a *)", "*)"] {
-            let first = input.chars().next().unwrap();
+    fn rejects_a_start_comment_symbol() {
+        assert_eq!(
+            read("(* a *)"),
+            Err(ParseCommentlessSymbolError::NotCommentless('('))
+        );
+    }
+
+    #[test]
+    fn rejects_an_unmatched_end_comment_symbol() {
+        for input in ["*)", "*) a"] {
             assert_eq!(
                 read(input),
-                Err(ParseCommentlessSymbolError::NotCommentless(first)),
+                Err(ParseCommentlessSymbolError::UnmatchedEndCommentSymbol),
                 "{input:?}"
             );
         }
@@ -346,6 +361,10 @@ mod tests {
             (
                 ParseCommentlessSymbolError::NotCommentless('@'),
                 "'@' does not start an EBNF commentless symbol",
+            ),
+            (
+                ParseCommentlessSymbolError::UnmatchedEndCommentSymbol,
+                "`*)` without a matching `(*`",
             ),
             (
                 ParseCommentlessSymbolError::Integer(
