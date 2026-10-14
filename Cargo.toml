@@ -1,0 +1,72 @@
+[package]
+name = "caiaphas"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = """
+EBNF parser generator for Rust that detects grammar ambiguities and suggests \
+fixes"""
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/AndreKoraleski/caiaphas"
+# Up to five each. Categories must match https://crates.io/category_slugs.
+keywords = []
+categories = []
+# Only for a dedicated website, never `repository`.
+# homepage = ""
+# Left unset, as crates.io links to docs.rs.
+# documentation = ""
+# Makes `cargo publish` refuse until the line is removed.
+# publish = false
+
+[dependencies]
+
+# Lints warn locally. CI denies every warning.
+#
+# Backed by the Rust API Guidelines. Anything commented out is an opt-in extra.
+[lints.rust]
+missing_docs = "warn"                  # C-CRATE-DOC, C-EXAMPLE
+missing_debug_implementations = "warn" # C-DEBUG
+# unsafe_code = "forbid"
+# missing_copy_implementations = "warn" # C-COMMON-TRAITS, but removing Copy
+#                                       # later breaks users
+# unreachable_pub = "warn"
+# unnameable_types = "warn"
+# rust_2018_idioms = { level = "warn", priority = -1 }
+# unused_lifetimes = "warn"
+# redundant_lifetimes = "warn"
+# let_underscore_drop = "warn"
+# trivial_casts = "warn"
+# trivial_numeric_casts = "warn"
+# unit_bindings = "warn"
+# unused_macro_rules = "warn"
+# non_ascii_idents = "warn"
+
+[lints.clippy]
+# pedantic = { level = "warn", priority = -1 }
+# missing_errors_doc = "warn"    # C-FAILURE, part of pedantic
+# missing_panics_doc = "warn"    # C-FAILURE, part of pedantic
+# cargo_common_metadata = "warn" # C-METADATA
+
+# Restriction lints, picked one at a time, instead of as a group. Those marked
+# with a clippy.toml key can be relaxed inside tests by setting that key to
+# true in a clippy.toml.
+# dbg_macro = "warn"                       # allow-dbg-in-tests
+# todo = "warn"
+# unimplemented = "warn"
+# print_stdout = "warn"                    # allow-print-in-tests
+# print_stderr = "warn"                    # allow-print-in-tests
+# exit = "warn"
+# unwrap_used = "warn"                     # allow-unwrap-in-tests
+# unused_result_ok = "warn"
+# let_underscore_must_use = "warn"
+# missing_assert_message = "warn"
+# exhaustive_enums = "warn"
+# exhaustive_structs = "warn"
+# partial_pub_fields = "warn"
+# mod_module_files = "warn"                # foo.rs over foo/mod.rs, as the
+#                                          # Rust Book prefers
+# allow_attributes = "warn"
+# allow_attributes_without_reason = "warn"
+# indexing_slicing = "warn"                # allow-indexing-slicing-in-tests,
+#                                          # for untrusted input
+# string_slice = "warn"
