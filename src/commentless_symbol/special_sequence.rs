@@ -27,35 +27,49 @@ impl SpecialSequence {
     pub(crate) fn read(
         input: &str,
     ) -> Result<(Self, usize), ParseSpecialSequenceError> {
-        if !input.starts_with('?') {
-            return Err(ParseSpecialSequenceError::NoOpeningSymbol);
-        }
-        let mut content = String::new();
-        let mut length = 1;
-        loop {
-            length += gap_separator::length(&input[length..]);
-            let mut chars = input[length..].chars();
-            let first = chars
-                .next()
-                .ok_or(ParseSpecialSequenceError::NoClosingSymbol)?;
-            let (character, size) =
-                TerminalCharacter::read(first, chars.next()).map_err(
-                    |_| ParseSpecialSequenceError::InvalidCharacter(first),
-                )?;
-            // No two-character symbol ends in a `?`.
-            if character == TerminalCharacter::Symbol(Symbol::SpecialSequence)
-            {
-                let range = parse_range(&content)?;
-                return Ok((Self(range), length + 1));
-            }
-            content.push_str(&input[length..length + size]);
-            length += size;
-        }
+        let (content, length) = read_content(input)?;
+        Ok((Self(parse_range(&content)?), length))
     }
 
     /// Returns the characters it stands for.
     pub(crate) fn range(&self) -> &RangeInclusive<char> {
         &self.0
+    }
+}
+
+/// Returns how long the special sequence at the start of `input` is, `?`
+/// included, without reading what is between the `?`.
+pub(crate) fn length(input: &str) -> Result<usize, ParseSpecialSequenceError> {
+    read_content(input).map(|(_, length)| length)
+}
+
+/// Returns the special sequence characters between the `?` at the start of
+/// `input` without their gaps, and how long the special sequence is, `?`
+/// included.
+fn read_content(
+    input: &str,
+) -> Result<(String, usize), ParseSpecialSequenceError> {
+    if !input.starts_with('?') {
+        return Err(ParseSpecialSequenceError::NoOpeningSymbol);
+    }
+    let mut content = String::new();
+    let mut length = 1;
+    loop {
+        length += gap_separator::length(&input[length..]);
+        let mut chars = input[length..].chars();
+        let first = chars
+            .next()
+            .ok_or(ParseSpecialSequenceError::NoClosingSymbol)?;
+        let (character, size) = TerminalCharacter::read(first, chars.next())
+            .map_err(|_| {
+            ParseSpecialSequenceError::InvalidCharacter(first)
+        })?;
+        // No two-character symbol ends in a `?`.
+        if character == TerminalCharacter::Symbol(Symbol::SpecialSequence) {
+            return Ok((content, length + 1));
+        }
+        content.push_str(&input[length..length + size]);
+        length += size;
     }
 }
 
@@ -273,6 +287,24 @@ mod tests {
                 "{input:?}"
             );
         }
+    }
+
+    #[test]
+    fn measures_without_reading_the_content() {
+        assert_eq!(length("? any note ? | x"), Ok(12));
+        assert_eq!(length("??"), Ok(2));
+        assert_eq!(
+            length("?U+0041"),
+            Err(ParseSpecialSequenceError::NoClosingSymbol)
+        );
+        assert_eq!(
+            length("a?"),
+            Err(ParseSpecialSequenceError::NoOpeningSymbol)
+        );
+        assert_eq!(
+            length("? é ?"),
+            Err(ParseSpecialSequenceError::InvalidCharacter('é'))
+        );
     }
 
     #[test]
