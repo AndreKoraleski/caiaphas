@@ -23,7 +23,7 @@ pub fn add(left: u64, right: u64) -> u64 {
 }
 
 mod commentless_symbol;
-mod gaps;
+mod gap_separator;
 mod integer;
 mod meta_identifier;
 mod special_sequence;

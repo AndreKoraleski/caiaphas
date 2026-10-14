@@ -12,19 +12,19 @@
 ///
 /// Every gap separator is ASCII, so the length is the same in bytes and
 /// characters.
-pub(crate) fn measure(rest: &str) -> usize {
-    let mut length = 0;
+pub(crate) fn length(rest: &str) -> usize {
+    let mut total = 0;
     loop {
-        let after = &rest[length..];
+        let after = &rest[total..];
         let separator = match after.chars().next() {
             Some(' ' | '\t' | '\x0B' | '\x0C') => 1,
-            Some('\r' | '\n') => measure_new_line(after),
+            Some('\r' | '\n') => new_line_length(after),
             _ => 0,
         };
         if separator == 0 {
-            return length;
+            return total;
         }
-        length += separator;
+        total += separator;
     }
 }
 
@@ -37,31 +37,31 @@ pub(crate) fn measure(rest: &str) -> usize {
 ///
 /// `accept` should only take ASCII characters, so the length is the same in
 /// bytes and characters.
-pub(crate) fn read_joined(
+pub(crate) fn remove(
     rest: &str,
     accept: impl Fn(char) -> bool,
 ) -> (String, usize) {
-    let mut joined = String::new();
-    let mut length = 0;
+    let mut kept = String::new();
+    let mut total = 0;
     loop {
-        let gap = if joined.is_empty() {
+        let gap = if kept.is_empty() {
             0
         } else {
-            measure(&rest[length..])
+            length(&rest[total..])
         };
-        match rest[length + gap..].chars().next() {
+        match rest[total + gap..].chars().next() {
             Some(c) if accept(c) => {
-                joined.push(c);
-                length += gap + c.len_utf8();
+                kept.push(c);
+                total += gap + c.len_utf8();
             }
-            _ => return (joined, length),
+            _ => return (kept, total),
         }
     }
 }
 
 /// Returns how long the new line at the start of `rest` is, or 0 if there is
 /// none.
-fn measure_new_line(rest: &str) -> usize {
+fn new_line_length(rest: &str) -> usize {
     let before = carriage_returns(rest);
     match rest[before..].strip_prefix('\n') {
         Some(after) => before + 1 + carriage_returns(after),
@@ -79,11 +79,11 @@ mod tests {
     use super::*;
 
     fn read_letters(rest: &str) -> (String, usize) {
-        read_joined(rest, |c| c.is_ascii_alphabetic())
+        remove(rest, |c| c.is_ascii_alphabetic())
     }
 
     #[test]
-    fn joins_characters_across_gaps() {
+    fn removes_gaps_between_characters() {
         assert_eq!(read_letters("ab c\n\td"), ("abcd".to_owned(), 7));
     }
 
@@ -100,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn does_not_join_across_a_lone_carriage_return() {
+    fn keeps_a_lone_carriage_return_as_a_stop() {
         assert_eq!(read_letters("a\rb"), ("a".to_owned(), 1));
     }
 
@@ -114,13 +114,13 @@ mod tests {
     #[test]
     fn reads_each_separator() {
         for text in [" ", "\t", "\x0B", "\x0C", "\n"] {
-            assert_eq!(measure(text), 1, "{text:?}");
+            assert_eq!(length(text), 1, "{text:?}");
         }
     }
 
     #[test]
     fn reads_a_run_of_separators() {
-        assert_eq!(measure("  \t\n\x0B\x0C x"), 7);
+        assert_eq!(length("  \t\n\x0B\x0C x"), 7);
     }
 
     #[test]
@@ -128,38 +128,38 @@ mod tests {
         for text in
             ["\r\n", "\n\r", "\r\r\n", "\n\r\r", "\r\n\r", "\r\r\n\r\r"]
         {
-            assert_eq!(measure(text), text.len(), "{text:?}");
+            assert_eq!(length(text), text.len(), "{text:?}");
         }
     }
 
     #[test]
     fn reads_consecutive_new_lines() {
-        assert_eq!(measure("\r\n\r\n\n"), 5);
+        assert_eq!(length("\r\n\r\n\n"), 5);
     }
 
     #[test]
     fn rejects_carriage_returns_without_a_line_feed() {
         for text in ["\r", "\r\r", "\rx", "\r\r x", "\r \n"] {
-            assert_eq!(measure(text), 0, "{text:?}");
+            assert_eq!(length(text), 0, "{text:?}");
         }
     }
 
     #[test]
     fn stops_before_carriage_returns_without_a_line_feed() {
-        assert_eq!(measure(" \rx"), 1);
-        assert_eq!(measure("\n \r"), 2);
+        assert_eq!(length(" \rx"), 1);
+        assert_eq!(length("\n \r"), 2);
     }
 
     #[test]
     fn stops_at_the_first_character_that_is_not_a_gap() {
-        assert_eq!(measure("  a  "), 2);
-        assert_eq!(measure("\n(* *)"), 1);
+        assert_eq!(length("  a  "), 2);
+        assert_eq!(length("\n(* *)"), 1);
     }
 
     #[test]
     fn reads_nothing_without_a_gap() {
         for text in ["", "a", "(", "'"] {
-            assert_eq!(measure(text), 0, "{text:?}");
+            assert_eq!(length(text), 0, "{text:?}");
         }
     }
 
@@ -173,7 +173,7 @@ mod tests {
             "\u{0085}", // next line
             "\u{2028}", // line separator
         ] {
-            assert_eq!(measure(text), 0, "{text:?}");
+            assert_eq!(length(text), 0, "{text:?}");
         }
     }
 }

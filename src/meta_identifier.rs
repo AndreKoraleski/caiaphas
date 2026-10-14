@@ -4,7 +4,7 @@
 
 use std::{error::Error, fmt};
 
-use crate::{gaps, terminal_character::TerminalCharacter};
+use crate::{gap_separator, terminal_character::TerminalCharacter};
 
 /// A meta identifier, which names a rule.
 ///
@@ -28,7 +28,7 @@ impl MetaIdentifier {
             return Err(ParseMetaIdentifierError);
         }
         let (name, length) =
-            gaps::read_joined(rest, is_meta_identifier_character);
+            gap_separator::remove(rest, is_meta_identifier_character);
         Ok((Self(name), length))
     }
 

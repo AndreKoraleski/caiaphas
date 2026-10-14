@@ -10,7 +10,7 @@
 use std::{error::Error, fmt, ops::RangeInclusive};
 
 use crate::{
-    gaps,
+    gap_separator,
     terminal_character::{Symbol, TerminalCharacter},
 };
 
@@ -38,7 +38,7 @@ impl SpecialSequence {
         let mut content = String::new();
         let mut length = 1;
         loop {
-            length += gaps::measure(&rest[length..]);
+            length += gap_separator::length(&rest[length..]);
             let mut chars = rest[length..].chars();
             let first = chars
                 .next()

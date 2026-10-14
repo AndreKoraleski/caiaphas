@@ -4,7 +4,7 @@
 
 use std::{error::Error, fmt};
 
-use crate::{gaps, terminal_character::TerminalCharacter};
+use crate::{gap_separator, terminal_character::TerminalCharacter};
 
 /// An integer, which counts the repetitions of a syntactic factor.
 ///
@@ -24,7 +24,7 @@ impl Integer {
     pub(crate) fn read(
         rest: &str,
     ) -> Result<(Self, usize), ParseIntegerError> {
-        let (digits, length) = gaps::read_joined(rest, is_decimal_digit);
+        let (digits, length) = gap_separator::remove(rest, is_decimal_digit);
         if digits.is_empty() {
             return Err(ParseIntegerError::NoDigit);
         }
