@@ -9,6 +9,14 @@
 //! assert_eq!(add(2, 2), 4);
 //! ```
 
+#![cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "nothing outside the crate calls the parser yet"
+    )
+)]
+
 /// Adds two numbers together.
 ///
 /// # Examples
@@ -23,6 +31,7 @@ pub fn add(left: u64, right: u64) -> u64 {
 }
 
 mod lexer;
+mod parser;
 mod span;
 
 #[cfg(test)]

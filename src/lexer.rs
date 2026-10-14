@@ -11,8 +11,13 @@ mod token;
 use std::{error::Error, fmt};
 
 use bracketed_textual_comment::ParseBracketedTextualCommentError;
-use commentless_symbol::{CommentlessSymbol, ParseCommentlessSymbolError};
-use token::Token;
+pub(crate) use commentless_symbol::ParseCommentlessSymbolError;
+pub(crate) use commentless_symbol::{
+    CommentlessSymbol, Integer, MetaIdentifier, SpecialSequence,
+    TerminalString,
+};
+pub(crate) use terminal_character::Symbol;
+pub(crate) use token::Token;
 
 use crate::span::Span;
 
@@ -178,21 +183,34 @@ pub(crate) enum LexErrorKind {
     BracketedTextualComment(ParseBracketedTextualCommentError),
 }
 
+impl LexErrorKind {
+    /// Returns the error that caused this one, if any.
+    pub(crate) fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::CommentlessSymbol(error) => error.source(),
+            Self::BracketedTextualComment(error) => error.source(),
+        }
+    }
+}
+
+impl fmt::Display for LexErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CommentlessSymbol(error) => error.fmt(f),
+            Self::BracketedTextualComment(error) => error.fmt(f),
+        }
+    }
+}
+
 impl fmt::Display for LexError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.kind {
-            LexErrorKind::CommentlessSymbol(error) => error.fmt(f),
-            LexErrorKind::BracketedTextualComment(error) => error.fmt(f),
-        }
+        self.kind.fmt(f)
     }
 }
 
 impl Error for LexError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match &self.kind {
-            LexErrorKind::CommentlessSymbol(error) => error.source(),
-            LexErrorKind::BracketedTextualComment(error) => error.source(),
-        }
+        self.kind.source()
     }
 }
 

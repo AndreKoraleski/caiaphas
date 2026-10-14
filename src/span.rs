@@ -13,3 +13,13 @@ pub(crate) struct Span {
     pub(crate) start: usize,
     pub(crate) end: usize,
 }
+
+impl Span {
+    /// Returns the span from the start of this one to the end of `other`.
+    pub(crate) fn to(self, other: Self) -> Self {
+        Self {
+            start: self.start,
+            end: other.end,
+        }
+    }
+}

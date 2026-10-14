@@ -7,10 +7,13 @@ pub(crate) mod terminal_string;
 
 use std::{error::Error, fmt};
 
-use integer::{Integer, ParseIntegerError};
-use meta_identifier::MetaIdentifier;
-use special_sequence::{ParseSpecialSequenceError, SpecialSequence};
-use terminal_string::{ParseTerminalStringError, TerminalString};
+pub(crate) use integer::Integer;
+use integer::ParseIntegerError;
+pub(crate) use meta_identifier::MetaIdentifier;
+use special_sequence::ParseSpecialSequenceError;
+pub(crate) use special_sequence::SpecialSequence;
+use terminal_string::ParseTerminalStringError;
+pub(crate) use terminal_string::TerminalString;
 
 use crate::lexer::terminal_character::{Symbol, TerminalCharacter};
 
