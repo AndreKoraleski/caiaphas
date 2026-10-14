@@ -53,7 +53,7 @@ impl CommentlessSymbol {
                 );
                 (Self::MetaIdentifier(identifier), length)
             }
-            TerminalCharacter::Digit(_) => {
+            TerminalCharacter::DecimalDigit(_) => {
                 let (integer, length) = Integer::read(rest)
                     .map_err(ParseCommentlessSymbolError::Integer)?;
                 (Self::Integer(integer), length)
@@ -73,7 +73,7 @@ impl CommentlessSymbol {
             TerminalCharacter::Symbol(
                 Symbol::StartComment | Symbol::EndComment,
             )
-            | TerminalCharacter::Other(_) => {
+            | TerminalCharacter::OtherCharacter(_) => {
                 return Err(ParseCommentlessSymbolError::NotCommentless(
                     first,
                 ));

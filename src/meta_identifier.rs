@@ -51,7 +51,7 @@ fn is_meta_identifier_character(c: char) -> bool {
     matches!(
         TerminalCharacter::read(c, None),
         Ok((
-            TerminalCharacter::Letter(_) | TerminalCharacter::Digit(_),
+            TerminalCharacter::Letter(_) | TerminalCharacter::DecimalDigit(_),
             _
         ))
     )

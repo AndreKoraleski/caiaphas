@@ -21,9 +21,9 @@ pub(crate) use symbol::Symbol;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TerminalCharacter {
     Letter(Letter),
-    Digit(DecimalDigit),
+    DecimalDigit(DecimalDigit),
     Symbol(Symbol),
-    Other(OtherCharacter),
+    OtherCharacter(OtherCharacter),
 }
 
 impl TerminalCharacter {
@@ -46,7 +46,7 @@ impl TerminalCharacter {
             '0'..='9' => {
                 let digit =
                     DecimalDigit::try_from(first).map_err(|_| error)?;
-                (Self::Digit(digit), 1)
+                (Self::DecimalDigit(digit), 1)
             }
             // `:` alone is an other character, but `:)` is a symbol, so the
             // longer symbol is tried first.
@@ -55,7 +55,7 @@ impl TerminalCharacter {
                 Err(_) => {
                     let other =
                         OtherCharacter::try_from(first).map_err(|_| error)?;
-                    (Self::Other(other), 1)
+                    (Self::OtherCharacter(other), 1)
                 }
             },
         })
@@ -111,7 +111,9 @@ mod tests {
         assert_eq!(
             TerminalCharacter::read('7', Some(')')),
             Ok((
-                TerminalCharacter::Digit(DecimalDigit::try_from('7').unwrap()),
+                TerminalCharacter::DecimalDigit(
+                    DecimalDigit::try_from('7').unwrap()
+                ),
                 1
             ))
         );
@@ -138,7 +140,10 @@ mod tests {
         for second in [None, Some(' '), Some(':'), Some('a')] {
             assert_eq!(
                 TerminalCharacter::read(':', second),
-                Ok((TerminalCharacter::Other(OtherCharacter::Colon), 1)),
+                Ok((
+                    TerminalCharacter::OtherCharacter(OtherCharacter::Colon),
+                    1
+                )),
                 "{second:?}"
             );
         }
@@ -148,11 +153,11 @@ mod tests {
     fn reads_other_characters() {
         assert_eq!(
             TerminalCharacter::read(' ', None),
-            Ok((TerminalCharacter::Other(OtherCharacter::Space), 1))
+            Ok((TerminalCharacter::OtherCharacter(OtherCharacter::Space), 1))
         );
         assert_eq!(
             TerminalCharacter::read('~', None),
-            Ok((TerminalCharacter::Other(OtherCharacter::Tilde), 1))
+            Ok((TerminalCharacter::OtherCharacter(OtherCharacter::Tilde), 1))
         );
     }
 

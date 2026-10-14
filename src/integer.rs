@@ -41,7 +41,7 @@ impl Integer {
 fn is_decimal_digit(c: char) -> bool {
     matches!(
         TerminalCharacter::read(c, None),
-        Ok((TerminalCharacter::Digit(_), _))
+        Ok((TerminalCharacter::DecimalDigit(_), _))
     )
 }
 
