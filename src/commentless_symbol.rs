@@ -29,9 +29,8 @@ impl CommentlessSymbol {
     /// Returns the commentless symbol at the start of `input`, and how long it
     /// is.
     ///
-    /// `input` should not start with a gap. A gap after the commentless symbol
-    /// is not part of it, but gaps inside a meta identifier, an integer or a
-    /// special sequence are.
+    /// `input` should not start with a gap. Gaps inside a meta identifier, an
+    /// integer or a special sequence are part of its length.
     ///
     /// Every commentless symbol is ASCII, so the length is the same in bytes
     /// and characters.
@@ -85,8 +84,7 @@ impl CommentlessSymbol {
     }
 }
 
-/// Error returned when text does not start with a valid
-/// [`CommentlessSymbol`].
+/// Error returned when text does not start with a valid [`CommentlessSymbol`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ParseCommentlessSymbolError {
     /// The text is empty.

@@ -9,18 +9,14 @@ use crate::{gap_separator, terminal_character::TerminalCharacter};
 /// A meta identifier, which names a rule.
 ///
 /// It is a letter followed by any number of letters and digits. Gaps may come
-/// between those characters but are not part of the name, so `syntax rule`
-/// and `syntaxrule` are the same meta identifier.
+/// between those characters but are not part of the name, so `syntax rule` and
+/// `syntaxrule` are the same meta identifier.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct MetaIdentifier(String);
 
 impl MetaIdentifier {
     /// Returns the meta identifier at the start of `input`, and how long it
     /// is, gaps between its characters included.
-    ///
-    /// A gap after the last character is not part of it. Every meta
-    /// identifier character is ASCII, so the length is the same in bytes and
-    /// characters.
     pub(crate) fn read(
         input: &str,
     ) -> Result<(Self, usize), ParseMetaIdentifierError> {

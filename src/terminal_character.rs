@@ -31,8 +31,7 @@ impl TerminalCharacter {
     /// characters it takes, 1 or 2.
     ///
     /// `second` is the character after `first`, if any. Only a symbol can take
-    /// it, so `:)` is an end repeat symbol, but `:` before anything else is an
-    /// other character.
+    /// it.
     pub(crate) fn read(
         first: char,
         second: Option<char>,

@@ -16,11 +16,6 @@ pub(crate) struct Integer(u32);
 impl Integer {
     /// Returns the integer at the start of `input`, and how long it is, gaps
     /// between its digits included.
-    ///
-    /// A gap after the last digit is not part of it.
-    ///
-    /// Every decimal digit is ASCII, so the length is the same in bytes and
-    /// characters.
     pub(crate) fn read(
         input: &str,
     ) -> Result<(Self, usize), ParseIntegerError> {
@@ -32,7 +27,6 @@ impl Integer {
         Ok((Self(value), length))
     }
 
-    /// Returns the value.
     pub(crate) fn get(self) -> u32 {
         self.0
     }

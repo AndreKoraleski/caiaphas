@@ -4,14 +4,9 @@
 
 /// Returns how long the gap at the start of `input` is, or 0 if there is none.
 ///
-/// `input` is the source from the current position onward.
-///
 /// A gap is any number of spaces, horizontal or vertical tabs, form feeds and
 /// new lines. A new line is a line feed with any number of carriage returns on
 /// either side, so a carriage return without a line feed is not a gap.
-///
-/// Every gap separator is ASCII, so the length is the same in bytes and
-/// characters.
 pub(crate) fn length(input: &str) -> usize {
     let mut total = 0;
     loop {
@@ -28,16 +23,12 @@ pub(crate) fn length(input: &str) -> usize {
     }
 }
 
-/// Returns the characters at the start of `input` that `accept` takes,
-/// with the gaps between them removed, and how long they are, those gaps
-/// included.
+/// Returns the characters at the start of `input` that `accept` takes, with
+/// the gaps between them removed, and how long they are, those gaps included.
 ///
 /// A gap is only taken when an accepted character follows it, so a gap after
 /// the last one is left for the caller. Returns an empty string and 0 if the
 /// first character is not accepted.
-///
-/// `accept` should only take ASCII characters, so the length is the same in
-/// bytes and characters.
 pub(crate) fn remove(
     input: &str,
     accept: impl Fn(char) -> bool,

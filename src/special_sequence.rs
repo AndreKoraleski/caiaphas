@@ -26,9 +26,6 @@ impl SpecialSequence {
     ///
     /// Gaps between the `?` are removed before the code points are read, so
     /// `? U+0041 .. U+005A ?` is the same as `?U+0041..U+005A?`.
-    ///
-    /// Every special sequence character is ASCII, so the length is the same in
-    /// bytes and characters.
     pub(crate) fn read(
         input: &str,
     ) -> Result<(Self, usize), ParseSpecialSequenceError> {

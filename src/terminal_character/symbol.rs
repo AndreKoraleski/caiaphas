@@ -49,7 +49,7 @@ impl Symbol {
     ///
     /// `second` is the character after `first`, if any. A symbol takes it only
     /// when the two form a longer symbol, so `(*` is a start comment, but
-    /// `( *`, with a gap between, is a start group.
+    /// `( *` is a start group.
     pub(crate) fn read(
         first: char,
         second: Option<char>,

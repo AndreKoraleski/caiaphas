@@ -19,9 +19,6 @@ pub(crate) struct TerminalString(String);
 impl TerminalString {
     /// Returns the terminal string at the start of `input`, and how long it
     /// is, quotes included.
-    ///
-    /// Every terminal character is ASCII, so the length is the same in bytes
-    /// and characters.
     pub(crate) fn read(
         input: &str,
     ) -> Result<(Self, usize), ParseTerminalStringError> {
