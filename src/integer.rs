@@ -26,7 +26,7 @@ impl Integer {
     ) -> Result<(Self, usize), ParseIntegerError> {
         let (digits, length) = gap_separator::remove(rest, is_decimal_digit);
         if digits.is_empty() {
-            return Err(ParseIntegerError::NoDigit);
+            return Err(ParseIntegerError::NoDecimalDigit);
         }
         let value = digits.parse().map_err(|_| ParseIntegerError::TooLarge)?;
         Ok((Self(value), length))
@@ -49,7 +49,7 @@ fn is_decimal_digit(c: char) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ParseIntegerError {
     /// The text does not start with a decimal digit.
-    NoDigit,
+    NoDecimalDigit,
     /// The digits are more than a `u32` can hold.
     TooLarge,
 }
@@ -57,7 +57,9 @@ pub(crate) enum ParseIntegerError {
 impl fmt::Display for ParseIntegerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::NoDigit => "EBNF integer does not start with a digit",
+            Self::NoDecimalDigit => {
+                "EBNF integer does not start with a decimal digit"
+            }
             Self::TooLarge => "EBNF integer is too large to fit in a u32",
         })
     }
@@ -124,7 +126,7 @@ mod tests {
         for rest in ["", "a1", " 1", "-1", "+1", "٣"] {
             assert_eq!(
                 read(rest),
-                Err(ParseIntegerError::NoDigit),
+                Err(ParseIntegerError::NoDecimalDigit),
                 "{rest:?}"
             );
         }
@@ -133,8 +135,8 @@ mod tests {
     #[test]
     fn error_displays_message() {
         assert_eq!(
-            ParseIntegerError::NoDigit.to_string(),
-            "EBNF integer does not start with a digit"
+            ParseIntegerError::NoDecimalDigit.to_string(),
+            "EBNF integer does not start with a decimal digit"
         );
         assert_eq!(
             ParseIntegerError::TooLarge.to_string(),
