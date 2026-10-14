@@ -2,15 +2,19 @@
 
 #![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
 
+mod integer;
+mod meta_identifier;
+mod special_sequence;
+mod terminal_string;
+
 use std::{error::Error, fmt};
 
-use crate::{
-    integer::{Integer, ParseIntegerError},
-    meta_identifier::MetaIdentifier,
-    special_sequence::{ParseSpecialSequenceError, SpecialSequence},
-    terminal_character::{Symbol, TerminalCharacter},
-    terminal_string::{ParseTerminalStringError, TerminalString},
-};
+use integer::{Integer, ParseIntegerError};
+use meta_identifier::MetaIdentifier;
+use special_sequence::{ParseSpecialSequenceError, SpecialSequence};
+use terminal_string::{ParseTerminalStringError, TerminalString};
+
+use crate::terminal_character::{Symbol, TerminalCharacter};
 
 /// A commentless symbol is what's left of a grammar once its gaps and comments
 /// are removed.
