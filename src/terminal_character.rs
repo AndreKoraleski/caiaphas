@@ -60,9 +60,9 @@ impl TerminalCharacter {
         })
     }
 
-    /// Returns whether this is a first terminal character, one that may appear 
-    /// in a terminal string between two `'`. 
-    /// 
+    /// Returns whether this is a first terminal character, one that may appear
+    /// in a terminal string between two `'`.
+    ///
     /// That list is any terminal character but the first quote symbol.
     pub(crate) fn is_first_terminal_character(self) -> bool {
         self != Self::Symbol(Symbol::FirstQuote)
@@ -70,7 +70,7 @@ impl TerminalCharacter {
 
     /// Returns whether this is a second terminal character, one that may
     /// appear in a terminal string between two `"`.
-    /// 
+    ///
     /// That list is any terminal character but the second quote symbol.
     pub(crate) fn is_second_terminal_character(self) -> bool {
         self != Self::Symbol(Symbol::SecondQuote)

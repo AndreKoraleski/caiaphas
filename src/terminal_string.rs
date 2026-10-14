@@ -9,15 +9,15 @@ use crate::terminal_character::TerminalCharacter;
 /// A terminal string, which stands for its characters exactly as written.
 ///
 /// It is written between two `'` or two `"`, and holds at least one terminal
-/// character. 
-/// 
-/// The quotes are not part of it, so `'a'` and `"a"` are the same terminal 
+/// character.
+///
+/// The quotes are not part of it, so `'a'` and `"a"` are the same terminal
 /// string.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct TerminalString(String);
 
 impl TerminalString {
-    /// Returns the terminal string at the start of `rest`, and how long it is, 
+    /// Returns the terminal string at the start of `rest`, and how long it is,
     /// quotes included.
     ///
     /// Every terminal character is ASCII, so the length is the same in bytes
