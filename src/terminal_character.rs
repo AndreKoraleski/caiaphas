@@ -2,14 +2,14 @@
 
 #![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
 
-mod digit;
+mod decimal_digit;
 mod letter;
 mod other_character;
 mod symbol;
 
 use std::{error::Error, fmt};
 
-use digit::Digit;
+use decimal_digit::DecimalDigit;
 use letter::Letter;
 use other_character::OtherCharacter;
 pub(crate) use symbol::Symbol;
@@ -21,7 +21,7 @@ pub(crate) use symbol::Symbol;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TerminalCharacter {
     Letter(Letter),
-    Digit(Digit),
+    Digit(DecimalDigit),
     Symbol(Symbol),
     Other(OtherCharacter),
 }
@@ -44,7 +44,8 @@ impl TerminalCharacter {
                 (Self::Letter(letter), 1)
             }
             '0'..='9' => {
-                let digit = Digit::try_from(first).map_err(|_| error)?;
+                let digit =
+                    DecimalDigit::try_from(first).map_err(|_| error)?;
                 (Self::Digit(digit), 1)
             }
             // `:` alone is an other character, but `:)` is a symbol, so the
@@ -109,7 +110,10 @@ mod tests {
     fn reads_digits() {
         assert_eq!(
             TerminalCharacter::read('7', Some(')')),
-            Ok((TerminalCharacter::Digit(Digit::try_from('7').unwrap()), 1))
+            Ok((
+                TerminalCharacter::Digit(DecimalDigit::try_from('7').unwrap()),
+                1
+            ))
         );
     }
 
