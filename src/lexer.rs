@@ -1,6 +1,4 @@
-//! The lexer, the mechanism to turn the grammar source into tokens.
-
-#![cfg_attr(not(test), expect(dead_code, reason = "no parser exists to read"))]
+//! The lexer turns the source of a grammar into tokens.
 
 mod bracketed_textual_comment;
 mod commentless_symbol;

@@ -102,7 +102,7 @@ pub(crate) enum ParseCommentlessSymbolError {
     /// The text starts with a terminal character that only belongs in a
     /// comment or a terminal string, such as an other character or `(*`.
     NotCommentless(char),
-    /// The text starts with `*)`, which only ends a comment.
+    /// The text starts with `*)` while no comment is open.
     UnmatchedEndCommentSymbol,
     /// The text starts with a decimal digit, but not a valid integer.
     Integer(ParseIntegerError),

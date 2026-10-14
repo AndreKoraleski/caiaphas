@@ -1,7 +1,5 @@
 //! The span of something in the source grammar.
 
-#![cfg_attr(not(test), expect(dead_code, reason = "no parser exists to read"))]
-
 /// Where something is in the source, as byte offsets from its start.
 ///
 /// `start` is the first byte, and `end` the byte after the last one, so an
