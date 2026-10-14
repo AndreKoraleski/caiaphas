@@ -24,6 +24,7 @@ pub fn add(left: u64, right: u64) -> u64 {
 
 mod commentless_symbol;
 mod gap_separator;
+mod span;
 mod terminal_character;
 
 #[cfg(test)]
