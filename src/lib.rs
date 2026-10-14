@@ -24,6 +24,7 @@ pub fn add(left: u64, right: u64) -> u64 {
 
 mod gaps;
 mod terminal_character;
+mod terminal_string;
 
 #[cfg(test)]
 mod tests {
