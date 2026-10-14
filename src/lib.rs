@@ -22,10 +22,7 @@ pub fn add(left: u64, right: u64) -> u64 {
     left + right
 }
 
-mod digit;
-mod letter;
-mod other_character;
-mod symbol;
+mod terminal_character;
 
 #[cfg(test)]
 mod tests {
