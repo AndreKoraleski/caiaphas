@@ -12,7 +12,7 @@ use std::{error::Error, fmt};
 use digit::Digit;
 use letter::Letter;
 use other_character::OtherCharacter;
-use symbol::Symbol;
+pub(crate) use symbol::Symbol;
 
 /// A letter, a decimal digit, a symbol or an other character.
 ///

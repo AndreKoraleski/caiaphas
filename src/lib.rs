@@ -25,6 +25,7 @@ pub fn add(left: u64, right: u64) -> u64 {
 mod gaps;
 mod integer;
 mod meta_identifier;
+mod special_sequence;
 mod terminal_character;
 mod terminal_string;
 
