@@ -5,8 +5,6 @@
 //!
 //! Here it holds one code point, such as `? U+00E9 ?`, or an inclusive range
 //! of them, such as `? U+0041..U+005A ?`.
-#![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
-
 use std::{error::Error, fmt, ops::RangeInclusive};
 
 use crate::{
