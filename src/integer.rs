@@ -1,0 +1,150 @@
+//! Integers of ISO/IEC 14977 EBNF.
+
+#![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
+
+use std::{error::Error, fmt};
+
+use crate::{gaps, terminal_character::TerminalCharacter};
+
+/// An integer, which counts the repetitions of a syntactic factor.
+///
+/// It is one or more decimal digits. Gaps may come between them but are not
+/// part of the number, so `1 2` is 12.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct Integer(u32);
+
+impl Integer {
+    /// Returns the integer at the start of `rest`, and how long it is, gaps
+    /// between its digits included.
+    ///
+    /// A gap after the last digit is not part of it.
+    ///
+    /// Every decimal digit is ASCII, so the length is the same in bytes and
+    /// characters.
+    pub(crate) fn read(
+        rest: &str,
+    ) -> Result<(Self, usize), ParseIntegerError> {
+        let (digits, length) = gaps::read_joined(rest, is_decimal_digit);
+        if digits.is_empty() {
+            return Err(ParseIntegerError::NoDigit);
+        }
+        let value = digits.parse().map_err(|_| ParseIntegerError::TooLarge)?;
+        Ok((Self(value), length))
+    }
+
+    /// Returns the value.
+    pub(crate) fn get(self) -> u32 {
+        self.0
+    }
+}
+
+fn is_decimal_digit(c: char) -> bool {
+    matches!(
+        TerminalCharacter::read(c, None),
+        Ok((TerminalCharacter::Digit(_), _))
+    )
+}
+
+/// Error returned when text does not start with a valid [`Integer`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ParseIntegerError {
+    /// The text does not start with a decimal digit.
+    NoDigit,
+    /// The digits are more than a `u32` can hold.
+    TooLarge,
+}
+
+impl fmt::Display for ParseIntegerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::NoDigit => "EBNF integer does not start with a digit",
+            Self::TooLarge => "EBNF integer is too large to fit in a u32",
+        })
+    }
+}
+
+impl Error for ParseIntegerError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn read(rest: &str) -> Result<(u32, usize), ParseIntegerError> {
+        Integer::read(rest).map(|(integer, length)| (integer.get(), length))
+    }
+
+    #[test]
+    fn reads_digits() {
+        assert_eq!(read("0"), Ok((0, 1)));
+        assert_eq!(read("42"), Ok((42, 2)));
+    }
+
+    #[test]
+    fn ignores_leading_zeros() {
+        assert_eq!(read("007"), Ok((7, 3)));
+    }
+
+    #[test]
+    fn removes_gaps_between_digits() {
+        assert_eq!(read("1 2"), Ok((12, 3)));
+        assert_eq!(read("1\n\t2 3"), Ok((123, 6)));
+    }
+
+    #[test]
+    fn leaves_a_gap_after_the_last_digit() {
+        assert_eq!(read("3 * 'a'"), Ok((3, 1)));
+        assert_eq!(read("3*"), Ok((3, 1)));
+    }
+
+    #[test]
+    fn stops_at_a_character_that_is_not_a_digit() {
+        for rest in ["1a", "1.5", "1,2", "1_000", "1٣"] {
+            assert_eq!(read(rest), Ok((1, 1)), "{rest:?}");
+        }
+    }
+
+    #[test]
+    fn reads_the_largest_u32() {
+        assert_eq!(read("4294967295"), Ok((u32::MAX, 10)));
+    }
+
+    #[test]
+    fn rejects_integers_too_large_for_a_u32() {
+        for rest in ["4294967296", "4294 967 296", "99999999999999999999"] {
+            assert_eq!(
+                read(rest),
+                Err(ParseIntegerError::TooLarge),
+                "{rest:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_text_that_does_not_start_with_a_digit() {
+        for rest in ["", "a1", " 1", "-1", "+1", "٣"] {
+            assert_eq!(
+                read(rest),
+                Err(ParseIntegerError::NoDigit),
+                "{rest:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn error_displays_message() {
+        assert_eq!(
+            ParseIntegerError::NoDigit.to_string(),
+            "EBNF integer does not start with a digit"
+        );
+        assert_eq!(
+            ParseIntegerError::TooLarge.to_string(),
+            "EBNF integer is too large to fit in a u32"
+        );
+    }
+
+    #[test]
+    fn error_implements_error_trait() {
+        let error: &dyn Error = &ParseIntegerError::TooLarge;
+        assert!(error.source().is_none());
+    }
+}

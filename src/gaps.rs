@@ -28,6 +28,37 @@ pub(crate) fn measure(rest: &str) -> usize {
     }
 }
 
+/// Returns the characters at the start of `rest` that `accept` takes, with the
+/// gaps between them removed, and how long they are, those gaps included.
+///
+/// A gap is only taken when an accepted character follows it, so a gap after
+/// the last one is left for the caller. Returns an empty string and 0 if the
+/// first character is not accepted.
+///
+/// `accept` should only take ASCII characters, so the length is the same in
+/// bytes and characters.
+pub(crate) fn read_joined(
+    rest: &str,
+    accept: impl Fn(char) -> bool,
+) -> (String, usize) {
+    let mut joined = String::new();
+    let mut length = 0;
+    loop {
+        let gap = if joined.is_empty() {
+            0
+        } else {
+            measure(&rest[length..])
+        };
+        match rest[length + gap..].chars().next() {
+            Some(c) if accept(c) => {
+                joined.push(c);
+                length += gap + c.len_utf8();
+            }
+            _ => return (joined, length),
+        }
+    }
+}
+
 /// Returns how long the new line at the start of `rest` is, or 0 if there is
 /// none.
 fn measure_new_line(rest: &str) -> usize {
@@ -46,6 +77,39 @@ fn carriage_returns(rest: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn read_letters(rest: &str) -> (String, usize) {
+        read_joined(rest, |c| c.is_ascii_alphabetic())
+    }
+
+    #[test]
+    fn joins_characters_across_gaps() {
+        assert_eq!(read_letters("ab c\n\td"), ("abcd".to_owned(), 7));
+    }
+
+    #[test]
+    fn leaves_a_gap_after_the_last_character() {
+        assert_eq!(read_letters("ab  = c"), ("ab".to_owned(), 2));
+        assert_eq!(read_letters("ab \n"), ("ab".to_owned(), 2));
+    }
+
+    #[test]
+    fn stops_at_a_character_that_is_not_accepted() {
+        assert_eq!(read_letters("ab1c"), ("ab".to_owned(), 2));
+        assert_eq!(read_letters("a (* b *)"), ("a".to_owned(), 1));
+    }
+
+    #[test]
+    fn does_not_join_across_a_lone_carriage_return() {
+        assert_eq!(read_letters("a\rb"), ("a".to_owned(), 1));
+    }
+
+    #[test]
+    fn reads_nothing_when_the_first_character_is_not_accepted() {
+        for rest in ["", "1a", " a", "\na"] {
+            assert_eq!(read_letters(rest), (String::new(), 0), "{rest:?}");
+        }
+    }
 
     #[test]
     fn reads_each_separator() {
