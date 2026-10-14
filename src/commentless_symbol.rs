@@ -1,0 +1,396 @@
+//! Commentless symbols of ISO/IEC 14977 EBNF.
+
+#![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
+
+use std::{error::Error, fmt};
+
+use crate::{
+    integer::{Integer, ParseIntegerError},
+    meta_identifier::MetaIdentifier,
+    special_sequence::{ParseSpecialSequenceError, SpecialSequence},
+    terminal_character::{Symbol, TerminalCharacter},
+    terminal_string::{ParseTerminalStringError, TerminalString},
+};
+
+/// A commentless symbol is what's left of a grammar once its gaps and comments
+/// are removed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum CommentlessSymbol {
+    /// Any symbol but a quote, a comment or a special sequence symbol, since
+    /// those start or end another commentless symbol or a comment.
+    Symbol(Symbol),
+    MetaIdentifier(MetaIdentifier),
+    Integer(Integer),
+    TerminalString(TerminalString),
+    SpecialSequence(SpecialSequence),
+}
+
+impl CommentlessSymbol {
+    /// Returns the commentless symbol at the start of `rest`, and how long it
+    /// is.
+    ///
+    /// `rest` should not start with a gap. A gap after the commentless symbol
+    /// is not part of it, but gaps inside a meta identifier, an integer or a
+    /// special sequence are.
+    ///
+    /// Every commentless symbol is ASCII, so the length is the same in bytes
+    /// and characters.
+    pub(crate) fn read(
+        rest: &str,
+    ) -> Result<(Self, usize), ParseCommentlessSymbolError> {
+        let mut chars = rest.chars();
+        let first = chars
+            .next()
+            .ok_or(ParseCommentlessSymbolError::EndOfInput)?;
+        let (character, length) = TerminalCharacter::read(first, chars.next())
+            .map_err(|_| {
+                ParseCommentlessSymbolError::InvalidCharacter(first)
+            })?;
+        Ok(match character {
+            TerminalCharacter::Letter(_) => {
+                let (identifier, length) = MetaIdentifier::read(rest).expect(
+                    "text starting with a letter is a meta identifier",
+                );
+                (Self::MetaIdentifier(identifier), length)
+            }
+            TerminalCharacter::Digit(_) => {
+                let (integer, length) = Integer::read(rest)
+                    .map_err(ParseCommentlessSymbolError::Integer)?;
+                (Self::Integer(integer), length)
+            }
+            TerminalCharacter::Symbol(
+                Symbol::FirstQuote | Symbol::SecondQuote,
+            ) => {
+                let (string, length) = TerminalString::read(rest)
+                    .map_err(ParseCommentlessSymbolError::TerminalString)?;
+                (Self::TerminalString(string), length)
+            }
+            TerminalCharacter::Symbol(Symbol::SpecialSequence) => {
+                let (sequence, length) = SpecialSequence::read(rest)
+                    .map_err(ParseCommentlessSymbolError::SpecialSequence)?;
+                (Self::SpecialSequence(sequence), length)
+            }
+            TerminalCharacter::Symbol(
+                Symbol::StartComment | Symbol::EndComment,
+            )
+            | TerminalCharacter::Other(_) => {
+                return Err(ParseCommentlessSymbolError::NotCommentless(
+                    first,
+                ));
+            }
+            TerminalCharacter::Symbol(symbol) => {
+                (Self::Symbol(symbol), length)
+            }
+        })
+    }
+}
+
+/// Error returned when text does not start with a valid
+/// [`CommentlessSymbol`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ParseCommentlessSymbolError {
+    /// The text is empty.
+    EndOfInput,
+    /// The text starts with a character that is not a terminal character.
+    InvalidCharacter(char),
+    /// The text starts with a terminal character that only belongs in a
+    /// comment or a terminal string, such as an other character or `(*`.
+    NotCommentless(char),
+    /// The text starts with a digit, but not a valid integer.
+    Integer(ParseIntegerError),
+    /// The text starts with a quote, but not a valid terminal string.
+    TerminalString(ParseTerminalStringError),
+    /// The text starts with `?`, but not a valid special sequence.
+    SpecialSequence(ParseSpecialSequenceError),
+}
+
+impl fmt::Display for ParseCommentlessSymbolError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EndOfInput => f.write_str("expected an EBNF symbol"),
+            Self::InvalidCharacter(c) => {
+                write!(f, "{c:?} is not a valid EBNF terminal character")
+            }
+            Self::NotCommentless(c) => {
+                write!(f, "{c:?} does not start an EBNF commentless symbol")
+            }
+            Self::Integer(_) => f.write_str("invalid EBNF integer"),
+            Self::TerminalString(_) => {
+                f.write_str("invalid EBNF terminal string")
+            }
+            Self::SpecialSequence(_) => {
+                f.write_str("invalid EBNF special sequence")
+            }
+        }
+    }
+}
+
+impl Error for ParseCommentlessSymbolError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Integer(error) => Some(error),
+            Self::TerminalString(error) => Some(error),
+            Self::SpecialSequence(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn read(
+        rest: &str,
+    ) -> Result<(CommentlessSymbol, usize), ParseCommentlessSymbolError> {
+        CommentlessSymbol::read(rest)
+    }
+
+    #[test]
+    fn reads_symbols() {
+        let cases = [
+            (",", Symbol::Concatenate, 1),
+            ("=", Symbol::Defining, 1),
+            ("|", Symbol::DefinitionSeparator, 1),
+            ("/", Symbol::DefinitionSeparator, 1),
+            ("!", Symbol::DefinitionSeparator, 1),
+            (")", Symbol::EndGroup, 1),
+            ("]", Symbol::EndOption, 1),
+            ("/)", Symbol::EndOption, 2),
+            ("}", Symbol::EndRepeat, 1),
+            (":)", Symbol::EndRepeat, 2),
+            ("-", Symbol::Except, 1),
+            ("*", Symbol::Repetition, 1),
+            ("(", Symbol::StartGroup, 1),
+            ("[", Symbol::StartOption, 1),
+            ("(/", Symbol::StartOption, 2),
+            ("{", Symbol::StartRepeat, 1),
+            ("(:", Symbol::StartRepeat, 2),
+            (";", Symbol::Terminator, 1),
+            (".", Symbol::Terminator, 1),
+        ];
+        for (rest, symbol, length) in cases {
+            assert_eq!(
+                read(rest),
+                Ok((CommentlessSymbol::Symbol(symbol), length)),
+                "{rest:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn reads_meta_identifiers_with_their_gaps() {
+        let (symbol, length) = read("syntax rule = x").unwrap();
+        assert_eq!(length, 11);
+        assert!(matches!(
+            symbol,
+            CommentlessSymbol::MetaIdentifier(identifier)
+                if identifier.as_str() == "syntaxrule"
+        ));
+    }
+
+    #[test]
+    fn reads_integers_with_their_gaps() {
+        let (symbol, length) = read("1 2 * x").unwrap();
+        assert_eq!(length, 3);
+        assert!(matches!(
+            symbol,
+            CommentlessSymbol::Integer(integer) if integer.get() == 12
+        ));
+    }
+
+    #[test]
+    fn reads_terminal_strings_in_either_quote() {
+        for rest in ["'a b' , c", "\"a b\" , c"] {
+            let (symbol, length) = read(rest).unwrap();
+            assert_eq!(length, 5, "{rest:?}");
+            assert!(
+                matches!(
+                    symbol,
+                    CommentlessSymbol::TerminalString(string)
+                        if string.as_str() == "a b"
+                ),
+                "{rest:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn reads_special_sequences_with_their_gaps() {
+        let (symbol, length) = read("? U+0041 .. U+005A ? | x").unwrap();
+        assert_eq!(length, 20);
+        assert!(matches!(
+            symbol,
+            CommentlessSymbol::SpecialSequence(sequence)
+                if *sequence.range() == ('A'..='Z')
+        ));
+    }
+
+    #[test]
+    fn reads_a_symbol_before_another() {
+        assert_eq!(
+            read("(*)"),
+            Err(ParseCommentlessSymbolError::NotCommentless('('))
+        );
+        assert_eq!(
+            read("( *)"),
+            Ok((CommentlessSymbol::Symbol(Symbol::StartGroup), 1))
+        );
+    }
+
+    #[test]
+    fn rejects_comment_symbols() {
+        for rest in ["(* a *)", "*)"] {
+            let first = rest.chars().next().unwrap();
+            assert_eq!(
+                read(rest),
+                Err(ParseCommentlessSymbolError::NotCommentless(first)),
+                "{rest:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_other_characters() {
+        for c in " :+_%@&#$<>\\^`~".chars() {
+            assert_eq!(
+                read(&c.to_string()),
+                Err(ParseCommentlessSymbolError::NotCommentless(c)),
+                "{c:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_a_colon_not_before_an_end_group() {
+        assert_eq!(
+            read(": )"),
+            Err(ParseCommentlessSymbolError::NotCommentless(':'))
+        );
+    }
+
+    #[test]
+    fn rejects_characters_that_are_not_terminal_characters() {
+        for c in ['\t', '\n', '\r', '\0', 'é', '\u{00A0}'] {
+            assert_eq!(
+                read(&c.to_string()),
+                Err(ParseCommentlessSymbolError::InvalidCharacter(c)),
+                "{c:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_empty_text() {
+        assert_eq!(read(""), Err(ParseCommentlessSymbolError::EndOfInput));
+    }
+
+    #[test]
+    fn passes_on_integer_errors() {
+        assert_eq!(
+            read("4294967296"),
+            Err(ParseCommentlessSymbolError::Integer(
+                ParseIntegerError::TooLarge
+            ))
+        );
+    }
+
+    #[test]
+    fn passes_on_terminal_string_errors() {
+        let cases = [
+            ("''", ParseTerminalStringError::Empty),
+            ("'abc", ParseTerminalStringError::NoClosingQuote),
+            ("'a\tb'", ParseTerminalStringError::InvalidCharacter('\t')),
+        ];
+        for (rest, error) in cases {
+            assert_eq!(
+                read(rest),
+                Err(ParseCommentlessSymbolError::TerminalString(error)),
+                "{rest:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn passes_on_special_sequence_errors() {
+        let cases = [
+            ("?U+0041", ParseSpecialSequenceError::NoClosingSymbol),
+            ("?a?", ParseSpecialSequenceError::Unsupported),
+            (
+                "?U+D800?",
+                ParseSpecialSequenceError::NotAScalarValue(0xD800),
+            ),
+        ];
+        for (rest, error) in cases {
+            assert_eq!(
+                read(rest),
+                Err(ParseCommentlessSymbolError::SpecialSequence(error)),
+                "{rest:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn error_displays_message() {
+        let cases = [
+            (
+                ParseCommentlessSymbolError::EndOfInput,
+                "expected an EBNF symbol",
+            ),
+            (
+                ParseCommentlessSymbolError::InvalidCharacter('é'),
+                "'é' is not a valid EBNF terminal character",
+            ),
+            (
+                ParseCommentlessSymbolError::NotCommentless('@'),
+                "'@' does not start an EBNF commentless symbol",
+            ),
+            (
+                ParseCommentlessSymbolError::Integer(
+                    ParseIntegerError::TooLarge,
+                ),
+                "invalid EBNF integer",
+            ),
+            (
+                ParseCommentlessSymbolError::TerminalString(
+                    ParseTerminalStringError::Empty,
+                ),
+                "invalid EBNF terminal string",
+            ),
+            (
+                ParseCommentlessSymbolError::SpecialSequence(
+                    ParseSpecialSequenceError::Unsupported,
+                ),
+                "invalid EBNF special sequence",
+            ),
+        ];
+        for (error, message) in cases {
+            assert_eq!(error.to_string(), message);
+        }
+    }
+
+    #[test]
+    fn error_gives_the_wrapped_error_as_its_source() {
+        let error =
+            ParseCommentlessSymbolError::Integer(ParseIntegerError::TooLarge);
+        assert_eq!(
+            error.source().map(ToString::to_string),
+            Some(ParseIntegerError::TooLarge.to_string())
+        );
+        let error = ParseCommentlessSymbolError::TerminalString(
+            ParseTerminalStringError::Empty,
+        );
+        assert_eq!(
+            error.source().map(ToString::to_string),
+            Some(ParseTerminalStringError::Empty.to_string())
+        );
+        let error = ParseCommentlessSymbolError::SpecialSequence(
+            ParseSpecialSequenceError::Unsupported,
+        );
+        assert_eq!(
+            error.source().map(ToString::to_string),
+            Some(ParseSpecialSequenceError::Unsupported.to_string())
+        );
+        assert!(ParseCommentlessSymbolError::EndOfInput.source().is_none());
+    }
+}
