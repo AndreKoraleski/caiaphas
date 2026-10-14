@@ -17,22 +17,22 @@ use crate::terminal_character::TerminalCharacter;
 pub(crate) struct TerminalString(String);
 
 impl TerminalString {
-    /// Returns the terminal string at the start of `rest`, and how long it is,
-    /// quotes included.
+    /// Returns the terminal string at the start of `input`, and how long it
+    /// is, quotes included.
     ///
     /// Every terminal character is ASCII, so the length is the same in bytes
     /// and characters.
     pub(crate) fn read(
-        rest: &str,
+        input: &str,
     ) -> Result<(Self, usize), ParseTerminalStringError> {
-        let is_content = match rest.chars().next() {
+        let is_content = match input.chars().next() {
             Some('\'') => TerminalCharacter::is_first_terminal_character,
             Some('"') => TerminalCharacter::is_second_terminal_character,
             _ => return Err(ParseTerminalStringError::NoOpeningQuote),
         };
         let mut length = 1;
         loop {
-            let mut chars = rest[length..].chars();
+            let mut chars = input[length..].chars();
             let first = chars
                 .next()
                 .ok_or(ParseTerminalStringError::NoClosingQuote)?;
@@ -45,7 +45,7 @@ impl TerminalString {
                 if length == 1 {
                     return Err(ParseTerminalStringError::Empty);
                 }
-                return Ok((Self(rest[1..length].to_owned()), length + 1));
+                return Ok((Self(input[1..length].to_owned()), length + 1));
             }
             length += size;
         }
@@ -94,8 +94,8 @@ impl Error for ParseTerminalStringError {}
 mod tests {
     use super::*;
 
-    fn read(rest: &str) -> Result<(String, usize), ParseTerminalStringError> {
-        TerminalString::read(rest)
+    fn read(input: &str) -> Result<(String, usize), ParseTerminalStringError> {
+        TerminalString::read(input)
             .map(|(string, length)| (string.as_str().to_owned(), length))
     }
 
@@ -159,22 +159,22 @@ mod tests {
 
     #[test]
     fn rejects_text_without_an_opening_quote() {
-        for rest in ["", "a'", " 'a'", "?a?"] {
+        for input in ["", "a'", " 'a'", "?a?"] {
             assert_eq!(
-                read(rest),
+                read(input),
                 Err(ParseTerminalStringError::NoOpeningQuote),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }
 
     #[test]
     fn rejects_text_without_a_closing_quote() {
-        for rest in ["'", "'abc", "\"abc'", "'abc\""] {
+        for input in ["'", "'abc", "\"abc'", "'abc\""] {
             assert_eq!(
-                read(rest),
+                read(input),
                 Err(ParseTerminalStringError::NoClosingQuote),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }

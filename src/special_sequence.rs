@@ -21,7 +21,7 @@ use crate::{
 pub(crate) struct SpecialSequence(RangeInclusive<char>);
 
 impl SpecialSequence {
-    /// Returns the special sequence at the start of `rest`, and how long it
+    /// Returns the special sequence at the start of `input`, and how long it
     /// is, `?` included.
     ///
     /// Gaps between the `?` are removed before the code points are read, so
@@ -30,16 +30,16 @@ impl SpecialSequence {
     /// Every special sequence character is ASCII, so the length is the same in
     /// bytes and characters.
     pub(crate) fn read(
-        rest: &str,
+        input: &str,
     ) -> Result<(Self, usize), ParseSpecialSequenceError> {
-        if !rest.starts_with('?') {
+        if !input.starts_with('?') {
             return Err(ParseSpecialSequenceError::NoOpeningSymbol);
         }
         let mut content = String::new();
         let mut length = 1;
         loop {
-            length += gap_separator::length(&rest[length..]);
-            let mut chars = rest[length..].chars();
+            length += gap_separator::length(&input[length..]);
+            let mut chars = input[length..].chars();
             let first = chars
                 .next()
                 .ok_or(ParseSpecialSequenceError::NoClosingSymbol)?;
@@ -53,7 +53,7 @@ impl SpecialSequence {
                 let range = parse_range(&content)?;
                 return Ok((Self(range), length + 1));
             }
-            content.push_str(&rest[length..length + size]);
+            content.push_str(&input[length..length + size]);
             length += size;
         }
     }
@@ -152,9 +152,9 @@ mod tests {
     use super::*;
 
     fn read(
-        rest: &str,
+        input: &str,
     ) -> Result<(RangeInclusive<char>, usize), ParseSpecialSequenceError> {
-        SpecialSequence::read(rest)
+        SpecialSequence::read(input)
             .map(|(sequence, length)| (sequence.range().clone(), length))
     }
 
@@ -203,22 +203,22 @@ mod tests {
 
     #[test]
     fn rejects_text_without_an_opening_symbol() {
-        for rest in ["", "U+0041?", " ?U+0041?", "'a'"] {
+        for input in ["", "U+0041?", " ?U+0041?", "'a'"] {
             assert_eq!(
-                read(rest),
+                read(input),
                 Err(ParseSpecialSequenceError::NoOpeningSymbol),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }
 
     #[test]
     fn rejects_text_without_a_closing_symbol() {
-        for rest in ["?", "?U+0041", "?U+0041 \n"] {
+        for input in ["?", "?U+0041", "?U+0041 \n"] {
             assert_eq!(
-                read(rest),
+                read(input),
                 Err(ParseSpecialSequenceError::NoClosingSymbol),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }
@@ -271,11 +271,11 @@ mod tests {
             ("?U+FFFFFF?", 0xFF_FFFF),
             ("?U+0041..U+D800?", 0xD800),
         ];
-        for (rest, value) in cases {
+        for (input, value) in cases {
             assert_eq!(
-                read(rest),
+                read(input),
                 Err(ParseSpecialSequenceError::NotAScalarValue(value)),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }

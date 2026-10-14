@@ -15,20 +15,20 @@ use crate::{gap_separator, terminal_character::TerminalCharacter};
 pub(crate) struct MetaIdentifier(String);
 
 impl MetaIdentifier {
-    /// Returns the meta identifier at the start of `rest`, and how long it is,
-    /// gaps between its characters included.
+    /// Returns the meta identifier at the start of `input`, and how long it
+    /// is, gaps between its characters included.
     ///
     /// A gap after the last character is not part of it. Every meta
     /// identifier character is ASCII, so the length is the same in bytes and
     /// characters.
     pub(crate) fn read(
-        rest: &str,
+        input: &str,
     ) -> Result<(Self, usize), ParseMetaIdentifierError> {
-        if !rest.chars().next().is_some_and(is_letter) {
+        if !input.chars().next().is_some_and(is_letter) {
             return Err(ParseMetaIdentifierError);
         }
         let (name, length) =
-            gap_separator::remove(rest, is_meta_identifier_character);
+            gap_separator::remove(input, is_meta_identifier_character);
         Ok((Self(name), length))
     }
 
@@ -73,8 +73,8 @@ impl Error for ParseMetaIdentifierError {}
 mod tests {
     use super::*;
 
-    fn read(rest: &str) -> Result<(String, usize), ParseMetaIdentifierError> {
-        MetaIdentifier::read(rest).map(|(identifier, length)| {
+    fn read(input: &str) -> Result<(String, usize), ParseMetaIdentifierError> {
+        MetaIdentifier::read(input).map(|(identifier, length)| {
             (identifier.as_str().to_owned(), length)
         })
     }
@@ -117,15 +117,19 @@ mod tests {
 
     #[test]
     fn stops_at_a_character_that_is_not_a_letter_or_digit() {
-        for rest in ["a,b", "a=b", "a_b", "a-b", "a(*b*)", "a'b'", "aé"] {
-            assert_eq!(read(rest), Ok(("a".to_owned(), 1)), "{rest:?}");
+        for input in ["a,b", "a=b", "a_b", "a-b", "a(*b*)", "a'b'", "aé"] {
+            assert_eq!(read(input), Ok(("a".to_owned(), 1)), "{input:?}");
         }
     }
 
     #[test]
     fn rejects_text_that_does_not_start_with_a_letter() {
-        for rest in ["", "1a", "_a", " a", "'a'", "éa"] {
-            assert_eq!(read(rest), Err(ParseMetaIdentifierError), "{rest:?}");
+        for input in ["", "1a", "_a", " a", "'a'", "éa"] {
+            assert_eq!(
+                read(input),
+                Err(ParseMetaIdentifierError),
+                "{input:?}"
+            );
         }
     }
 

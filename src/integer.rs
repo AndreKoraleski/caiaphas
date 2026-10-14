@@ -14,7 +14,7 @@ use crate::{gap_separator, terminal_character::TerminalCharacter};
 pub(crate) struct Integer(u32);
 
 impl Integer {
-    /// Returns the integer at the start of `rest`, and how long it is, gaps
+    /// Returns the integer at the start of `input`, and how long it is, gaps
     /// between its digits included.
     ///
     /// A gap after the last digit is not part of it.
@@ -22,9 +22,9 @@ impl Integer {
     /// Every decimal digit is ASCII, so the length is the same in bytes and
     /// characters.
     pub(crate) fn read(
-        rest: &str,
+        input: &str,
     ) -> Result<(Self, usize), ParseIntegerError> {
-        let (digits, length) = gap_separator::remove(rest, is_decimal_digit);
+        let (digits, length) = gap_separator::remove(input, is_decimal_digit);
         if digits.is_empty() {
             return Err(ParseIntegerError::NoDecimalDigit);
         }
@@ -71,8 +71,8 @@ impl Error for ParseIntegerError {}
 mod tests {
     use super::*;
 
-    fn read(rest: &str) -> Result<(u32, usize), ParseIntegerError> {
-        Integer::read(rest).map(|(integer, length)| (integer.get(), length))
+    fn read(input: &str) -> Result<(u32, usize), ParseIntegerError> {
+        Integer::read(input).map(|(integer, length)| (integer.get(), length))
     }
 
     #[test]
@@ -100,8 +100,8 @@ mod tests {
 
     #[test]
     fn stops_at_a_character_that_is_not_a_digit() {
-        for rest in ["1a", "1.5", "1,2", "1_000", "1٣"] {
-            assert_eq!(read(rest), Ok((1, 1)), "{rest:?}");
+        for input in ["1a", "1.5", "1,2", "1_000", "1٣"] {
+            assert_eq!(read(input), Ok((1, 1)), "{input:?}");
         }
     }
 
@@ -112,22 +112,22 @@ mod tests {
 
     #[test]
     fn rejects_integers_too_large_for_a_u32() {
-        for rest in ["4294967296", "4294 967 296", "99999999999999999999"] {
+        for input in ["4294967296", "4294 967 296", "99999999999999999999"] {
             assert_eq!(
-                read(rest),
+                read(input),
                 Err(ParseIntegerError::TooLarge),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }
 
     #[test]
     fn rejects_text_that_does_not_start_with_a_digit() {
-        for rest in ["", "a1", " 1", "-1", "+1", "٣"] {
+        for input in ["", "a1", " 1", "-1", "+1", "٣"] {
             assert_eq!(
-                read(rest),
+                read(input),
                 Err(ParseIntegerError::NoDecimalDigit),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }

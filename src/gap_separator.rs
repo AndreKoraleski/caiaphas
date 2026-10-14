@@ -2,9 +2,9 @@
 
 #![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
 
-/// Returns how long the gap at the start of `rest` is, or 0 if there is none.
+/// Returns how long the gap at the start of `input` is, or 0 if there is none.
 ///
-/// `rest` here means the remaining characters of the source string.
+/// `input` is the source from the current position onward.
 ///
 /// A gap is any number of spaces, horizontal or vertical tabs, form feeds and
 /// new lines. A new line is a line feed with any number of carriage returns on
@@ -12,10 +12,10 @@
 ///
 /// Every gap separator is ASCII, so the length is the same in bytes and
 /// characters.
-pub(crate) fn length(rest: &str) -> usize {
+pub(crate) fn length(input: &str) -> usize {
     let mut total = 0;
     loop {
-        let after = &rest[total..];
+        let after = &input[total..];
         let separator = match after.chars().next() {
             Some(' ' | '\t' | '\x0B' | '\x0C') => 1,
             Some('\r' | '\n') => new_line_length(after),
@@ -28,8 +28,9 @@ pub(crate) fn length(rest: &str) -> usize {
     }
 }
 
-/// Returns the characters at the start of `rest` that `accept` takes, with the
-/// gaps between them removed, and how long they are, those gaps included.
+/// Returns the characters at the start of `input` that `accept` takes,
+/// with the gaps between them removed, and how long they are, those gaps
+/// included.
 ///
 /// A gap is only taken when an accepted character follows it, so a gap after
 /// the last one is left for the caller. Returns an empty string and 0 if the
@@ -38,7 +39,7 @@ pub(crate) fn length(rest: &str) -> usize {
 /// `accept` should only take ASCII characters, so the length is the same in
 /// bytes and characters.
 pub(crate) fn remove(
-    rest: &str,
+    input: &str,
     accept: impl Fn(char) -> bool,
 ) -> (String, usize) {
     let mut kept = String::new();
@@ -47,9 +48,9 @@ pub(crate) fn remove(
         let gap = if kept.is_empty() {
             0
         } else {
-            length(&rest[total..])
+            length(&input[total..])
         };
-        match rest[total + gap..].chars().next() {
+        match input[total + gap..].chars().next() {
             Some(c) if accept(c) => {
                 kept.push(c);
                 total += gap + c.len_utf8();
@@ -59,27 +60,27 @@ pub(crate) fn remove(
     }
 }
 
-/// Returns how long the new line at the start of `rest` is, or 0 if there is
+/// Returns how long the new line at the start of `input` is, or 0 if there is
 /// none.
-fn new_line_length(rest: &str) -> usize {
-    let before = carriage_returns(rest);
-    match rest[before..].strip_prefix('\n') {
+fn new_line_length(input: &str) -> usize {
+    let before = carriage_returns(input);
+    match input[before..].strip_prefix('\n') {
         Some(after) => before + 1 + carriage_returns(after),
         None => 0,
     }
 }
 
-/// Returns how many carriage returns `rest` starts with.
-fn carriage_returns(rest: &str) -> usize {
-    rest.len() - rest.trim_start_matches('\r').len()
+/// Returns how many carriage returns `input` starts with.
+fn carriage_returns(input: &str) -> usize {
+    input.len() - input.trim_start_matches('\r').len()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn read_letters(rest: &str) -> (String, usize) {
-        remove(rest, |c| c.is_ascii_alphabetic())
+    fn read_letters(input: &str) -> (String, usize) {
+        remove(input, |c| c.is_ascii_alphabetic())
     }
 
     #[test]
@@ -106,8 +107,8 @@ mod tests {
 
     #[test]
     fn reads_nothing_when_the_first_character_is_not_accepted() {
-        for rest in ["", "1a", " a", "\na"] {
-            assert_eq!(read_letters(rest), (String::new(), 0), "{rest:?}");
+        for input in ["", "1a", " a", "\na"] {
+            assert_eq!(read_letters(input), (String::new(), 0), "{input:?}");
         }
     }
 

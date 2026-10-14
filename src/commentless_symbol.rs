@@ -26,19 +26,19 @@ pub(crate) enum CommentlessSymbol {
 }
 
 impl CommentlessSymbol {
-    /// Returns the commentless symbol at the start of `rest`, and how long it
+    /// Returns the commentless symbol at the start of `input`, and how long it
     /// is.
     ///
-    /// `rest` should not start with a gap. A gap after the commentless symbol
+    /// `input` should not start with a gap. A gap after the commentless symbol
     /// is not part of it, but gaps inside a meta identifier, an integer or a
     /// special sequence are.
     ///
     /// Every commentless symbol is ASCII, so the length is the same in bytes
     /// and characters.
     pub(crate) fn read(
-        rest: &str,
+        input: &str,
     ) -> Result<(Self, usize), ParseCommentlessSymbolError> {
-        let mut chars = rest.chars();
+        let mut chars = input.chars();
         let first = chars
             .next()
             .ok_or(ParseCommentlessSymbolError::EndOfInput)?;
@@ -48,25 +48,25 @@ impl CommentlessSymbol {
             })?;
         Ok(match character {
             TerminalCharacter::Letter(_) => {
-                let (identifier, length) = MetaIdentifier::read(rest).expect(
+                let (identifier, length) = MetaIdentifier::read(input).expect(
                     "text starting with a letter is a meta identifier",
                 );
                 (Self::MetaIdentifier(identifier), length)
             }
             TerminalCharacter::DecimalDigit(_) => {
-                let (integer, length) = Integer::read(rest)
+                let (integer, length) = Integer::read(input)
                     .map_err(ParseCommentlessSymbolError::Integer)?;
                 (Self::Integer(integer), length)
             }
             TerminalCharacter::Symbol(
                 Symbol::FirstQuote | Symbol::SecondQuote,
             ) => {
-                let (string, length) = TerminalString::read(rest)
+                let (string, length) = TerminalString::read(input)
                     .map_err(ParseCommentlessSymbolError::TerminalString)?;
                 (Self::TerminalString(string), length)
             }
             TerminalCharacter::Symbol(Symbol::SpecialSequence) => {
-                let (sequence, length) = SpecialSequence::read(rest)
+                let (sequence, length) = SpecialSequence::read(input)
                     .map_err(ParseCommentlessSymbolError::SpecialSequence)?;
                 (Self::SpecialSequence(sequence), length)
             }
@@ -141,9 +141,9 @@ mod tests {
     use super::*;
 
     fn read(
-        rest: &str,
+        input: &str,
     ) -> Result<(CommentlessSymbol, usize), ParseCommentlessSymbolError> {
-        CommentlessSymbol::read(rest)
+        CommentlessSymbol::read(input)
     }
 
     #[test]
@@ -169,11 +169,11 @@ mod tests {
             (";", Symbol::Terminator, 1),
             (".", Symbol::Terminator, 1),
         ];
-        for (rest, symbol, length) in cases {
+        for (input, symbol, length) in cases {
             assert_eq!(
-                read(rest),
+                read(input),
                 Ok((CommentlessSymbol::Symbol(symbol), length)),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }
@@ -201,16 +201,16 @@ mod tests {
 
     #[test]
     fn reads_terminal_strings_in_either_quote() {
-        for rest in ["'a b' , c", "\"a b\" , c"] {
-            let (symbol, length) = read(rest).unwrap();
-            assert_eq!(length, 5, "{rest:?}");
+        for input in ["'a b' , c", "\"a b\" , c"] {
+            let (symbol, length) = read(input).unwrap();
+            assert_eq!(length, 5, "{input:?}");
             assert!(
                 matches!(
                     symbol,
                     CommentlessSymbol::TerminalString(string)
                         if string.as_str() == "a b"
                 ),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }
@@ -240,12 +240,12 @@ mod tests {
 
     #[test]
     fn rejects_comment_symbols() {
-        for rest in ["(* a *)", "*)"] {
-            let first = rest.chars().next().unwrap();
+        for input in ["(* a *)", "*)"] {
+            let first = input.chars().next().unwrap();
             assert_eq!(
-                read(rest),
+                read(input),
                 Err(ParseCommentlessSymbolError::NotCommentless(first)),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }
@@ -302,11 +302,11 @@ mod tests {
             ("'abc", ParseTerminalStringError::NoClosingQuote),
             ("'a\tb'", ParseTerminalStringError::InvalidCharacter('\t')),
         ];
-        for (rest, error) in cases {
+        for (input, error) in cases {
             assert_eq!(
-                read(rest),
+                read(input),
                 Err(ParseCommentlessSymbolError::TerminalString(error)),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }
@@ -321,11 +321,11 @@ mod tests {
                 ParseSpecialSequenceError::NotAScalarValue(0xD800),
             ),
         ];
-        for (rest, error) in cases {
+        for (input, error) in cases {
             assert_eq!(
-                read(rest),
+                read(input),
                 Err(ParseCommentlessSymbolError::SpecialSequence(error)),
-                "{rest:?}"
+                "{input:?}"
             );
         }
     }
