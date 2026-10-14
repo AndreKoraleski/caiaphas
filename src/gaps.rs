@@ -5,7 +5,7 @@
 /// Returns how long the gap at the start of `rest` is, or 0 if there is none.
 ///
 /// `rest` here means the remaining characters of the source string.
-/// 
+///
 /// A gap is any number of spaces, horizontal or vertical tabs, form feeds and
 /// new lines. A new line is a line feed with any number of carriage returns on
 /// either side, so a carriage return without a line feed is not a gap.
