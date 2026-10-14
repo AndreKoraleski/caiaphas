@@ -26,6 +26,7 @@ mod commentless_symbol;
 mod gap_separator;
 mod span;
 mod terminal_character;
+mod token;
 
 #[cfg(test)]
 mod tests {
