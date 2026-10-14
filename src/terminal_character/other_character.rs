@@ -1,7 +1,5 @@
 //! Other characters of ISO/IEC 14977 EBNF.
 
-#![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
-
 use std::{error::Error, fmt};
 
 /// One of the 15 ASCII characters, space included, that may appear in terminal
