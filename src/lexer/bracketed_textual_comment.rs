@@ -4,7 +4,7 @@
 
 use std::{error::Error, fmt};
 
-use crate::{
+use crate::lexer::{
     commentless_symbol::{
         special_sequence::{self, ParseSpecialSequenceError},
         terminal_string::{ParseTerminalStringError, TerminalString},

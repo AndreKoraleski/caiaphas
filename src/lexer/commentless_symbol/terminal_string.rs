@@ -2,7 +2,7 @@
 
 use std::{error::Error, fmt};
 
-use crate::terminal_character::TerminalCharacter;
+use crate::lexer::terminal_character::TerminalCharacter;
 
 /// A terminal string stands for its characters exactly as written.
 ///

@@ -14,7 +14,7 @@ use meta_identifier::MetaIdentifier;
 use special_sequence::{ParseSpecialSequenceError, SpecialSequence};
 use terminal_string::{ParseTerminalStringError, TerminalString};
 
-use crate::terminal_character::{Symbol, TerminalCharacter};
+use crate::lexer::terminal_character::{Symbol, TerminalCharacter};
 
 /// A commentless symbol is what's left of a grammar once its gaps and comments
 /// are removed.

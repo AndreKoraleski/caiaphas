@@ -7,7 +7,7 @@
 //! of them, such as `? U+0041..U+005A ?`.
 use std::{error::Error, fmt, ops::RangeInclusive};
 
-use crate::{
+use crate::lexer::{
     gap_separator,
     terminal_character::{Symbol, TerminalCharacter},
 };

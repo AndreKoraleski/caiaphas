@@ -22,12 +22,8 @@ pub fn add(left: u64, right: u64) -> u64 {
     left + right
 }
 
-mod bracketed_textual_comment;
-mod commentless_symbol;
-mod gap_separator;
+mod lexer;
 mod span;
-mod terminal_character;
-mod token;
 
 #[cfg(test)]
 mod tests {

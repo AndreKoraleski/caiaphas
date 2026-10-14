@@ -2,7 +2,7 @@
 
 use std::{error::Error, fmt};
 
-use crate::{gap_separator, terminal_character::TerminalCharacter};
+use crate::lexer::{gap_separator, terminal_character::TerminalCharacter};
 
 /// A meta identifier names a rule.
 ///
