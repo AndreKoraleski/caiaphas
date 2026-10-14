@@ -59,6 +59,22 @@ impl TerminalCharacter {
             },
         })
     }
+
+    /// Returns whether this is a first terminal character, one that may appear 
+    /// in a terminal string between two `'`. 
+    /// 
+    /// That list is any terminal character but the first quote symbol.
+    pub(crate) fn is_first_terminal_character(self) -> bool {
+        self != Self::Symbol(Symbol::FirstQuote)
+    }
+
+    /// Returns whether this is a second terminal character, one that may
+    /// appear in a terminal string between two `"`.
+    /// 
+    /// That list is any terminal character but the second quote symbol.
+    pub(crate) fn is_second_terminal_character(self) -> bool {
+        self != Self::Symbol(Symbol::SecondQuote)
+    }
 }
 
 /// Error returned when a character does not start a [`TerminalCharacter`].
@@ -167,6 +183,32 @@ mod tests {
                 Err(ParseTerminalCharacterError(c)),
                 "{c:?}"
             );
+        }
+    }
+
+    #[test]
+    fn first_terminal_characters_exclude_only_the_first_quote() {
+        for c in (0..=0x7F_u8).map(char::from) {
+            if let Ok((character, _)) = TerminalCharacter::read(c, None) {
+                assert_eq!(
+                    character.is_first_terminal_character(),
+                    c != '\'',
+                    "{c:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn second_terminal_characters_exclude_only_the_second_quote() {
+        for c in (0..=0x7F_u8).map(char::from) {
+            if let Ok((character, _)) = TerminalCharacter::read(c, None) {
+                assert_eq!(
+                    character.is_second_terminal_character(),
+                    c != '"',
+                    "{c:?}"
+                );
+            }
         }
     }
 
