@@ -1,0 +1,2 @@
+# Lines stay under 80 columns.
+max_width = 79
