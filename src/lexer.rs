@@ -18,13 +18,12 @@ use crate::span::Span;
 
 /// Reads the tokens of a grammar one at a time, skipping gaps and comments.
 ///
-/// It stops after the first error, so every later call to `next` returns
-/// `None`.
+/// After an error it skips what could not be read and goes on, so one pass
+/// finds every error that does not hide the ones after it.
 #[derive(Debug, Clone)]
 pub(crate) struct Lexer<'a> {
     source: &'a str,
     position: usize,
-    failed: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -32,51 +31,65 @@ impl<'a> Lexer<'a> {
         Self {
             source,
             position: 0,
-            failed: false,
         }
     }
 
-    /// Moves past the gaps and comments at the current position.
+    /// Moves past the gaps and comments at the current position, or past the
+    /// first comment that cannot be read.
     fn skip_gaps_and_comments(&mut self) -> Result<(), LexError> {
         loop {
             self.position += gap_separator::length(self.rest());
             if !self.rest().starts_with("(*") {
                 return Ok(());
             }
-            let length = bracketed_textual_comment::length(self.rest())
-                .map_err(|error| {
-                    self.error(LexErrorKind::BracketedTextualComment(error))
-                })?;
-            self.position += length;
+            match bracketed_textual_comment::length(self.rest()) {
+                Ok(length) => self.position += length,
+                Err(error) => {
+                    let length = unchecked_comment_length(self.rest());
+                    return Err(self.skip(
+                        LexErrorKind::BracketedTextualComment(error),
+                        length,
+                    ));
+                }
+            }
         }
     }
 
+    /// Reads the token at the current position, or moves past what cannot be
+    /// read.
     fn read_token(&mut self) -> Result<Token, LexError> {
-        let (symbol, length) =
-            CommentlessSymbol::read(self.rest()).map_err(|error| {
-                self.error(LexErrorKind::CommentlessSymbol(error))
-            })?;
-        let span = Span {
-            start: self.position,
-            end: self.position + length,
-        };
-        self.position = span.end;
-        Ok(Token { symbol, span })
+        match CommentlessSymbol::read(self.rest()) {
+            Ok((symbol, length)) => {
+                let span = self.advance(length);
+                Ok(Token { symbol, span })
+            }
+            Err(error) => {
+                let length = recovery_length(error, self.rest());
+                Err(self.skip(LexErrorKind::CommentlessSymbol(error), length))
+            }
+        }
     }
 
     fn rest(&self) -> &'a str {
         &self.source[self.position..]
     }
 
-    /// Returns an error whose span is the character at the current position.
-    fn error(&self, kind: LexErrorKind) -> LexError {
-        let length = self.rest().chars().next().map_or(0, char::len_utf8);
+    /// Moves `length` bytes ahead, and returns the span moved over.
+    fn advance(&mut self, length: usize) -> Span {
+        let start = self.position;
+        self.position += length;
+        Span {
+            start,
+            end: self.position,
+        }
+    }
+
+    /// Moves `length` bytes ahead, and returns an error over what it moved
+    /// over.
+    fn skip(&mut self, kind: LexErrorKind, length: usize) -> LexError {
         LexError {
             kind,
-            span: Span {
-                start: self.position,
-                end: self.position + length,
-            },
+            span: self.advance(length),
         }
     }
 }
@@ -85,29 +98,76 @@ impl Iterator for Lexer<'_> {
     type Item = Result<Token, LexError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.failed {
+        if let Err(error) = self.skip_gaps_and_comments() {
+            return Some(Err(error));
+        }
+        if self.rest().is_empty() {
             return None;
         }
-        let token = self
-            .skip_gaps_and_comments()
-            .and_then(|()| {
-                if self.rest().is_empty() {
-                    Ok(None)
-                } else {
-                    self.read_token().map(Some)
-                }
-            })
-            .transpose();
-        self.failed = matches!(token, Some(Err(_)));
-        token
+        Some(self.read_token())
     }
 }
 
-/// Error returned when the source of a grammar cannot be split into tokens.
+/// Returns how much of `input` to skip after `error`, so that reading goes on
+/// where the next token most likely starts.
+///
+/// Skips at least one character, so the lexer always moves.
+fn recovery_length(error: ParseCommentlessSymbolError, input: &str) -> usize {
+    let first = input.chars().next().map_or(0, char::len_utf8);
+    let length = match error {
+        // The digits are clear, only their value is not.
+        ParseCommentlessSymbolError::Integer(_) => {
+            gap_separator::remove(input, |c| c.is_ascii_digit()).1
+        }
+        // A terminal string cannot go past the end of its line.
+        ParseCommentlessSymbolError::TerminalString(_) => {
+            let line = input.find('\n').map_or(input, |end| &input[..end]);
+            line[first..]
+                .find(&input[..first])
+                .map_or(line.len(), |end| first + end + first)
+        }
+        ParseCommentlessSymbolError::SpecialSequence(_) => input[first..]
+            .find('?')
+            .map_or(input.len(), |end| first + end + 1),
+        ParseCommentlessSymbolError::UnmatchedEndCommentSymbol => 2,
+        ParseCommentlessSymbolError::EndOfInput
+        | ParseCommentlessSymbolError::InvalidCharacter(_)
+        | ParseCommentlessSymbolError::NotCommentless(_) => first,
+    };
+    length.max(first)
+}
+
+/// Returns how long the comment at the start of `input` is, counting only `(*`
+/// and `*)`, or the length of `input` if it does not end.
+///
+/// Used to move past a comment that cannot be read as the standard says.
+fn unchecked_comment_length(input: &str) -> usize {
+    let mut depth = 0;
+    let mut length = 0;
+    while let Some(c) = input[length..].chars().next() {
+        let after = &input[length..];
+        if after.starts_with("(*") {
+            depth += 1;
+            length += 2;
+        } else if after.starts_with("*)") {
+            depth -= 1;
+            length += 2;
+            if depth == 0 {
+                return length;
+            }
+        } else {
+            length += c.len_utf8();
+        }
+    }
+    length
+}
+
+/// Error returned when part of the source of a grammar cannot be read as a
+/// token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct LexError {
     pub(crate) kind: LexErrorKind,
-    /// The first character of the token or comment that could not be read.
+    /// What the lexer skipped to go on reading.
     pub(crate) span: Span,
 }
 
@@ -166,6 +226,16 @@ mod tests {
         Lexer::new(source)
             .find_map(Result::err)
             .expect("the source has an error")
+    }
+
+    /// Returns the text of each token, and the text skipped by each error.
+    fn outline(source: &str) -> Vec<Result<&str, &str>> {
+        Lexer::new(source)
+            .map(|token| match token {
+                Ok(token) => Ok(&source[token.span.start..token.span.end]),
+                Err(error) => Err(&source[error.span.start..error.span.end]),
+            })
+            .collect()
     }
 
     #[test]
@@ -264,20 +334,20 @@ mod tests {
                 kind: LexErrorKind::CommentlessSymbol(
                     ParseCommentlessSymbolError::UnmatchedEndCommentSymbol
                 ),
-                span: Span { start: 2, end: 3 },
+                span: Span { start: 2, end: 4 },
             }
         );
     }
 
     #[test]
-    fn rejects_an_unclosed_comment_at_its_start() {
+    fn rejects_an_unclosed_comment_up_to_the_end() {
         assert_eq!(
             error("a = b; (* note"),
             LexError {
                 kind: LexErrorKind::BracketedTextualComment(
                     ParseBracketedTextualCommentError::NoClosingSymbol
                 ),
-                span: Span { start: 7, end: 8 },
+                span: Span { start: 7, end: 14 },
             }
         );
     }
@@ -309,8 +379,92 @@ mod tests {
     }
 
     #[test]
-    fn stops_after_an_error() {
-        let mut lexer = Lexer::new("@ a b c");
+    fn goes_on_after_a_character_it_cannot_read() {
+        assert_eq!(
+            outline("@ a é *) b"),
+            [Err("@"), Ok("a"), Err("é"), Err("*)"), Ok("b")]
+        );
+    }
+
+    #[test]
+    fn collects_every_error_in_a_grammar() {
+        let errors = Lexer::new("a = @;\nb = 'x\nc = ? x ?;\nd = 4294967296;")
+            .filter(Result::is_err)
+            .count();
+        assert_eq!(errors, 4);
+    }
+
+    #[test]
+    fn goes_on_after_an_integer_that_is_too_large() {
+        assert_eq!(
+            outline("4294 967 296 * a"),
+            [Err("4294 967 296"), Ok("*"), Ok("a")]
+        );
+    }
+
+    #[test]
+    fn goes_on_after_the_closing_quote_of_a_broken_terminal_string() {
+        assert_eq!(
+            outline("a = 'x\ty', b;"),
+            [Ok("a"), Ok("="), Err("'x\ty'"), Ok(","), Ok("b"), Ok(";")]
+        );
+        assert_eq!(
+            outline("a = '', b;"),
+            [Ok("a"), Ok("="), Err("''"), Ok(","), Ok("b"), Ok(";")]
+        );
+    }
+
+    #[test]
+    fn goes_on_at_the_next_line_after_an_unclosed_terminal_string() {
+        assert_eq!(
+            outline("a = 'x, b;\nc;"),
+            [Ok("a"), Ok("="), Err("'x, b;"), Ok("c"), Ok(";")]
+        );
+        assert_eq!(
+            outline("a = \"x\r\nc;"),
+            [Ok("a"), Ok("="), Err("\"x\r"), Ok("c"), Ok(";")]
+        );
+    }
+
+    #[test]
+    fn goes_on_after_the_closing_symbol_of_a_broken_special_sequence() {
+        assert_eq!(
+            outline("a = ? x ?, ? U+D800 ?, b;"),
+            [
+                Ok("a"),
+                Ok("="),
+                Err("? x ?"),
+                Ok(","),
+                Err("? U+D800 ?"),
+                Ok(","),
+                Ok("b"),
+                Ok(";")
+            ]
+        );
+    }
+
+    #[test]
+    fn stops_at_an_unclosed_special_sequence() {
+        assert_eq!(outline("a = ? x"), [Ok("a"), Ok("="), Err("? x")]);
+    }
+
+    #[test]
+    fn goes_on_after_the_end_of_a_broken_comment() {
+        assert_eq!(outline("(* don't *) a"), [Err("(* don't *)"), Ok("a")]);
+        assert_eq!(
+            outline("(* (* é *) *) a"),
+            [Err("(* (* é *) *)"), Ok("a")]
+        );
+    }
+
+    #[test]
+    fn stops_at_an_unclosed_comment() {
+        assert_eq!(outline("a (* b (* c *)"), [Ok("a"), Err("(* b (* c *)")]);
+    }
+
+    #[test]
+    fn ends_after_the_last_error() {
+        let mut lexer = Lexer::new("@");
         assert!(lexer.next().is_some_and(|token| token.is_err()));
         assert!(lexer.next().is_none());
         assert!(lexer.next().is_none());
