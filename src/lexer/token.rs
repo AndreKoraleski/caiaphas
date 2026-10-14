@@ -1,6 +1,6 @@
 //! Tokens lexer reads from the source.
 
-#![expect(dead_code, reason = "no lexer exists to read")]
+#![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
 
 use crate::{lexer::commentless_symbol::CommentlessSymbol, span::Span};
 

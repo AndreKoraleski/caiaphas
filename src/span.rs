@@ -1,6 +1,6 @@
 //! The span of something in the source grammar.
 
-#![expect(dead_code, reason = "no lexer exists to read")]
+#![cfg_attr(not(test), expect(dead_code, reason = "no lexer exists to read"))]
 
 /// Where something is in the source, as byte offsets from its start.
 ///
