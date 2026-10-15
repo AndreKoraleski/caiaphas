@@ -22,7 +22,7 @@ pub(crate) fn length(
     input: &str,
 ) -> Result<usize, ParseBracketedTextualCommentError> {
     if !input.starts_with("(*") {
-        return Err(ParseBracketedTextualCommentError::NoOpeningSymbol);
+        return Err(ParseBracketedTextualCommentError::NoStartCommentSymbol);
     }
     let mut depth = 1;
     let mut total = 2;
@@ -32,7 +32,7 @@ pub(crate) fn length(
         let mut chars = after.chars();
         let first = chars
             .next()
-            .ok_or(ParseBracketedTextualCommentError::NoClosingSymbol)?;
+            .ok_or(ParseBracketedTextualCommentError::NoEndCommentSymbol)?;
         let (character, size) = TerminalCharacter::read(first, chars.next())
             .map_err(|_| {
             ParseBracketedTextualCommentError::InvalidCharacter(first)
@@ -69,9 +69,9 @@ pub(crate) fn length(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ParseBracketedTextualCommentError {
     /// The text does not start with `(*`.
-    NoOpeningSymbol,
+    NoStartCommentSymbol,
     /// The text ends before every `(*` has its `*)`.
-    NoClosingSymbol,
+    NoEndCommentSymbol,
     /// A character in the comment is neither a terminal character nor a gap.
     InvalidCharacter(char),
     /// A quote in the comment does not start a valid terminal string.
@@ -83,10 +83,10 @@ pub(crate) enum ParseBracketedTextualCommentError {
 impl fmt::Display for ParseBracketedTextualCommentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NoOpeningSymbol => {
+            Self::NoStartCommentSymbol => {
                 f.write_str("EBNF comment has no opening `(*`")
             }
-            Self::NoClosingSymbol => {
+            Self::NoEndCommentSymbol => {
                 f.write_str("EBNF comment has no closing `*)`")
             }
             Self::InvalidCharacter(c) => {
@@ -178,7 +178,7 @@ mod tests {
         for input in ["", "(", "( *", "*)", "a", " (* *)"] {
             assert_eq!(
                 length(input),
-                Err(ParseBracketedTextualCommentError::NoOpeningSymbol),
+                Err(ParseBracketedTextualCommentError::NoStartCommentSymbol),
                 "{input:?}"
             );
         }
@@ -189,7 +189,7 @@ mod tests {
         for input in ["(*", "(*)", "(* a", "(* a * )", "(* (* a *)"] {
             assert_eq!(
                 length(input),
-                Err(ParseBracketedTextualCommentError::NoClosingSymbol),
+                Err(ParseBracketedTextualCommentError::NoEndCommentSymbol),
                 "{input:?}"
             );
         }
@@ -236,11 +236,11 @@ mod tests {
     fn error_displays_message() {
         let cases = [
             (
-                ParseBracketedTextualCommentError::NoOpeningSymbol,
+                ParseBracketedTextualCommentError::NoStartCommentSymbol,
                 "EBNF comment has no opening `(*`",
             ),
             (
-                ParseBracketedTextualCommentError::NoClosingSymbol,
+                ParseBracketedTextualCommentError::NoEndCommentSymbol,
                 "EBNF comment has no closing `*)`",
             ),
             (
@@ -282,7 +282,7 @@ mod tests {
             Some(ParseSpecialSequenceError::NoClosingSymbol.to_string())
         );
         assert!(
-            ParseBracketedTextualCommentError::NoClosingSymbol
+            ParseBracketedTextualCommentError::NoEndCommentSymbol
                 .source()
                 .is_none()
         );

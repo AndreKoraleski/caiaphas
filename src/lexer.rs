@@ -383,7 +383,7 @@ mod tests {
             error("a = b; (* note"),
             LexError {
                 kind: LexErrorKind::BracketedTextualComment(
-                    ParseBracketedTextualCommentError::NoClosingSymbol
+                    ParseBracketedTextualCommentError::NoEndCommentSymbol
                 ),
                 span: Span { start: 7, end: 14 },
             }
