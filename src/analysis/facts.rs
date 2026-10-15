@@ -22,7 +22,7 @@ pub(crate) struct Facts<'a> {
     follow: OnceCell<Vec<Follow>>,
     /// The characters each rule matches, when it only ever matches one
     /// character.
-    characters: OnceCell<Vec<Option<CharacterSet>>>,
+    single_characters: OnceCell<Vec<Option<CharacterSet>>>,
 }
 
 impl<'a> Facts<'a> {
@@ -33,7 +33,7 @@ impl<'a> Facts<'a> {
             productive: OnceCell::new(),
             first: OnceCell::new(),
             follow: OnceCell::new(),
-            characters: OnceCell::new(),
+            single_characters: OnceCell::new(),
         }
     }
 
@@ -117,8 +117,8 @@ impl<'a> Facts<'a> {
     /// right after it.
     pub(crate) fn walk(&self, visit: &mut impl FnMut(&Expression, &Follow)) {
         for (position, rule) in self.grammar.syntax_rules.iter().enumerate() {
-            let after = self.follow_rules()[position].clone();
-            self.walk_expression(&rule.definitions_list, &after, visit);
+            let after = &self.follow_rules()[position];
+            self.walk_expression(&rule.definitions_list, after, visit);
         }
     }
 
@@ -231,32 +231,34 @@ impl<'a> Facts<'a> {
     }
 
     fn nullable_rules(&self) -> &[bool] {
-        self.nullable.get_or_init(|| self.rules_where(is_nullable))
+        self.nullable
+            .get_or_init(|| self.fixed_point(false, is_nullable))
     }
 
     fn productive_rules(&self) -> &[bool] {
         self.productive
-            .get_or_init(|| self.rules_where(is_productive))
+            .get_or_init(|| self.fixed_point(false, is_productive))
     }
 
-    /// Returns which rules `holds` is true for, where whether it holds for a
-    /// rule depends on whether it holds for the rules it references.
+    /// Returns a value for each rule, where the value of a rule depends on the
+    /// values of the rules it references.
     ///
-    /// Starts from false for every rule and turns rules true until none
-    /// changes, so recursion that never ends makes a rule false.
-    fn rules_where(
+    /// Starts every rule at `initial` and works each out again with `value`
+    /// until none changes, so recursion that never ends adds nothing.
+    fn fixed_point<T: Clone + PartialEq>(
         &self,
-        holds: fn(&Expression, &[bool]) -> bool,
-    ) -> Vec<bool> {
+        initial: T,
+        value: impl Fn(&Expression, &[T]) -> T,
+    ) -> Vec<T> {
         let rules = &self.grammar.syntax_rules;
-        let mut values = vec![false; rules.len()];
+        let mut values = vec![initial; rules.len()];
         let mut changed = true;
         while changed {
             changed = false;
             for (position, rule) in rules.iter().enumerate() {
-                if !values[position] && holds(&rule.definitions_list, &values)
-                {
-                    values[position] = true;
+                let next = value(&rule.definitions_list, &values);
+                if next != values[position] {
+                    values[position] = next;
                     changed = true;
                 }
             }
@@ -266,32 +268,16 @@ impl<'a> Facts<'a> {
 
     fn first_rules(&self) -> &[CharacterSet] {
         self.first.get_or_init(|| {
-            let rules = &self.grammar.syntax_rules;
             let nullable = self.nullable_rules();
             let characters = self.single_character_rules();
-            let mut sets = vec![CharacterSet::default(); rules.len()];
-            let mut changed = true;
-            while changed {
-                changed = false;
-                for (position, rule) in rules.iter().enumerate() {
-                    let set = first(
-                        &rule.definitions_list,
-                        nullable,
-                        &sets,
-                        characters,
-                    );
-                    if set != sets[position] {
-                        sets[position] = set;
-                        changed = true;
-                    }
-                }
-            }
-            sets
+            self.fixed_point(CharacterSet::default(), |expression, sets| {
+                first(expression, nullable, sets, characters)
+            })
         })
     }
 
     fn single_character_rules(&self) -> &[Option<CharacterSet>] {
-        self.characters.get_or_init(|| {
+        self.single_characters.get_or_init(|| {
             let rules = &self.grammar.syntax_rules;
             let mut states = vec![Characters::Unvisited; rules.len()];
             (0..rules.len())
@@ -311,25 +297,24 @@ impl<'a> Facts<'a> {
             while changed {
                 changed = false;
                 for (position, rule) in rules.iter().enumerate() {
-                    let mut found = Vec::new();
+                    let rule_after = sets[position].clone();
                     self.walk_expression(
                         &rule.definitions_list,
-                        &sets[position].clone(),
+                        &rule_after,
                         &mut |expression, after| {
-                            if let ExpressionKind::MetaIdentifier(rule_id) =
+                            let ExpressionKind::MetaIdentifier(rule_id) =
                                 expression.kind
-                            {
-                                found.push((rule_id, after.clone()));
+                            else {
+                                return;
+                            };
+                            let RuleId(target) = rule_id;
+                            let set = sets[target].union(after);
+                            if set != sets[target] {
+                                sets[target] = set;
+                                changed = true;
                             }
                         },
                     );
-                    for (RuleId(target), after) in found {
-                        let set = sets[target].union(&after);
-                        if set != sets[target] {
-                            sets[target] = set;
-                            changed = true;
-                        }
-                    }
                 }
             }
             sets
