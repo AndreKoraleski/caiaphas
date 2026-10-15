@@ -3,6 +3,7 @@
 mod ambiguous_recursion;
 mod duplicate_alternative;
 mod empty_rule;
+mod exhaustive_exception;
 mod indirect_left_recursion;
 mod ineffective_exception;
 mod left_recursion;
@@ -27,4 +28,5 @@ pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     duplicate_alternative::check,
     ineffective_exception::check,
     empty_rule::check,
+    exhaustive_exception::check,
 ];

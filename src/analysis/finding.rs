@@ -73,6 +73,9 @@ pub(crate) enum FindingKind {
     /// A repeated sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to repeat it again.
     RepeatedFollowConflict { characters: CharacterSet },
+    /// A syntactic exception matches everything its factor matches, so the
+    /// term can never match.
+    ExhaustiveException,
 }
 
 impl FindingKind {
@@ -92,6 +95,7 @@ impl FindingKind {
             Self::EmptyRule { .. } => Severity::Warning,
             Self::OptionalFollowConflict { .. }
             | Self::RepeatedFollowConflict { .. } => Severity::Warning,
+            Self::ExhaustiveException => Severity::Warning,
         }
     }
 
@@ -174,6 +178,11 @@ impl FindingKind {
                  make what comes after it start differently"
                     .to_owned()
             }
+            Self::ExhaustiveException => {
+                "remove this term, or narrow the exception so something is \
+                 left"
+                    .to_owned()
+            }
         }
     }
 }
@@ -252,6 +261,10 @@ impl fmt::Display for Finding {
                 "this repeated sequence and what comes after it can both \
                  start with {characters}, so a parser cannot tell whether to \
                  repeat it again"
+            ),
+            FindingKind::ExhaustiveException => f.write_str(
+                "this term can never match, since the exception matches \
+                 everything before the `-` does",
             ),
         }
     }
@@ -410,6 +423,15 @@ mod tests {
                       repeat it again",
             help: "end the repetition with something it cannot start with, or \
                    make what comes after it start differently",
+        },
+        Case {
+            source: "a = 'x' - ? U+0061..U+007A ?;",
+            is_kind: |kind| *kind == FindingKind::ExhaustiveException,
+            severity: Severity::Warning,
+            message: "this term can never match, since the exception matches \
+                      everything before the `-` does",
+            help: "remove this term, or narrow the exception so something is \
+                   left",
         },
     ];
 
