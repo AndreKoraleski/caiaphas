@@ -10,6 +10,8 @@
 mod character_set;
 mod choice_check;
 mod choice_point;
+#[cfg(test)]
+mod corpus;
 mod facts;
 mod finding;
 mod grammar_check;
