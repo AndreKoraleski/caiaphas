@@ -35,28 +35,20 @@ impl TerminalCharacter {
         first: char,
         second: Option<char>,
     ) -> Result<(Self, usize), ParseTerminalCharacterError> {
-        let error = ParseTerminalCharacterError(first);
-        Ok(match first {
-            'a'..='z' | 'A'..='Z' => {
-                let letter = Letter::try_from(first).map_err(|_| error)?;
-                (Self::Letter(letter), 1)
-            }
-            '0'..='9' => {
-                let digit =
-                    DecimalDigit::try_from(first).map_err(|_| error)?;
-                (Self::DecimalDigit(digit), 1)
-            }
-            // `:` alone is an other character, but `:)` is a symbol, so the
-            // longer symbol is tried first.
-            _ => match Symbol::read(first, second) {
-                Ok((symbol, len)) => (Self::Symbol(symbol), len),
-                Err(_) => {
-                    let other =
-                        OtherCharacter::try_from(first).map_err(|_| error)?;
-                    (Self::OtherCharacter(other), 1)
-                }
-            },
-        })
+        if let Ok(letter) = Letter::try_from(first) {
+            return Ok((Self::Letter(letter), 1));
+        }
+        if let Ok(digit) = DecimalDigit::try_from(first) {
+            return Ok((Self::DecimalDigit(digit), 1));
+        }
+        // `:` alone is an other character, but `:)` is a symbol, so the
+        // longer symbol is tried first.
+        if let Ok((symbol, length)) = Symbol::read(first, second) {
+            return Ok((Self::Symbol(symbol), length));
+        }
+        OtherCharacter::try_from(first)
+            .map(|other| (Self::OtherCharacter(other), 1))
+            .map_err(|_| ParseTerminalCharacterError(first))
     }
 
     /// Returns whether this is a first terminal character.
