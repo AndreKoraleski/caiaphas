@@ -33,8 +33,8 @@ impl CharacterSet {
         let mut ranges: Vec<RangeInclusive<char>> = Vec::new();
         for range in all {
             if let Some(last) = ranges.last_mut() {
-                let touches =
-                    u32::from(*range.start()) <= u32::from(*last.end()) + 1;
+                let touches = next(*last.end())
+                    .is_none_or(|after| *range.start() <= after);
                 if touches {
                     *last = *last.start()..=*last.end().max(range.end());
                     continue;
@@ -158,6 +158,18 @@ mod tests {
         assert_eq!(
             set(&['a'..='z', 'c'..='d']),
             CharacterSet::from_range('a'..='z')
+        );
+    }
+
+    #[test]
+    fn merges_ranges_that_touch_across_the_surrogates() {
+        let all = CharacterSet::from_range('\0'..=char::MAX);
+        let split = set(&['\0'..='\u{D7FF}', '\u{E000}'..=char::MAX]);
+        assert_eq!(split, all);
+        assert!(all.is_subset(&split));
+        assert_eq!(
+            set(&['\0'..='\u{D7FE}', '\u{E000}'..=char::MAX]).to_string(),
+            "'\\0'..='\\u{d7fe}', '\\u{e000}'..='\\u{10ffff}'"
         );
     }
 
