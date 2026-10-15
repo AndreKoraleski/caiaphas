@@ -47,12 +47,10 @@ impl Diagnostic {
         }
         let snippet = Snippet::source(source)
             .path(path)
-            .annotation(
-                AnnotationKind::Primary.span(self.span.start..self.span.end),
-            )
+            .annotation(AnnotationKind::Primary.span(self.span.range()))
             .annotations(self.labels.iter().map(|label| {
                 AnnotationKind::Context
-                    .span(label.span.start..label.span.end)
+                    .span(label.span.range())
                     .label(label.message)
             }));
         let mut group = title.element(snippet);

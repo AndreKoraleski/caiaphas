@@ -6,7 +6,7 @@ use crate::{analysis::tests::findings, span::Span};
 /// Returns each finding about `source` as the text it points at, its message
 /// and the text each of its labels points at.
 fn summary(source: &str) -> Vec<String> {
-    let text = |span: Span| &source[span.start..span.end];
+    let text = |span: Span| &source[span.range()];
     findings(source)
         .into_iter()
         .map(|finding| {

@@ -53,7 +53,7 @@ pub(crate) fn parse(source: &str) -> (Syntax, Vec<ParseError>) {
     }
     let mut errors = parser.errors;
     for &span in parser.lexer.comments() {
-        let text = &source[span.start..span.end];
+        let text = &source[span.range()];
         let expectation = match Comment::read(text, span) {
             Comment::Ordinary => continue,
             Comment::Expectation(expectation) => expectation,
@@ -463,7 +463,7 @@ mod tests {
         let source = "a = b, 3 * [c];";
         let syntax = parse_valid(source);
         let rule = &syntax.syntax_rules[0];
-        let text = |span: Span| &source[span.start..span.end];
+        let text = |span: Span| &source[span.range()];
         assert_eq!(text(rule.span), "a = b, 3 * [c];");
         assert_eq!(text(rule.definitions_list.span), "b, 3 * [c]");
         let terms =

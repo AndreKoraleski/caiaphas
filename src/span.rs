@@ -1,5 +1,7 @@
 //! The span of something in the source grammar.
 
+use std::ops::Range;
+
 /// Where something is in the source, as byte offsets from its start.
 ///
 /// `start` is the first byte, and `end` the byte after the last one, so an
@@ -13,6 +15,11 @@ pub(crate) struct Span {
 }
 
 impl Span {
+    /// Returns the byte offsets the span covers, to index the source with.
+    pub(crate) fn range(self) -> Range<usize> {
+        self.start..self.end
+    }
+
     /// Returns the span from the start of this one to the end of `other`.
     pub(crate) fn to(self, other: Self) -> Self {
         Self {

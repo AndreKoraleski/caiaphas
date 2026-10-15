@@ -245,7 +245,7 @@ mod tests {
         Lexer::new(source)
             .map(|token| {
                 let span = token.unwrap().span;
-                &source[span.start..span.end]
+                &source[span.range()]
             })
             .collect()
     }
@@ -260,8 +260,8 @@ mod tests {
     fn outline(source: &str) -> Vec<Result<&str, &str>> {
         Lexer::new(source)
             .map(|token| match token {
-                Ok(token) => Ok(&source[token.span.start..token.span.end]),
-                Err(error) => Err(&source[error.span.start..error.span.end]),
+                Ok(token) => Ok(&source[token.span.range()]),
+                Err(error) => Err(&source[error.span.range()]),
             })
             .collect()
     }
