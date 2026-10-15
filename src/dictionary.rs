@@ -133,8 +133,9 @@ pub(crate) enum DictionaryErrorKind {
     /// A rule such as `grammar = expression;` that nothing references fixes
     /// it.
     NoStartSyntaxRule,
-    /// A syntactic exception uses a meta identifier whose rule is recursive,
-    /// so it could not be replaced by one without meta identifiers.
+    /// A syntactic exception uses a meta identifier whose rule is recursive or
+    /// references a recursive rule, so it could not be replaced by one without
+    /// meta identifiers.
     RecursiveSyntacticException { meta_identifier: MetaIdentifier },
 }
 
@@ -160,7 +161,8 @@ impl fmt::Display for DictionaryError {
                 meta_identifier,
             } => write!(
                 f,
-                "`{}` is recursive, so a syntactic exception cannot use it",
+                "`{}` is or references a recursive rule, so a syntactic \
+                 exception cannot use it",
                 meta_identifier.as_str()
             ),
         }
@@ -364,7 +366,13 @@ mod tests {
             ),
             (
                 "s = 'x' - b; b = 'y', [b];",
-                "`b` is recursive, so a syntactic exception cannot use it",
+                "`b` is or references a recursive rule, so a syntactic \
+                 exception cannot use it",
+            ),
+            (
+                "s = 'x' - b; b = c; c = 'y', [c];",
+                "`b` is or references a recursive rule, so a syntactic \
+                 exception cannot use it",
             ),
         ];
         for (source, message) in cases {
