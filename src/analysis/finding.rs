@@ -62,6 +62,9 @@ pub(crate) enum FindingKind {
     /// An alternative is written the same way as an earlier alternative of the
     /// same choice.
     DuplicateAlternative,
+    /// A syntactic exception can never apply, since nothing its factor matches
+    /// is also matched by the exception.
+    IneffectiveException,
     /// An optional sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to take it.
     OptionalFollowConflict { characters: CharacterSet },
@@ -83,6 +86,7 @@ impl FindingKind {
             Self::UnreachableRule { .. } => Severity::Warning,
             Self::IndirectLeftRecursion { .. } => Severity::Error,
             Self::DuplicateAlternative => Severity::Warning,
+            Self::IneffectiveException => Severity::Warning,
             Self::OptionalFollowConflict { .. }
             | Self::RepeatedFollowConflict { .. } => Severity::Warning,
         }
@@ -127,6 +131,10 @@ impl FindingKind {
                 )
             }
             Self::DuplicateAlternative => "remove this alternative".to_owned(),
+            Self::IneffectiveException => {
+                "remove the exception, or write the one that was meant"
+                    .to_owned()
+            }
             Self::OverlappingBranches { .. } => {
                 "move what the branches start with in common before the \
                  choice, or exclude it from one with `-`"
@@ -215,6 +223,10 @@ impl fmt::Display for Finding {
             FindingKind::DuplicateAlternative => f.write_str(
                 "this alternative is written the same way as an earlier one, \
                  so both always match the same input",
+            ),
+            FindingKind::IneffectiveException => f.write_str(
+                "this exception can never apply, since nothing before the `-` \
+                 matches the same input",
             ),
             FindingKind::OptionalFollowConflict { characters } => write!(
                 f,
@@ -344,6 +356,14 @@ mod tests {
             message: "this alternative is written the same way as an earlier \
                       one, so both always match the same input",
             help: "remove this alternative",
+        },
+        Case {
+            source: "a = 'x' - 'y';",
+            is_kind: |kind| *kind == FindingKind::IneffectiveException,
+            severity: Severity::Warning,
+            message: "this exception can never apply, since nothing before \
+                      the `-` matches the same input",
+            help: "remove the exception, or write the one that was meant",
         },
         Case {
             source: "a = ['x'], 'x';",
