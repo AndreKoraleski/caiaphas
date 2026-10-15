@@ -226,11 +226,8 @@ impl Error for LexError {
 
 #[cfg(test)]
 mod tests {
+    use super::commentless_symbol::terminal_string::ParseTerminalStringError;
     use super::*;
-    use super::{
-        commentless_symbol::terminal_string::ParseTerminalStringError,
-        terminal_character::Symbol,
-    };
 
     fn spans(source: &str) -> Vec<(usize, usize)> {
         Lexer::new(source)
@@ -356,6 +353,7 @@ mod tests {
 
     #[test]
     fn reads_a_group_and_an_end_comment_symbol_from_a_spaced_star() {
+        assert_eq!(outline("( *)"), [Ok("("), Err("*)")]);
         assert_eq!(
             error("( *)").kind,
             LexErrorKind::CommentlessSymbol(
@@ -426,10 +424,12 @@ mod tests {
 
     #[test]
     fn collects_every_error_in_a_grammar() {
-        let errors = Lexer::new("a = @;\nb = 'x\nc = ? x ?;\nd = 4294967296;")
-            .filter(Result::is_err)
-            .count();
-        assert_eq!(errors, 4);
+        let errors: Vec<&str> =
+            outline("a = @;\nb = 'x\nc = ? x ?;\nd = 4294967296;")
+                .into_iter()
+                .filter_map(Result::err)
+                .collect();
+        assert_eq!(errors, ["@", "'x", "? x ?", "4294967296"]);
     }
 
     #[test]

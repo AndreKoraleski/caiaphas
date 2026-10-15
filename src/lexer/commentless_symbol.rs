@@ -2,8 +2,8 @@
 
 mod integer;
 mod meta_identifier;
-pub(crate) mod special_sequence;
-pub(crate) mod terminal_string;
+pub(super) mod special_sequence;
+pub(super) mod terminal_string;
 
 use std::{error::Error, fmt};
 
