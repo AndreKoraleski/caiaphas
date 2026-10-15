@@ -53,6 +53,12 @@ pub(crate) enum FindingKind {
     UnproductiveRule { meta_identifier: MetaIdentifier },
     /// No start rule can reach a rule, so no parser uses it.
     UnreachableRule { meta_identifier: MetaIdentifier },
+    /// A rule can reach itself through other rules before reading anything, so
+    /// its parser would never end.
+    IndirectLeftRecursion {
+        meta_identifier: MetaIdentifier,
+        through: MetaIdentifier,
+    },
     /// An optional sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to take it.
     OptionalFollowConflict { characters: CharacterSet },
@@ -72,6 +78,7 @@ impl FindingKind {
             Self::EmptyRepetition => Severity::Error,
             Self::UnproductiveRule { .. } => Severity::Error,
             Self::UnreachableRule { .. } => Severity::Warning,
+            Self::IndirectLeftRecursion { .. } => Severity::Error,
             Self::OptionalFollowConflict { .. }
             | Self::RepeatedFollowConflict { .. } => Severity::Warning,
         }
@@ -88,6 +95,15 @@ impl FindingKind {
                      `{name} = {name}, x | y;` becomes `{name} = y, {{x}};`"
                 )
             }
+            Self::IndirectLeftRecursion {
+                meta_identifier,
+                through,
+            } => format!(
+                "replace `{}` in `{}` with its definition until the recursion \
+                 is direct, then rewrite it as a repetition",
+                through.as_str(),
+                meta_identifier.as_str()
+            ),
             Self::UnproductiveRule { meta_identifier } => format!(
                 "give `{}` an alternative that only reads characters, or make \
                  the recursive part optional with `[...]` or `{{...}}`",
@@ -180,6 +196,16 @@ impl fmt::Display for Finding {
                 "`{}` cannot be reached from any start rule, so no parser \
                  uses it",
                 meta_identifier.as_str()
+            ),
+            FindingKind::IndirectLeftRecursion {
+                meta_identifier,
+                through,
+            } => write!(
+                f,
+                "`{}` can reach itself through `{}` before reading anything, \
+                 so its parser would never end",
+                meta_identifier.as_str(),
+                through.as_str()
             ),
             FindingKind::OptionalFollowConflict { characters } => write!(
                 f,
@@ -290,6 +316,17 @@ mod tests {
             message: "`a` cannot be reached from any start rule, so no parser \
                       uses it",
             help: "remove `a`, or reference it from a rule a parser uses",
+        },
+        Case {
+            source: "s = a; a = b, 'x' | 'y'; b = a, 'z' | 'w';",
+            is_kind: |kind| {
+                matches!(kind, FindingKind::IndirectLeftRecursion { .. })
+            },
+            severity: Severity::Error,
+            message: "`a` can reach itself through `b` before reading \
+                      anything, so its parser would never end",
+            help: "replace `b` in `a` with its definition until the recursion \
+                   is direct, then rewrite it as a repetition",
         },
         Case {
             source: "a = ['x'], 'x';",

@@ -1,6 +1,7 @@
 //! Grammar checks read the whole grammar, such as those about recursion.
 
 mod ambiguous_recursion;
+mod indirect_left_recursion;
 mod left_recursion;
 mod unproductive_rule;
 mod unreachable_rule;
@@ -19,4 +20,5 @@ pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     ambiguous_recursion::check,
     unproductive_rule::check,
     unreachable_rule::check,
+    indirect_left_recursion::check,
 ];
