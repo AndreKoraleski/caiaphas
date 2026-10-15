@@ -194,8 +194,41 @@ impl FindingCode {
     /// Returns whether an expectation can mark a finding with this code as
     /// intended. Only warnings about the grammar itself can be.
     pub(crate) fn is_expectable(self) -> bool {
-        self.severity() == Severity::Warning
-            && self != Self::UnfulfilledExpectation
+        self.intended_behaviour().is_some()
+    }
+
+    /// Returns what happens when an expectation marks a finding with this
+    /// code as intended, if one can.
+    fn intended_behaviour(self) -> Option<&'static str> {
+        match self {
+            Self::OverlappingBranches
+            | Self::ShadowedBranch
+            | Self::DuplicateAlternative
+            | Self::AmbiguousEmptyBranches => {
+                Some("the parser takes the first branch that matches")
+            }
+            Self::OptionalFollowConflict => Some(
+                "the parser takes the sequence whenever the next character \
+                 can start it, as usual for a dangling else",
+            ),
+            Self::RepeatedFollowConflict => Some(
+                "the parser repeats the sequence whenever the next character \
+                 can start it, so it extends as far as it can",
+            ),
+            Self::AmbiguousRecursion
+            | Self::UnreachableRule
+            | Self::IneffectiveException
+            | Self::EmptyRule
+            | Self::ExhaustiveException
+            | Self::CaseOnlyNames => Some("the grammar stays as it is"),
+            Self::LeftRecursion
+            | Self::IndirectLeftRecursion
+            | Self::UnproductiveRule
+            | Self::EmptyRepetition
+            | Self::UnknownExpectation
+            | Self::UnexpectableFinding
+            | Self::UnfulfilledExpectation => None,
+        }
     }
 }
 
@@ -242,9 +275,23 @@ impl FindingKind {
         self.code().severity()
     }
 
-    /// Returns how to fix the grammar, as the usual remedy for this kind of
-    /// problem.
+    /// Returns how to fix the grammar, and how to mark the finding as intended
+    /// when it can be.
     pub(crate) fn help(&self) -> String {
+        let code = self.code();
+        let remedy = self.remedy();
+        match code.intended_behaviour() {
+            Some(behaviour) => format!(
+                "{remedy}; if this is intended, write `(* expect {}: reason \
+                 *)` right before the rule, and {behaviour}",
+                code.name()
+            ),
+            None => remedy,
+        }
+    }
+
+    /// Returns the usual remedy for this kind of problem.
+    fn remedy(&self) -> String {
         match self {
             Self::LeftRecursion { meta_identifier } => {
                 let name = meta_identifier.as_str();
@@ -311,9 +358,7 @@ impl FindingKind {
                     .to_owned()
             }
             Self::OptionalFollowConflict { .. } => {
-                "if the sequence should be taken whenever it can, as usual \
-                 for a dangling else, keep it; otherwise make what comes \
-                 after it start differently"
+                "make what comes after the sequence start differently"
                     .to_owned()
             }
             Self::RepeatedFollowConflict { .. } => {
@@ -497,7 +542,10 @@ mod tests {
             severity: Severity::Warning,
             message: "these branches can both start with 'b'..='c'",
             help: "move what the branches start with in common before the \
-                   choice, or exclude it from one with `-`",
+                   choice, or exclude it from one with `-`; if this is \
+                   intended, write `(* expect overlapping-branches: reason \
+                   *)` right before the rule, and the parser takes the first \
+                   branch that matches",
         },
         Case {
             source: "e = e, '+', e | 'n';",
@@ -507,7 +555,9 @@ mod tests {
                       group either way",
             help: "replace one end with a rule that does not start with `e`, \
                    so `e = e, '+', e | 'n';` becomes `e = e, '+', term | \
-                   term;` to group from the left",
+                   term;` to group from the left; if this is intended, write \
+                   `(* expect ambiguous-recursion: reason *)` right before \
+                   the rule, and the grammar stays as it is",
         },
         Case {
             source: "a = ? U+0061..U+007A ? | 'x';",
@@ -516,7 +566,10 @@ mod tests {
             message: "another branch can start with every character this one \
                       can",
             help: "remove this branch if the other already matches what it \
-                   does, or exclude it from the other with `-`",
+                   does, or exclude it from the other with `-`; if this is \
+                   intended, write `(* expect shadowed-branch: reason *)` \
+                   right before the rule, and the parser takes the first \
+                   branch that matches",
         },
         Case {
             source: "a = ['x'] | ['y'];",
@@ -524,7 +577,10 @@ mod tests {
             severity: Severity::Warning,
             message: "more than one branch can match nothing",
             help: "make all but one of these branches read something, such as \
-                   by removing `[...]` around one of them",
+                   by removing `[...]` around one of them; if this is \
+                   intended, write `(* expect ambiguous-empty-branches: \
+                   reason *)` right before the rule, and the parser takes the \
+                   first branch that matches",
         },
         Case {
             source: "a = {['x']};",
@@ -550,7 +606,10 @@ mod tests {
             severity: Severity::Warning,
             message: "`a` cannot be reached from any start rule, so no parser \
                       uses it",
-            help: "remove `a`, or reference it from a rule a parser uses",
+            help: "remove `a`, or reference it from a rule a parser uses; if \
+                   this is intended, write `(* expect unreachable-rule: \
+                   reason *)` right before the rule, and the grammar stays as \
+                   it is",
         },
         Case {
             source: "s = a; a = b, 'x' | 'y'; b = a, 'z' | 'w';",
@@ -567,7 +626,9 @@ mod tests {
             severity: Severity::Warning,
             message: "this alternative is written the same way as an earlier \
                       one, so both always match the same input",
-            help: "remove this alternative",
+            help: "remove this alternative; if this is intended, write `(* \
+                   expect duplicate-alternative: reason *)` right before the \
+                   rule, and the parser takes the first branch that matches",
         },
         Case {
             source: "a = 'x' - 'y';",
@@ -575,7 +636,10 @@ mod tests {
             severity: Severity::Warning,
             message: "this exception can never apply, since nothing before \
                       the `-` matches the same input",
-            help: "remove the exception, or write the one that was meant",
+            help: "remove the exception, or write the one that was meant; if \
+                   this is intended, write `(* expect ineffective-exception: \
+                   reason *)` right before the rule, and the grammar stays as \
+                   it is",
         },
         Case {
             source: "s = a, 'x'; a = ;",
@@ -583,7 +647,9 @@ mod tests {
             severity: Severity::Warning,
             message: "`a` can only match nothing, so it never reads any input",
             help: "give `a` something to read, or remove it and every \
-                   reference to it",
+                   reference to it; if this is intended, write `(* expect \
+                   empty-rule: reason *)` right before the rule, and the \
+                   grammar stays as it is",
         },
         Case {
             source: "a = ['x'], 'x';",
@@ -592,9 +658,11 @@ mod tests {
             message: "this optional sequence and what comes after it can both \
                       start with 'x', so a parser cannot tell whether to take \
                       it",
-            help: "if the sequence should be taken whenever it can, as usual \
-                   for a dangling else, keep it; otherwise make what comes \
-                   after it start differently",
+            help: "make what comes after the sequence start differently; if \
+                   this is intended, write `(* expect \
+                   optional-follow-conflict: reason *)` right before the \
+                   rule, and the parser takes the sequence whenever the next \
+                   character can start it, as usual for a dangling else",
         },
         Case {
             source: "a = {'x'}, 'x';",
@@ -604,7 +672,11 @@ mod tests {
                       start with 'x', so a parser cannot tell whether to \
                       repeat it again",
             help: "end the repetition with something it cannot start with, or \
-                   make what comes after it start differently",
+                   make what comes after it start differently; if this is \
+                   intended, write `(* expect repeated-follow-conflict: \
+                   reason *)` right before the rule, and the parser repeats \
+                   the sequence whenever the next character can start it, so \
+                   it extends as far as it can",
         },
         Case {
             source: "a = 'x' - ? U+0061..U+007A ?;",
@@ -613,7 +685,9 @@ mod tests {
             message: "this term can never match, since the exception matches \
                       everything before the `-` does",
             help: "remove this term, or narrow the exception so something is \
-                   left",
+                   left; if this is intended, write `(* expect \
+                   exhaustive-exception: reason *)` right before the rule, \
+                   and the grammar stays as it is",
         },
         Case {
             source: "s = digit, Digit; digit = '0'; Digit = '1';",
@@ -622,7 +696,9 @@ mod tests {
             message: "`Digit` differs from `digit` only in case, which is \
                       easy to mistake",
             help: "rename `Digit` or `digit`, or merge them if they mean the \
-                   same",
+                   same; if this is intended, write `(* expect \
+                   case-only-names: reason *)` right before the rule, and the \
+                   grammar stays as it is",
         },
         Case {
             source: "(* expect no-such-finding: none *) a = 'x';",
