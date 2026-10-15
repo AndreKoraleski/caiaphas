@@ -39,6 +39,12 @@ pub(crate) enum FindingKind {
     LeftRecursion { meta_identifier: MetaIdentifier },
     /// Two branches of a choice can start with some of the same characters.
     OverlappingBranches { characters: CharacterSet },
+    /// An optional sequence can start with characters that can also come right
+    /// after it, so a parser cannot tell whether to take it.
+    OptionalFollowConflict { characters: CharacterSet },
+    /// A repeated sequence can start with characters that can also come right
+    /// after it, so a parser cannot tell whether to repeat it again.
+    RepeatedFollowConflict { characters: CharacterSet },
 }
 
 impl FindingKind {
@@ -46,6 +52,8 @@ impl FindingKind {
         match self {
             Self::LeftRecursion { .. } => Severity::Error,
             Self::OverlappingBranches { .. } => Severity::Warning,
+            Self::OptionalFollowConflict { .. }
+            | Self::RepeatedFollowConflict { .. } => Severity::Warning,
         }
     }
 
@@ -65,6 +73,17 @@ impl FindingKind {
                  choice, or exclude it from one with `-`"
                     .to_owned()
             }
+            Self::OptionalFollowConflict { .. } => {
+                "if the sequence should be taken whenever it can, as usual \
+                 for a dangling else, keep it; otherwise make what comes \
+                 after it start differently"
+                    .to_owned()
+            }
+            Self::RepeatedFollowConflict { .. } => {
+                "end the repetition with something it cannot start with, or \
+                 make what comes after it start differently"
+                    .to_owned()
+            }
         }
     }
 }
@@ -81,6 +100,18 @@ impl fmt::Display for Finding {
             FindingKind::OverlappingBranches { characters } => {
                 write!(f, "these branches can both start with {characters}")
             }
+            FindingKind::OptionalFollowConflict { characters } => write!(
+                f,
+                "this optional sequence and what comes after it can both \
+                 start with {characters}, so a parser cannot tell whether to \
+                 take it"
+            ),
+            FindingKind::RepeatedFollowConflict { characters } => write!(
+                f,
+                "this repeated sequence and what comes after it can both \
+                 start with {characters}, so a parser cannot tell whether to \
+                 repeat it again"
+            ),
         }
     }
 }
@@ -119,6 +150,31 @@ mod tests {
             message: "these branches can both start with 'b'..='c'",
             help: "move what the branches start with in common before the \
                    choice, or exclude it from one with `-`",
+        },
+        Case {
+            source: "a = ['x'], 'x';",
+            is_kind: |kind| {
+                matches!(kind, FindingKind::OptionalFollowConflict { .. })
+            },
+            severity: Severity::Warning,
+            message: "this optional sequence and what comes after it can both \
+                      start with 'x', so a parser cannot tell whether to take \
+                      it",
+            help: "if the sequence should be taken whenever it can, as usual \
+                   for a dangling else, keep it; otherwise make what comes \
+                   after it start differently",
+        },
+        Case {
+            source: "a = {'x'}, 'x';",
+            is_kind: |kind| {
+                matches!(kind, FindingKind::RepeatedFollowConflict { .. })
+            },
+            severity: Severity::Warning,
+            message: "this repeated sequence and what comes after it can both \
+                      start with 'x', so a parser cannot tell whether to \
+                      repeat it again",
+            help: "end the repetition with something it cannot start with, or \
+                   make what comes after it start differently",
         },
     ];
 

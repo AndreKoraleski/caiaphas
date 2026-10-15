@@ -1,6 +1,6 @@
 //! Overlapping branches are alternatives that share some of the characters
 //! they can start with, so one character is not enough to pick between them.
-//! Optional and repeated sequences are not compared here.
+//! Optional and repeated sequences are left to the follow conflict check.
 
 use crate::analysis::{
     choice_point::{ChoiceKind, ChoicePoint},
@@ -74,7 +74,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_optional_sequences() {
+    fn leaves_optional_sequences_to_the_follow_conflict_check() {
         assert_eq!(
             overlaps("a = [? U+0061..U+0063 ?], ? U+0062..U+0064 ?;"),
             []
