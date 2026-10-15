@@ -2,6 +2,7 @@
 
 mod ambiguous_recursion;
 mod left_recursion;
+mod unproductive_rule;
 
 use crate::{
     analysis::{facts::Facts, finding::Finding},
@@ -12,5 +13,8 @@ use crate::{
 pub(super) type GrammarCheck = fn(&Grammar, &Facts<'_>, &mut Vec<Finding>);
 
 /// Every grammar check. A new one goes in its own file and in this list.
-pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] =
-    &[left_recursion::check, ambiguous_recursion::check];
+pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
+    left_recursion::check,
+    ambiguous_recursion::check,
+    unproductive_rule::check,
+];

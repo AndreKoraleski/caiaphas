@@ -14,6 +14,8 @@ pub(crate) struct Facts<'a> {
     grammar: &'a Grammar,
     /// Whether each rule can match nothing.
     nullable: OnceCell<Vec<bool>>,
+    /// Whether each rule can finish matching some input.
+    productive: OnceCell<Vec<bool>>,
     /// The characters each rule can start with.
     first: OnceCell<Vec<CharacterSet>>,
     /// The characters that can come right after each rule.
@@ -25,6 +27,7 @@ impl<'a> Facts<'a> {
         Self {
             grammar,
             nullable: OnceCell::new(),
+            productive: OnceCell::new(),
             first: OnceCell::new(),
             follow: OnceCell::new(),
         }
@@ -37,6 +40,14 @@ impl<'a> Facts<'a> {
     /// than too little.
     pub(crate) fn is_nullable(&self, expression: &Expression) -> bool {
         is_nullable(expression, self.nullable_rules())
+    }
+
+    /// Returns whether some input can finish matching `expression`.
+    ///
+    /// A syntactic term counts as one when its factor does, even if its
+    /// exception takes every match away.
+    pub(crate) fn is_productive(&self, expression: &Expression) -> bool {
+        is_productive(expression, self.productive_rules())
     }
 
     /// Returns the characters `expression` can start with.
@@ -185,6 +196,11 @@ impl<'a> Facts<'a> {
         self.nullable.get_or_init(|| self.rules_where(is_nullable))
     }
 
+    fn productive_rules(&self) -> &[bool] {
+        self.productive
+            .get_or_init(|| self.rules_where(is_productive))
+    }
+
     /// Returns which rules `holds` is true for, where whether it holds for a
     /// rule depends on whether it holds for the rules it references.
     ///
@@ -296,6 +312,31 @@ fn is_nullable(expression: &Expression, rules: &[bool]) -> bool {
     }
 }
 
+fn is_productive(expression: &Expression, rules: &[bool]) -> bool {
+    match &expression.kind {
+        ExpressionKind::SingleDefinition(expressions) => expressions
+            .iter()
+            .all(|expression| is_productive(expression, rules)),
+        ExpressionKind::DefinitionsList(expressions) => expressions
+            .iter()
+            .any(|expression| is_productive(expression, rules)),
+        ExpressionKind::OptionalSequence(_)
+        | ExpressionKind::RepeatedSequence(_)
+        | ExpressionKind::TerminalString(_)
+        | ExpressionKind::SpecialSequence(_)
+        | ExpressionKind::EmptySequence => true,
+        ExpressionKind::SyntacticFactor {
+            syntactic_primary: expression,
+            ..
+        }
+        | ExpressionKind::SyntacticTerm {
+            syntactic_factor: expression,
+            ..
+        } => is_productive(expression, rules),
+        ExpressionKind::MetaIdentifier(RuleId(position)) => rules[*position],
+    }
+}
+
 fn first(
     expression: &Expression,
     nullable: &[bool],
@@ -362,6 +403,17 @@ mod tests {
             .map(|position| facts.is_nullable(rule(&grammar, position)))
             .collect();
         assert_eq!(nullable, [true, true, false]);
+    }
+
+    #[test]
+    fn finds_rules_that_can_finish_matching() {
+        let grammar =
+            grammar("s = a | b | c; a = 'x', a; b = a | 'y'; c = [c], 'z';");
+        let facts = Facts::new(&grammar);
+        let productive: Vec<bool> = (0..4)
+            .map(|position| facts.is_productive(rule(&grammar, position)))
+            .collect();
+        assert_eq!(productive, [true, false, true, true]);
     }
 
     #[test]

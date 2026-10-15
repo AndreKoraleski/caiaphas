@@ -49,6 +49,8 @@ pub(crate) enum FindingKind {
     AmbiguousEmptyBranches,
     /// A repeated sequence can match nothing, so it could repeat forever.
     EmptyRepetition,
+    /// No input can ever finish matching a rule.
+    UnproductiveRule { meta_identifier: MetaIdentifier },
     /// An optional sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to take it.
     OptionalFollowConflict { characters: CharacterSet },
@@ -66,6 +68,7 @@ impl FindingKind {
             Self::ShadowedBranch => Severity::Warning,
             Self::AmbiguousEmptyBranches => Severity::Warning,
             Self::EmptyRepetition => Severity::Error,
+            Self::UnproductiveRule { .. } => Severity::Error,
             Self::OptionalFollowConflict { .. }
             | Self::RepeatedFollowConflict { .. } => Severity::Warning,
         }
@@ -82,6 +85,11 @@ impl FindingKind {
                      `{name} = {name}, x | y;` becomes `{name} = y, {{x}};`"
                 )
             }
+            Self::UnproductiveRule { meta_identifier } => format!(
+                "give `{}` an alternative that only reads characters, or make \
+                 the recursive part optional with `[...]` or `{{...}}`",
+                meta_identifier.as_str()
+            ),
             Self::AmbiguousRecursion { meta_identifier } => {
                 let name = meta_identifier.as_str();
                 format!(
@@ -153,6 +161,12 @@ impl fmt::Display for Finding {
             FindingKind::EmptyRepetition => f.write_str(
                 "this repeated sequence can match nothing, so it could repeat \
                  forever",
+            ),
+            FindingKind::UnproductiveRule { meta_identifier } => write!(
+                f,
+                "`{}` can never finish matching, since every way through it \
+                 needs a rule that cannot either",
+                meta_identifier.as_str()
             ),
             FindingKind::OptionalFollowConflict { characters } => write!(
                 f,
@@ -242,6 +256,17 @@ mod tests {
                       repeat forever",
             help: "make what repeats read something, such as by removing \
                    `[...]` inside the `{...}`",
+        },
+        Case {
+            source: "a = 'x', a;",
+            is_kind: |kind| {
+                matches!(kind, FindingKind::UnproductiveRule { .. })
+            },
+            severity: Severity::Error,
+            message: "`a` can never finish matching, since every way through \
+                      it needs a rule that cannot either",
+            help: "give `a` an alternative that only reads characters, or \
+                   make the recursive part optional with `[...]` or `{...}`",
         },
         Case {
             source: "a = ['x'], 'x';",
