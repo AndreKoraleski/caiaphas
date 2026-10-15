@@ -1,9 +1,6 @@
 //! Start rules are the rules a generated parser can start from.
 
-use crate::{
-    dictionary::meta_identifiers,
-    ir::{Rule, RuleId},
-};
+use crate::ir::{Rule, RuleId};
 
 /// Returns every rule that no other rule references.
 ///
@@ -11,11 +8,12 @@ use crate::{
 pub(super) fn start_rules(rules: &[Rule]) -> Vec<RuleId> {
     let mut referenced = vec![false; rules.len()];
     for (position, rule) in rules.iter().enumerate() {
-        meta_identifiers(&rule.definitions_list, &mut |RuleId(target), _| {
-            if target != position {
-                referenced[target] = true;
-            }
-        });
+        rule.definitions_list
+            .meta_identifiers(&mut |RuleId(target), _| {
+                if target != position {
+                    referenced[target] = true;
+                }
+            });
     }
     (0..rules.len())
         .filter(|&position| !referenced[position])

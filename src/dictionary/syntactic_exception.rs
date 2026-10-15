@@ -2,7 +2,7 @@
 //! ones without meta identifiers.
 
 use crate::{
-    dictionary::{DictionaryError, DictionaryErrorKind, meta_identifiers},
+    dictionary::{DictionaryError, DictionaryErrorKind},
     ir::{Expression, ExpressionKind, Rule, RuleId},
 };
 
@@ -33,7 +33,7 @@ fn check_expression(
     {
         // This checks every meta identifier in the exception, even in the
         // exceptions nested inside it, so only the factor is left to check.
-        meta_identifiers(syntactic_exception, &mut |rule_id, span| {
+        syntactic_exception.meta_identifiers(&mut |rule_id, span| {
             if !replaceable.is_replaceable(rule_id) {
                 let RuleId(position) = rule_id;
                 errors.push(DictionaryError {
@@ -79,10 +79,9 @@ impl Replaceable<'_> {
         }
         self.states[position] = State::Visiting;
         let mut targets = Vec::new();
-        meta_identifiers(
-            &self.rules[position].definitions_list,
-            &mut |target, _| targets.push(target),
-        );
+        self.rules[position]
+            .definitions_list
+            .meta_identifiers(&mut |target, _| targets.push(target));
         let replaceable = targets
             .into_iter()
             .all(|target| self.is_replaceable(target));

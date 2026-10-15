@@ -69,4 +69,26 @@ impl Expression {
             | ExpressionKind::EmptySequence => Vec::new(),
         }
     }
+
+    /// Calls `visit` with this expression and every expression inside it, each
+    /// before the ones inside it.
+    pub(crate) fn visit(&self, visit: &mut impl FnMut(&Self)) {
+        visit(self);
+        for child in self.children() {
+            child.visit(visit);
+        }
+    }
+
+    /// Calls `visit` with the rule and span of every meta identifier in this
+    /// expression.
+    pub(crate) fn meta_identifiers(
+        &self,
+        visit: &mut impl FnMut(RuleId, Span),
+    ) {
+        self.visit(&mut |expression| {
+            if let ExpressionKind::MetaIdentifier(rule_id) = expression.kind {
+                visit(rule_id, expression.span);
+            }
+        });
+    }
 }

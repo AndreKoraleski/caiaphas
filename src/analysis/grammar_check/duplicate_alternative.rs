@@ -19,11 +19,11 @@ use crate::{
 /// Reports every alternative that an earlier alternative of the same
 /// definitions list is written the same way as.
 pub(super) fn check(
-    _grammar: &Grammar,
-    facts: &Facts<'_>,
+    grammar: &Grammar,
+    _facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
-    facts.walk(&mut |expression, _| {
+    grammar.visit(&mut |expression| {
         let ExpressionKind::DefinitionsList(alternatives) = &expression.kind
         else {
             return;

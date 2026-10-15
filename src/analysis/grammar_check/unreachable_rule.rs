@@ -11,7 +11,7 @@ use crate::{
         facts::Facts,
         finding::{Finding, FindingKind},
     },
-    ir::{Expression, ExpressionKind, Grammar, RuleId},
+    ir::{Grammar, RuleId},
 };
 
 /// Reports every rule that no start rule can reach through references.
@@ -27,10 +27,9 @@ pub(super) fn check(
             continue;
         }
         reached[position] = true;
-        references(
-            &grammar.syntax_rules[position].definitions_list,
-            &mut pending,
-        );
+        grammar.syntax_rules[position]
+            .definitions_list
+            .meta_identifiers(&mut |rule_id, _| pending.push(rule_id));
     }
     for (rule, reached) in grammar.syntax_rules.iter().zip(reached) {
         if !reached {
@@ -42,16 +41,6 @@ pub(super) fn check(
                 labels: Vec::new(),
             });
         }
-    }
-}
-
-/// Adds every rule `expression` references to `found`.
-fn references(expression: &Expression, found: &mut Vec<RuleId>) {
-    if let ExpressionKind::MetaIdentifier(rule_id) = expression.kind {
-        found.push(rule_id);
-    }
-    for child in expression.children() {
-        references(child, found);
     }
 }
 

@@ -15,3 +15,13 @@ pub(crate) struct Grammar {
     /// The rules no other rule references. Each gets its own parser.
     pub(crate) start_syntax_rules: Vec<RuleId>,
 }
+
+impl Grammar {
+    /// Calls `visit` with every expression of every rule, each before the ones
+    /// inside it.
+    pub(crate) fn visit(&self, visit: &mut impl FnMut(&Expression)) {
+        for rule in &self.syntax_rules {
+            rule.definitions_list.visit(visit);
+        }
+    }
+}

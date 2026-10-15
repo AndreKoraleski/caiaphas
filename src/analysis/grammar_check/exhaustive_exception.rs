@@ -19,11 +19,11 @@ use crate::{
 /// Reports every syntactic term whose exception matches every character its
 /// factor does.
 pub(super) fn check(
-    _grammar: &Grammar,
+    grammar: &Grammar,
     facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
-    facts.walk(&mut |expression, _| {
+    grammar.visit(&mut |expression| {
         let ExpressionKind::SyntacticTerm {
             syntactic_factor,
             syntactic_exception,

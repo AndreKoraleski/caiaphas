@@ -13,7 +13,7 @@ use std::{
 
 use crate::{
     diagnostic::{Diagnostic, Label, Severity},
-    ir::{Expression, ExpressionKind, Grammar, RuleId},
+    ir::{Grammar, RuleId},
     lexer::MetaIdentifier,
     parser::{Syntax, SyntaxRule},
     span::Span,
@@ -48,20 +48,6 @@ pub(crate) fn build(syntax: &Syntax) -> (Grammar, Vec<DictionaryError>) {
         },
         errors,
     )
-}
-
-/// Calls `visit` with the rule and span of every meta identifier in
-/// `expression`.
-fn meta_identifiers(
-    expression: &Expression,
-    visit: &mut impl FnMut(RuleId, Span),
-) {
-    if let ExpressionKind::MetaIdentifier(rule_id) = expression.kind {
-        visit(rule_id, expression.span);
-    }
-    for child in expression.children() {
-        meta_identifiers(child, visit);
-    }
 }
 
 /// Maps each meta identifier to the syntax rule that defines it.
@@ -230,7 +216,10 @@ impl From<DictionaryError> for Diagnostic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::parse;
+    use crate::{
+        ir::{Expression, ExpressionKind},
+        parser::parse,
+    };
 
     /// Returns the grammar `source` defines, and the dictionary errors in it.
     pub(super) fn grammar(source: &str) -> (Grammar, Vec<DictionaryError>) {
