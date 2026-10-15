@@ -42,6 +42,9 @@ pub(crate) enum FindingKind {
     /// An alternative starts and ends with its own rule, so it can group
     /// either way.
     AmbiguousRecursion { meta_identifier: MetaIdentifier },
+    /// Every character a branch can start with, another branch of the same
+    /// choice can start with too.
+    ShadowedBranch,
     /// An optional sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to take it.
     OptionalFollowConflict { characters: CharacterSet },
@@ -56,6 +59,7 @@ impl FindingKind {
             Self::LeftRecursion { .. } => Severity::Error,
             Self::OverlappingBranches { .. } => Severity::Warning,
             Self::AmbiguousRecursion { .. } => Severity::Warning,
+            Self::ShadowedBranch => Severity::Warning,
             Self::OptionalFollowConflict { .. }
             | Self::RepeatedFollowConflict { .. } => Severity::Warning,
         }
@@ -84,6 +88,11 @@ impl FindingKind {
             Self::OverlappingBranches { .. } => {
                 "move what the branches start with in common before the \
                  choice, or exclude it from one with `-`"
+                    .to_owned()
+            }
+            Self::ShadowedBranch => {
+                "remove this branch if the other already matches what it \
+                 does, or exclude it from the other with `-`"
                     .to_owned()
             }
             Self::OptionalFollowConflict { .. } => {
@@ -118,6 +127,9 @@ impl fmt::Display for Finding {
                 "this alternative starts and ends with `{}`, so it can group \
                  either way",
                 meta_identifier.as_str()
+            ),
+            FindingKind::ShadowedBranch => f.write_str(
+                "another branch can start with every character this one can",
             ),
             FindingKind::OptionalFollowConflict { characters } => write!(
                 f,
@@ -181,6 +193,15 @@ mod tests {
             help: "replace one end with a rule that does not start with `e`, \
                    so `e = e, '+', e | 'n';` becomes `e = e, '+', term | \
                    term;` to group from the left",
+        },
+        Case {
+            source: "a = ? U+0061..U+007A ? | 'x';",
+            is_kind: |kind| *kind == FindingKind::ShadowedBranch,
+            severity: Severity::Warning,
+            message: "another branch can start with every character this one \
+                      can",
+            help: "remove this branch if the other already matches what it \
+                   does, or exclude it from the other with `-`",
         },
         Case {
             source: "a = ['x'], 'x';",

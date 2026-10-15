@@ -8,7 +8,8 @@ use crate::analysis::{
 };
 
 /// Reports every pair of branches that share some, but not all, of the
-/// characters either can start with.
+/// characters either can start with. When one has them all, the shadowed
+/// branch check reports it instead.
 pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
     if choice_point.kind != ChoiceKind::DefinitionsList {
         return;
@@ -87,7 +88,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_branches_that_contain_others() {
+    fn leaves_branches_that_contain_others_to_the_shadowed_check() {
         assert_eq!(overlaps("a = ? U+0061..U+007A ? | 'x';"), []);
     }
 }
