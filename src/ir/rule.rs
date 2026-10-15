@@ -1,6 +1,9 @@
 //! Rules of the intermediate representation.
 
-use crate::{ir::Expression, lexer::MetaIdentifier, span::Span};
+use crate::{
+    expectation::Expectation, ir::Expression, lexer::MetaIdentifier,
+    span::Span,
+};
 
 /// Identifies a rule by its index in the rules of its grammar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -11,6 +14,8 @@ pub(crate) struct RuleId(pub(crate) usize);
 pub(crate) struct Rule {
     pub(crate) meta_identifier: MetaIdentifier,
     pub(crate) definitions_list: Expression,
+    /// The findings the rule marks as intended.
+    pub(crate) expectations: Vec<Expectation>,
     /// The syntax rule it comes from.
     pub(crate) span: Span,
 }

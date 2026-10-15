@@ -35,6 +35,7 @@ impl Lowering<'_, '_> {
             meta_identifier: syntax_rule.meta_identifier.clone(),
             definitions_list: self
                 .definitions_list(&syntax_rule.definitions_list),
+            expectations: syntax_rule.expectations.clone(),
             span: syntax_rule.span,
         }
     }
@@ -249,6 +250,23 @@ mod tests {
             Span { start: 4, end: 9 }
         );
         assert_eq!(grammar.syntax_rules[0].span, Span { start: 0, end: 10 });
+    }
+
+    #[test]
+    fn keeps_the_expectations_of_each_rule() {
+        let (grammar, _) =
+            grammar("(* expect empty-rule: kept *) a = ; b = 'x', a;");
+        let codes: Vec<Vec<&str>> = grammar
+            .syntax_rules
+            .iter()
+            .map(|rule| {
+                rule.expectations
+                    .iter()
+                    .map(|expectation| expectation.code.as_str())
+                    .collect()
+            })
+            .collect();
+        assert_eq!(codes, [vec!["empty-rule"], vec![]]);
     }
 
     #[test]
