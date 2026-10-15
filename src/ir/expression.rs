@@ -23,6 +23,12 @@ pub(crate) enum ExpressionKind {
     OptionalSequence(Box<Expression>),
     /// Matches the expression any number of times.
     RepeatedSequence(Box<Expression>),
+    /// Matches `syntactic_primary` exactly `integer` times. Lowering only
+    /// makes one when `integer` is two or more.
+    SyntacticFactor {
+        integer: u32,
+        syntactic_primary: Box<Expression>,
+    },
     /// Matches what `syntactic_factor` matches, unless `syntactic_exception`
     /// matches it too.
     SyntacticTerm {
@@ -37,4 +43,30 @@ pub(crate) enum ExpressionKind {
     SpecialSequence(RangeInclusive<char>),
     /// Matches without reading anything.
     EmptySequence,
+}
+
+impl Expression {
+    /// Returns the expressions directly inside this one.
+    pub(crate) fn children(&self) -> Vec<&Self> {
+        match &self.kind {
+            ExpressionKind::SingleDefinition(expressions)
+            | ExpressionKind::DefinitionsList(expressions) => {
+                expressions.iter().collect()
+            }
+            ExpressionKind::OptionalSequence(expression)
+            | ExpressionKind::RepeatedSequence(expression)
+            | ExpressionKind::SyntacticFactor {
+                syntactic_primary: expression,
+                ..
+            } => vec![expression],
+            ExpressionKind::SyntacticTerm {
+                syntactic_factor,
+                syntactic_exception,
+            } => vec![syntactic_factor, syntactic_exception],
+            ExpressionKind::MetaIdentifier(_)
+            | ExpressionKind::TerminalString(_)
+            | ExpressionKind::SpecialSequence(_)
+            | ExpressionKind::EmptySequence => Vec::new(),
+        }
+    }
 }
