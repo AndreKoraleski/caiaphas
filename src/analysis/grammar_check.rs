@@ -1,0 +1,14 @@
+//! Grammar checks read the whole grammar, such as those about recursion.
+
+mod left_recursion;
+
+use crate::{
+    analysis::{facts::Facts, finding::Finding},
+    ir::Grammar,
+};
+
+/// A check over a whole grammar.
+pub(super) type GrammarCheck = fn(&Grammar, &Facts<'_>, &mut Vec<Finding>);
+
+/// Every grammar check. A new one goes in its own file and in this list.
+pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[left_recursion::check];
