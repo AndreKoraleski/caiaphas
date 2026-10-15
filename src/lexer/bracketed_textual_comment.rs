@@ -29,13 +29,10 @@ pub(crate) fn length(
     loop {
         total += gap_separator::length(&input[total..]);
         let after = &input[total..];
-        let mut chars = after.chars();
-        let first = chars
-            .next()
-            .ok_or(ParseBracketedTextualCommentError::NoEndCommentSymbol)?;
-        let (character, size) = TerminalCharacter::read(first, chars.next())
-            .ok_or(
-            ParseBracketedTextualCommentError::InvalidCharacter(first),
+        let (character, size) = TerminalCharacter::read_first(
+            after,
+            ParseBracketedTextualCommentError::NoEndCommentSymbol,
+            ParseBracketedTextualCommentError::InvalidCharacter,
         )?;
         total += match character {
             TerminalCharacter::Symbol(Symbol::StartComment) => {

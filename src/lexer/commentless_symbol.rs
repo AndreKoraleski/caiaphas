@@ -43,12 +43,11 @@ impl CommentlessSymbol {
     pub(crate) fn read(
         input: &str,
     ) -> Result<(Self, usize), ParseCommentlessSymbolError> {
-        let mut chars = input.chars();
-        let first = chars
-            .next()
-            .ok_or(ParseCommentlessSymbolError::EndOfInput)?;
-        let (character, length) = TerminalCharacter::read(first, chars.next())
-            .ok_or(ParseCommentlessSymbolError::InvalidCharacter(first))?;
+        let (character, length) = TerminalCharacter::read_first(
+            input,
+            ParseCommentlessSymbolError::EndOfInput,
+            ParseCommentlessSymbolError::InvalidCharacter,
+        )?;
         Ok(match character {
             TerminalCharacter::Letter(_) => {
                 let (identifier, length) = MetaIdentifier::read(input).expect(
@@ -80,6 +79,10 @@ impl CommentlessSymbol {
             }
             TerminalCharacter::Symbol(Symbol::StartComment)
             | TerminalCharacter::OtherCharacter(_) => {
+                let first = input
+                    .chars()
+                    .next()
+                    .expect("text with a terminal character is not empty");
                 return Err(ParseCommentlessSymbolError::NotCommentless(
                     first,
                 ));

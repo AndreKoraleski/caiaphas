@@ -48,6 +48,22 @@ impl TerminalCharacter {
             .map(|other| (Self::OtherCharacter(other), 1))
     }
 
+    /// Returns the terminal character at the start of `input`, and how many
+    /// characters it takes, 1 or 2.
+    ///
+    /// Returns `end` when `input` is empty, and `invalid` with the first
+    /// character when it is not a terminal character, so each caller reports
+    /// its own errors.
+    pub(crate) fn read_first<E>(
+        input: &str,
+        end: E,
+        invalid: impl FnOnce(char) -> E,
+    ) -> Result<(Self, usize), E> {
+        let mut chars = input.chars();
+        let first = chars.next().ok_or(end)?;
+        Self::read(first, chars.next()).ok_or_else(|| invalid(first))
+    }
+
     /// Returns whether this is a first terminal character.
     ///
     /// First terminal characters may appear in a terminal string between two
@@ -128,6 +144,22 @@ mod tests {
                 "{second:?}"
             );
         }
+    }
+
+    #[test]
+    fn reads_the_first_terminal_character_of_text() {
+        let read =
+            |input| TerminalCharacter::read_first(input, "end", |_| "invalid");
+        assert_eq!(
+            read("(*a"),
+            Ok((TerminalCharacter::Symbol(Symbol::StartComment), 2))
+        );
+        assert_eq!(read(""), Err("end"));
+        assert_eq!(read("é"), Err("invalid"));
+        assert_eq!(
+            TerminalCharacter::read_first("é", None, Some),
+            Err(Some('é'))
+        );
     }
 
     #[test]

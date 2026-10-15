@@ -27,14 +27,11 @@ impl TerminalString {
         };
         let mut length = 1;
         loop {
-            let mut chars = input[length..].chars();
-            let first = chars
-                .next()
-                .ok_or(ParseTerminalStringError::NoClosingQuote)?;
-            let (character, size) =
-                TerminalCharacter::read(first, chars.next()).ok_or(
-                    ParseTerminalStringError::InvalidCharacter(first),
-                )?;
+            let (character, size) = TerminalCharacter::read_first(
+                &input[length..],
+                ParseTerminalStringError::NoClosingQuote,
+                ParseTerminalStringError::InvalidCharacter,
+            )?;
             // No two-character symbol ends in a quote.
             if !is_content(character) {
                 if length == 1 {

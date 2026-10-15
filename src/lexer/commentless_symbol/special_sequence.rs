@@ -57,13 +57,11 @@ fn read_content(
     let mut length = 1;
     loop {
         length += gap_separator::length(&input[length..]);
-        let mut chars = input[length..].chars();
-        let first = chars
-            .next()
-            .ok_or(ParseSpecialSequenceError::NoClosingSymbol)?;
-        let (character, size) =
-            TerminalCharacter::read(first, chars.next())
-                .ok_or(ParseSpecialSequenceError::InvalidCharacter(first))?;
+        let (character, size) = TerminalCharacter::read_first(
+            &input[length..],
+            ParseSpecialSequenceError::NoClosingSymbol,
+            ParseSpecialSequenceError::InvalidCharacter,
+        )?;
         // No two-character symbol ends in a `?`.
         if character == TerminalCharacter::Symbol(Symbol::SpecialSequence) {
             return Ok((content, length + 1));
