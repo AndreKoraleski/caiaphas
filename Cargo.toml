@@ -19,6 +19,7 @@ categories = []
 # publish = false
 
 [dependencies]
+annotate-snippets = "0.12.16"
 
 # Lints warn locally. CI denies every warning.
 #
