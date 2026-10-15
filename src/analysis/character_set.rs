@@ -143,10 +143,22 @@ mod tests {
 
     #[test]
     fn merges_ranges_that_overlap_or_touch() {
-        assert_eq!(set(&['a'..='c', 'b'..='e']), set(&['a'..='e']));
-        assert_eq!(set(&['a'..='c', 'd'..='e']), set(&['a'..='e']));
-        assert_eq!(set(&['d'..='e', 'a'..='c']), set(&['a'..='e']));
-        assert_eq!(set(&['a'..='z', 'c'..='d']), set(&['a'..='z']));
+        assert_eq!(
+            set(&['a'..='c', 'b'..='e']),
+            CharacterSet::from_range('a'..='e')
+        );
+        assert_eq!(
+            set(&['a'..='c', 'd'..='e']),
+            CharacterSet::from_range('a'..='e')
+        );
+        assert_eq!(
+            set(&['d'..='e', 'a'..='c']),
+            CharacterSet::from_range('a'..='e')
+        );
+        assert_eq!(
+            set(&['a'..='z', 'c'..='d']),
+            CharacterSet::from_range('a'..='z')
+        );
     }
 
     #[test]
@@ -160,62 +172,80 @@ mod tests {
     #[test]
     fn intersects_sets() {
         let left = set(&['a'..='f', 'm'..='p']);
-        let right = set(&['d'..='n']);
+        let right = CharacterSet::from_range('d'..='n');
         assert_eq!(left.intersection(&right), set(&['d'..='f', 'm'..='n']));
-        assert!(left.intersection(&set(&['x'..='z'])).is_empty());
+        assert!(
+            left.intersection(&CharacterSet::from_range('x'..='z'))
+                .is_empty()
+        );
     }
 
     #[test]
     fn compares_subsets() {
-        assert!(set(&['b'..='c']).is_subset(&set(&['a'..='z'])));
-        assert!(set(&['a'..='z']).is_subset(&set(&['a'..='z'])));
-        assert!(!set(&['a'..='z']).is_subset(&set(&['b'..='c'])));
-        assert!(CharacterSet::default().is_subset(&set(&['a'..='a'])));
+        let letters = CharacterSet::from_range('a'..='z');
+        let some = CharacterSet::from_range('b'..='c');
+        assert!(some.is_subset(&letters));
+        assert!(letters.is_subset(&letters));
+        assert!(!letters.is_subset(&some));
+        assert!(CharacterSet::default().is_subset(&CharacterSet::single('a')));
     }
 
     #[test]
     fn subtracts_sets() {
-        let letters = set(&['a'..='z']);
+        let letters = CharacterSet::from_range('a'..='z');
         assert_eq!(
-            letters.difference(&set(&['x'..='x'])),
+            letters.difference(&CharacterSet::single('x')),
             set(&['a'..='w', 'y'..='z'])
         );
-        assert_eq!(letters.difference(&set(&['a'..='c'])), set(&['d'..='z']));
-        assert_eq!(letters.difference(&set(&['x'..='z'])), set(&['a'..='w']));
+        assert_eq!(
+            letters.difference(&CharacterSet::from_range('a'..='c')),
+            CharacterSet::from_range('d'..='z')
+        );
+        assert_eq!(
+            letters.difference(&CharacterSet::from_range('x'..='z')),
+            CharacterSet::from_range('a'..='w')
+        );
         assert_eq!(
             letters.difference(&set(&['b'..='c', 'm'..='n', 'y'..='y'])),
             set(&['a'..='a', 'd'..='l', 'o'..='x', 'z'..='z'])
         );
-        assert_eq!(letters.difference(&set(&['0'..='9'])), letters);
-        assert!(letters.difference(&set(&['\0'..=char::MAX])).is_empty());
+        assert_eq!(
+            letters.difference(&CharacterSet::from_range('0'..='9')),
+            letters
+        );
+        assert!(
+            letters
+                .difference(&CharacterSet::from_range('\0'..=char::MAX))
+                .is_empty()
+        );
     }
 
     #[test]
     fn subtracts_across_ranges_and_the_surrogates() {
         let two = set(&['a'..='c', 'x'..='z']);
         assert_eq!(
-            two.difference(&set(&['b'..='y'])),
+            two.difference(&CharacterSet::from_range('b'..='y')),
             set(&['a'..='a', 'z'..='z'])
         );
-        let around = set(&['\u{D000}'..='\u{F000}']);
+        let around = CharacterSet::from_range('\u{D000}'..='\u{F000}');
         assert_eq!(
-            around.difference(&set(&['\u{E000}'..='\u{E000}'])),
+            around.difference(&CharacterSet::single('\u{E000}')),
             set(&['\u{D000}'..='\u{D7FF}', '\u{E001}'..='\u{F000}'])
         );
         assert_eq!(
-            around.difference(&set(&['\u{D7FF}'..='\u{D7FF}'])),
+            around.difference(&CharacterSet::single('\u{D7FF}')),
             set(&['\u{D000}'..='\u{D7FE}', '\u{E000}'..='\u{F000}'])
         );
-        let all = set(&['\0'..=char::MAX]);
+        let all = CharacterSet::from_range('\0'..=char::MAX);
         assert_eq!(
             all.difference(&set(&['\0'..='\0', char::MAX..=char::MAX])),
-            set(&['\u{1}'..='\u{10FFFE}'])
+            CharacterSet::from_range('\u{1}'..='\u{10FFFE}')
         );
     }
 
     #[test]
     fn handles_the_whole_range_of_characters() {
-        let all = set(&['\0'..=char::MAX]);
+        let all = CharacterSet::from_range('\0'..=char::MAX);
         assert_eq!(all.union(&CharacterSet::single('a')), all);
         assert!(CharacterSet::single(char::MAX).is_subset(&all));
     }
