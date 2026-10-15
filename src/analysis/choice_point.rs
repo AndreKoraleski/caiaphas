@@ -43,7 +43,7 @@ pub(crate) fn choice_points(facts: &Facts<'_>) -> Vec<ChoicePoint> {
     facts.walk(&mut |expression, after| {
         let branch = |branch: &Expression| Branch {
             span: branch.span,
-            first: facts.first_before(branch, after),
+            first: facts.first_before(branch, &after.characters),
             nullable: facts.is_nullable(branch),
         };
         let end = || Branch {
@@ -51,7 +51,7 @@ pub(crate) fn choice_points(facts: &Facts<'_>) -> Vec<ChoicePoint> {
                 start: expression.span.end,
                 end: expression.span.end,
             },
-            first: after.clone(),
+            first: after.characters.clone(),
             nullable: true,
         };
         let (kind, branches) = match &expression.kind {

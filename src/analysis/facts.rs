@@ -18,8 +18,8 @@ pub(crate) struct Facts<'a> {
     productive: OnceCell<Vec<bool>>,
     /// The characters each rule can start with.
     first: OnceCell<Vec<CharacterSet>>,
-    /// The characters that can come right after each rule.
-    follow: OnceCell<Vec<CharacterSet>>,
+    /// What can come right after each rule.
+    follow: OnceCell<Vec<Follow>>,
     /// The characters each rule matches, when it only ever matches one
     /// character.
     characters: OnceCell<Vec<Option<CharacterSet>>>,
@@ -113,12 +113,9 @@ impl<'a> Facts<'a> {
         found
     }
 
-    /// Calls `visit` with every expression of every rule, and the characters
-    /// that can come right after it.
-    pub(crate) fn walk(
-        &self,
-        visit: &mut impl FnMut(&Expression, &CharacterSet),
-    ) {
+    /// Calls `visit` with every expression of every rule, and what can come
+    /// right after it.
+    pub(crate) fn walk(&self, visit: &mut impl FnMut(&Expression, &Follow)) {
         for (position, rule) in self.grammar.syntax_rules.iter().enumerate() {
             let after = self.follow_rules()[position].clone();
             self.walk_expression(&rule.definitions_list, &after, visit);
@@ -128,8 +125,8 @@ impl<'a> Facts<'a> {
     fn walk_expression(
         &self,
         expression: &Expression,
-        after: &CharacterSet,
-        visit: &mut impl FnMut(&Expression, &CharacterSet),
+        after: &Follow,
+        visit: &mut impl FnMut(&Expression, &Follow),
     ) {
         visit(expression, after);
         match &expression.kind {
@@ -137,7 +134,12 @@ impl<'a> Facts<'a> {
                 let mut rest = after.clone();
                 for expression in expressions.iter().rev() {
                     self.walk_expression(expression, &rest, visit);
-                    rest = self.first_before(expression, &rest);
+                    rest = Follow {
+                        characters: self
+                            .first_before(expression, &rest.characters),
+                        end_of_input: rest.end_of_input
+                            && self.is_nullable(expression),
+                    };
                 }
             }
             ExpressionKind::DefinitionsList(expressions) => {
@@ -153,7 +155,12 @@ impl<'a> Facts<'a> {
                 syntactic_primary: expression,
                 ..
             } => {
-                let again = self.first(expression).union(after);
+                let again = Follow {
+                    characters: self
+                        .first(expression)
+                        .union(&after.characters),
+                    end_of_input: after.end_of_input,
+                };
                 self.walk_expression(expression, &again, visit);
             }
             ExpressionKind::SyntacticTerm {
@@ -161,7 +168,17 @@ impl<'a> Facts<'a> {
                 syntactic_exception,
             } => {
                 self.walk_expression(syntactic_factor, after, visit);
-                self.walk_expression(syntactic_exception, after, visit);
+                // The exception only reads what its factor matched, so it ends
+                // where that does, as if the input ended there.
+                let exception_after = Follow {
+                    characters: after.characters.clone(),
+                    end_of_input: true,
+                };
+                self.walk_expression(
+                    syntactic_exception,
+                    &exception_after,
+                    visit,
+                );
             }
             ExpressionKind::MetaIdentifier(_)
             | ExpressionKind::TerminalString(_)
@@ -283,10 +300,13 @@ impl<'a> Facts<'a> {
         })
     }
 
-    fn follow_rules(&self) -> &[CharacterSet] {
+    fn follow_rules(&self) -> &[Follow] {
         self.follow.get_or_init(|| {
             let rules = &self.grammar.syntax_rules;
-            let mut sets = vec![CharacterSet::default(); rules.len()];
+            let mut sets = vec![Follow::default(); rules.len()];
+            for RuleId(position) in &self.grammar.start_syntax_rules {
+                sets[*position].end_of_input = true;
+            }
             let mut changed = true;
             while changed {
                 changed = false;
@@ -314,6 +334,24 @@ impl<'a> Facts<'a> {
             }
             sets
         })
+    }
+}
+
+/// What can come right after an expression.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Follow {
+    pub(crate) characters: CharacterSet,
+    /// Whether the input can end right after it, since a parser reads the
+    /// whole input from a start rule.
+    pub(crate) end_of_input: bool,
+}
+
+impl Follow {
+    fn union(&self, other: &Self) -> Self {
+        Self {
+            characters: self.characters.union(&other.characters),
+            end_of_input: self.end_of_input || other.end_of_input,
+        }
     }
 }
 
@@ -592,11 +630,18 @@ mod tests {
     fn finds_what_follows_each_rule() {
         let grammar = grammar("a = b, 'x' | c; b = 'y'; c = b, [b], 'z';");
         let facts = Facts::new(&grammar);
-        let follow =
-            |position: usize| facts.follow_rules()[position].to_string();
+        let follow = |position: usize| {
+            facts.follow_rules()[position].characters.to_string()
+        };
         assert_eq!(follow(0), "");
         assert_eq!(follow(1), "'x'..='z'");
         assert_eq!(follow(2), "");
+        let ends: Vec<bool> = facts
+            .follow_rules()
+            .iter()
+            .map(|follow| follow.end_of_input)
+            .collect();
+        assert_eq!(ends, [true, false, true]);
     }
 
     #[test]
@@ -618,15 +663,25 @@ mod tests {
 
     #[test]
     fn walks_every_expression_with_what_follows_it() {
-        let grammar = grammar("a = 'x', {'y'}, 'z';");
+        let grammar = grammar("a = 'x' - 'u', {'y'}, 'z', {'w'};");
         let facts = Facts::new(&grammar);
         let mut seen = Vec::new();
         facts.walk(&mut |expression, after| {
             if let ExpressionKind::TerminalString(string) = &expression.kind {
-                seen.push(format!("{string}:{after}"));
+                let end = if after.end_of_input { " end" } else { "" };
+                seen.push(format!("{string}:{}{end}", after.characters));
             }
         });
         seen.sort();
-        assert_eq!(seen, ["x:'y'..='z'", "y:'y'..='z'", "z:"]);
+        assert_eq!(
+            seen,
+            [
+                "u:'y'..='z' end",
+                "w:'w' end",
+                "x:'y'..='z'",
+                "y:'y'..='z'",
+                "z:'w' end"
+            ]
+        );
     }
 }
