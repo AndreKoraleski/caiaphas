@@ -65,6 +65,8 @@ pub(crate) enum FindingKind {
     /// A syntactic exception can never apply, since nothing its factor matches
     /// is also matched by the exception.
     IneffectiveException,
+    /// A rule can match nothing and nothing else, so it never reads input.
+    EmptyRule { meta_identifier: MetaIdentifier },
     /// An optional sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to take it.
     OptionalFollowConflict { characters: CharacterSet },
@@ -87,6 +89,7 @@ impl FindingKind {
             Self::IndirectLeftRecursion { .. } => Severity::Error,
             Self::DuplicateAlternative => Severity::Warning,
             Self::IneffectiveException => Severity::Warning,
+            Self::EmptyRule { .. } => Severity::Warning,
             Self::OptionalFollowConflict { .. }
             | Self::RepeatedFollowConflict { .. } => Severity::Warning,
         }
@@ -131,6 +134,11 @@ impl FindingKind {
                 )
             }
             Self::DuplicateAlternative => "remove this alternative".to_owned(),
+            Self::EmptyRule { meta_identifier } => format!(
+                "give `{}` something to read, or remove it and every \
+                 reference to it",
+                meta_identifier.as_str()
+            ),
             Self::IneffectiveException => {
                 "remove the exception, or write the one that was meant"
                     .to_owned()
@@ -227,6 +235,11 @@ impl fmt::Display for Finding {
             FindingKind::IneffectiveException => f.write_str(
                 "this exception can never apply, since nothing before the `-` \
                  matches the same input",
+            ),
+            FindingKind::EmptyRule { meta_identifier } => write!(
+                f,
+                "`{}` can only match nothing, so it never reads any input",
+                meta_identifier.as_str()
             ),
             FindingKind::OptionalFollowConflict { characters } => write!(
                 f,
@@ -364,6 +377,14 @@ mod tests {
             message: "this exception can never apply, since nothing before \
                       the `-` matches the same input",
             help: "remove the exception, or write the one that was meant",
+        },
+        Case {
+            source: "s = a, 'x'; a = ;",
+            is_kind: |kind| matches!(kind, FindingKind::EmptyRule { .. }),
+            severity: Severity::Warning,
+            message: "`a` can only match nothing, so it never reads any input",
+            help: "give `a` something to read, or remove it and every \
+                   reference to it",
         },
         Case {
             source: "a = ['x'], 'x';",
