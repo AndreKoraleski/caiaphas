@@ -819,6 +819,12 @@ mod tests {
     #[test]
     fn describes_every_kind_of_finding() {
         for case in CASES {
+            assert_eq!(
+                FindingCode::from_name(case.code.name()),
+                Some(case.code),
+                "{} is missing from `FindingCode::ALL`",
+                case.code.name()
+            );
             let finding = crate::analysis::tests::findings(case.source)
                 .into_iter()
                 .find(|finding| finding.kind.code() == case.code)

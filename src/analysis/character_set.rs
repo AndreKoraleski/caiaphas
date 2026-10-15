@@ -13,6 +13,7 @@ impl CharacterSet {
     /// Returns the set of every character in `range`. The range must not be
     /// empty.
     pub(crate) fn from_range(range: RangeInclusive<char>) -> Self {
+        debug_assert!(!range.is_empty(), "{range:?} is empty");
         Self {
             ranges: vec![range],
         }
