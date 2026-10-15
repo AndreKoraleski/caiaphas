@@ -19,6 +19,7 @@ pub(crate) use syntax::Syntax;
 pub(crate) use syntax_rule::SyntaxRule;
 
 use crate::{
+    expectation::Comment,
     lexer::{CommentlessSymbol, LexErrorKind, Lexer, Symbol, Token},
     span::Span,
 };
@@ -40,6 +41,30 @@ pub(crate) fn parse(source: &str) -> (Syntax, Vec<ParseError>) {
         }
     }
     let mut errors = parser.errors;
+    for &span in parser.lexer.comments() {
+        let text = &source[span.start..span.end];
+        let expectation = match Comment::read(text, span) {
+            Comment::Ordinary => continue,
+            Comment::Expectation(expectation) => expectation,
+            Comment::Malformed => {
+                errors.push(ParseError {
+                    kind: ParseErrorKind::MalformedExpectation,
+                    span,
+                });
+                continue;
+            }
+        };
+        let inside = rules.iter().any(|rule| {
+            rule.span.start < span.start && span.end < rule.span.end
+        });
+        match rules.iter_mut().find(|rule| rule.span.start >= span.end) {
+            Some(rule) if !inside => rule.expectations.push(expectation),
+            _ => errors.push(ParseError {
+                kind: ParseErrorKind::ExpectationWithoutRule,
+                span,
+            }),
+        }
+    }
     if rules.is_empty() && errors.is_empty() {
         errors.push(ParseError {
             kind: ParseErrorKind::NoSyntaxRule,
@@ -185,6 +210,10 @@ pub(crate) enum ParseErrorKind {
     UnexpectedEnd(Expected),
     /// The source has no syntax rule at all.
     NoSyntaxRule,
+    /// A comment starts with `expect` but is not written as an expectation.
+    MalformedExpectation,
+    /// An expectation is not right before a syntax rule.
+    ExpectationWithoutRule,
 }
 
 /// What the syntax needs where a [`ParseError`] is.
@@ -226,6 +255,14 @@ impl fmt::Display for ParseError {
             ParseErrorKind::NoSyntaxRule => {
                 f.write_str("EBNF grammar has no syntax rule")
             }
+            ParseErrorKind::MalformedExpectation => f.write_str(
+                "an expectation is written `(* expect code-in-kebab-case: \
+                 reason *)`",
+            ),
+            ParseErrorKind::ExpectationWithoutRule => f.write_str(
+                "an expectation must come right before the syntax rule it is \
+                 about",
+            ),
         }
     }
 }
@@ -520,6 +557,81 @@ mod tests {
         assert_eq!(starts, [6, 11, 21]);
     }
 
+    /// Returns the codes of the expectations of each syntax rule.
+    fn expectations(syntax: &Syntax) -> Vec<Vec<&str>> {
+        syntax
+            .syntax_rules
+            .iter()
+            .map(|rule| {
+                rule.expectations
+                    .iter()
+                    .map(|expectation| expectation.code.as_str())
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn attaches_expectations_to_the_rule_after_them() {
+        let source = "(* expect empty-rule: kept for later *) a = ; \
+                      (* a note *) b = 'x'; \
+                      (* expect shadowed-branch: first *) \
+                      (* expect unreachable-rule: second *) c = 'y';";
+        let syntax = parse_valid(source);
+        assert_eq!(
+            expectations(&syntax),
+            [
+                vec!["empty-rule"],
+                vec![],
+                vec!["shadowed-branch", "unreachable-rule"]
+            ]
+        );
+        let expectation = &syntax.syntax_rules[0].expectations[0];
+        assert_eq!(expectation.reason, "kept for later");
+        assert_eq!(expectation.span, Span { start: 0, end: 39 });
+    }
+
+    #[test]
+    fn rejects_a_malformed_expectation() {
+        let (syntax, errors) = parse("(* expect empty-rule *) a = 'x';");
+        assert_eq!(expectations(&syntax), [Vec::<&str>::new()]);
+        assert_eq!(
+            errors,
+            [ParseError {
+                kind: ParseErrorKind::MalformedExpectation,
+                span: Span { start: 0, end: 23 },
+            }]
+        );
+    }
+
+    #[test]
+    fn rejects_an_expectation_without_a_rule_after_it() {
+        for (source, start) in [
+            ("a = 'x'; (* expect empty-rule: kept *)", 9),
+            ("a = 'x', (* expect empty-rule: kept *) 'y';", 9),
+            ("a = 'x', (* expect empty-rule: kept *) 'y'; b = 'z';", 9),
+        ] {
+            let (syntax, errors) = parse(source);
+            assert!(
+                syntax
+                    .syntax_rules
+                    .iter()
+                    .all(|rule| rule.expectations.is_empty())
+            );
+            assert_eq!(
+                errors,
+                [ParseError {
+                    kind: ParseErrorKind::ExpectationWithoutRule,
+                    span: Span {
+                        start,
+                        end: start + 29,
+                    },
+                }],
+                "{source:?}"
+            );
+        }
+    }
+
     #[test]
     fn rejects_a_grammar_without_syntax_rules() {
         for source in ["", "  \n", "(* nothing here *)"] {
@@ -565,6 +677,16 @@ mod tests {
             (
                 error(ParseErrorKind::NoSyntaxRule),
                 "EBNF grammar has no syntax rule",
+            ),
+            (
+                error(ParseErrorKind::MalformedExpectation),
+                "an expectation is written `(* expect code-in-kebab-case: \
+                 reason *)`",
+            ),
+            (
+                error(ParseErrorKind::ExpectationWithoutRule),
+                "an expectation must come right before the syntax rule it is \
+                 about",
             ),
         ];
         for (error, message) in cases {

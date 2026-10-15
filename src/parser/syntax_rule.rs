@@ -1,6 +1,7 @@
 //! Syntax rules of ISO/IEC 14977 EBNF.
 
 use crate::{
+    expectation::Expectation,
     lexer::{CommentlessSymbol, MetaIdentifier, Symbol},
     parser::{
         Expected, ParseError, Parser, definitions_list::DefinitionsList,
@@ -14,6 +15,8 @@ use crate::{
 pub(crate) struct SyntaxRule {
     pub(crate) meta_identifier: MetaIdentifier,
     pub(crate) definitions_list: DefinitionsList,
+    /// The findings the comments right before the rule mark as intended.
+    pub(crate) expectations: Vec<Expectation>,
     /// From the meta identifier to the terminator, both included.
     pub(crate) span: Span,
 }
@@ -38,6 +41,7 @@ impl SyntaxRule {
         Ok(Self {
             meta_identifier: name,
             definitions_list,
+            expectations: Vec::new(),
             span: start.to(end),
         })
     }

@@ -27,6 +27,8 @@ use crate::span::Span;
 pub(crate) struct Lexer<'a> {
     source: &'a str,
     position: usize,
+    /// Where each comment read so far is.
+    comments: Vec<Span>,
 }
 
 impl<'a> Lexer<'a> {
@@ -34,7 +36,14 @@ impl<'a> Lexer<'a> {
         Self {
             source,
             position: 0,
+            comments: Vec::new(),
         }
+    }
+
+    /// Returns where each comment read so far is, in order. A comment that
+    /// could not be read is not one of them.
+    pub(crate) fn comments(&self) -> &[Span] {
+        &self.comments
     }
 
     /// Moves past the gaps and comments at the current position, or past the
@@ -46,7 +55,10 @@ impl<'a> Lexer<'a> {
                 return Ok(());
             }
             match bracketed_textual_comment::length(self.rest()) {
-                Ok(length) => self.position += length,
+                Ok(length) => {
+                    let span = self.advance(length);
+                    self.comments.push(span);
+                }
                 Err(error) => {
                     let length = unchecked_comment_length(self.rest());
                     return Err(self.skip(
@@ -262,6 +274,16 @@ mod tests {
     #[test]
     fn reads_nothing_from_gaps_and_comments() {
         assert_eq!(Lexer::new(" \n\t(* a *) (* b (* c *) *)\r\n").count(), 0);
+    }
+
+    #[test]
+    fn remembers_where_each_comment_is() {
+        let mut lexer = Lexer::new("a (* x *) = (* y (* z *) *) b; (* broken");
+        lexer.by_ref().for_each(drop);
+        assert_eq!(
+            lexer.comments(),
+            [Span { start: 2, end: 9 }, Span { start: 12, end: 27 }]
+        );
     }
 
     #[test]
