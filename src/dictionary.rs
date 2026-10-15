@@ -2,6 +2,7 @@
 //! representation.
 
 mod lower;
+mod start_rules;
 
 use std::{
     collections::{HashMap, hash_map::Entry},
@@ -10,7 +11,7 @@ use std::{
 };
 
 use crate::{
-    ir::{Grammar, RuleId},
+    ir::{Expression, ExpressionKind, Grammar, RuleId},
     lexer::MetaIdentifier,
     parser::{Syntax, SyntaxRule},
     span::Span,
@@ -25,7 +26,17 @@ pub(crate) fn build(syntax: &Syntax) -> (Grammar, Vec<DictionaryError>) {
     let mut errors = Vec::new();
     let index = Index::new(syntax, &mut errors);
     let syntax_rules = lower::lower(&index, &mut errors);
-    let start_syntax_rules = Vec::new();
+    let start_syntax_rules = start_rules::start_rules(&syntax_rules);
+    if start_syntax_rules.is_empty() {
+        if let (Some(first), Some(last)) =
+            (syntax_rules.first(), syntax_rules.last())
+        {
+            errors.push(DictionaryError {
+                kind: DictionaryErrorKind::NoStartSyntaxRule,
+                span: first.span.to(last.span),
+            });
+        }
+    }
     errors.sort_by_key(|error| error.span.start);
     (
         Grammar {
@@ -34,6 +45,20 @@ pub(crate) fn build(syntax: &Syntax) -> (Grammar, Vec<DictionaryError>) {
         },
         errors,
     )
+}
+
+/// Calls `visit` with the rule and span of every meta identifier in
+/// `expression`.
+fn meta_identifiers(
+    expression: &Expression,
+    visit: &mut impl FnMut(RuleId, Span),
+) {
+    if let ExpressionKind::MetaIdentifier(rule_id) = expression.kind {
+        visit(rule_id, expression.span);
+    }
+    for child in expression.children() {
+        meta_identifiers(child, visit);
+    }
 }
 
 /// Maps each meta identifier to the syntax rule that defines it.
@@ -101,6 +126,10 @@ pub(crate) enum DictionaryErrorKind {
     },
     /// No syntax rule defines a meta identifier that is used.
     UndefinedMetaIdentifier { meta_identifier: MetaIdentifier },
+    /// Every syntax rule is referenced by another, so none can start a parser.
+    /// A rule such as `grammar = expression;` that nothing references fixes
+    /// it.
+    NoStartSyntaxRule,
 }
 
 impl fmt::Display for DictionaryError {
@@ -117,6 +146,10 @@ impl fmt::Display for DictionaryError {
             } => {
                 write!(f, "`{}` is not defined", meta_identifier.as_str())
             }
+            DictionaryErrorKind::NoStartSyntaxRule => f.write_str(
+                "every syntax rule is referenced by another, so none starts \
+                 the grammar",
+            ),
         }
     }
 }
@@ -126,10 +159,7 @@ impl Error for DictionaryError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        ir::{Expression, ExpressionKind},
-        parser::parse,
-    };
+    use crate::parser::parse;
 
     /// Returns the grammar `source` defines, and the dictionary errors in it.
     pub(super) fn grammar(source: &str) -> (Grammar, Vec<DictionaryError>) {
@@ -201,12 +231,24 @@ mod tests {
         }
     }
 
+    /// Returns the names of the start rules of `grammar`.
+    pub(super) fn start_names(grammar: &Grammar) -> Vec<&str> {
+        grammar
+            .start_syntax_rules
+            .iter()
+            .map(|&RuleId(position)| {
+                grammar.syntax_rules[position].meta_identifier.as_str()
+            })
+            .collect()
+    }
+
     #[test]
     fn builds_a_grammar_without_errors() {
         let (grammar, errors) = grammar("a = b, 'x'; b = 'y' | 'z';");
         assert_eq!(errors, []);
         assert_eq!(render(&grammar, "a"), "seq(b, 'x')");
         assert_eq!(render(&grammar, "b"), "alt('y', 'z')");
+        assert_eq!(start_names(&grammar), ["a"]);
     }
 
     #[test]
@@ -219,6 +261,7 @@ mod tests {
                 DictionaryErrorKind::UndefinedMetaIdentifier { .. } => {
                     "undefined"
                 }
+                DictionaryErrorKind::NoStartSyntaxRule => "no start",
             })
             .collect();
         assert_eq!(kinds, ["undefined", "duplicate"]);
@@ -240,7 +283,14 @@ mod tests {
 
     #[test]
     fn error_displays_every_message() {
-        let cases = [("a = b;", "`b` is not defined")];
+        let cases = [
+            ("a = b;", "`b` is not defined"),
+            (
+                "a = b; b = a;",
+                "every syntax rule is referenced by another, so none starts \
+                 the grammar",
+            ),
+        ];
         for (source, message) in cases {
             let (_, errors) = grammar(source);
             assert_eq!(errors[0].to_string(), message, "{source:?}");

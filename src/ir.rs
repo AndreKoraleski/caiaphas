@@ -1,8 +1,6 @@
 //! The intermediate representation of a grammar, as analysis and code
 //! generation read it.
 
-#![expect(dead_code, reason = "no dictionary builds the IR yet")]
-
 mod expression;
 mod rule;
 
