@@ -1,6 +1,8 @@
 //! The dictionary resolves the syntax rules of a grammar into its intermediate
 //! representation.
 
+mod lower;
+
 use std::{
     collections::{HashMap, hash_map::Entry},
     error::Error,
@@ -8,11 +10,31 @@ use std::{
 };
 
 use crate::{
-    ir::RuleId,
+    ir::{Grammar, RuleId},
     lexer::MetaIdentifier,
     parser::{Syntax, SyntaxRule},
     span::Span,
 };
+
+/// Returns the grammar `syntax` defines, and every error found while resolving
+/// it.
+///
+/// The grammar holds every rule, even those with errors, so later checks can
+/// still read the rest.
+pub(crate) fn build(syntax: &Syntax) -> (Grammar, Vec<DictionaryError>) {
+    let mut errors = Vec::new();
+    let index = Index::new(syntax, &mut errors);
+    let syntax_rules = lower::lower(&index, &mut errors);
+    let start_syntax_rules = Vec::new();
+    errors.sort_by_key(|error| error.span.start);
+    (
+        Grammar {
+            syntax_rules,
+            start_syntax_rules,
+        },
+        errors,
+    )
+}
 
 /// Maps each meta identifier to the syntax rule that defines it.
 struct Index<'a> {
@@ -77,6 +99,8 @@ pub(crate) enum DictionaryErrorKind {
         meta_identifier: MetaIdentifier,
         first_definition: Span,
     },
+    /// No syntax rule defines a meta identifier that is used.
+    UndefinedMetaIdentifier { meta_identifier: MetaIdentifier },
 }
 
 impl fmt::Display for DictionaryError {
@@ -88,6 +112,11 @@ impl fmt::Display for DictionaryError {
             } => {
                 write!(f, "`{}` is already defined", meta_identifier.as_str())
             }
+            DictionaryErrorKind::UndefinedMetaIdentifier {
+                meta_identifier,
+            } => {
+                write!(f, "`{}` is not defined", meta_identifier.as_str())
+            }
         }
     }
 }
@@ -97,7 +126,126 @@ impl Error for DictionaryError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::parse;
+    use crate::{
+        ir::{Expression, ExpressionKind},
+        parser::parse,
+    };
+
+    /// Returns the grammar `source` defines, and the dictionary errors in it.
+    pub(super) fn grammar(source: &str) -> (Grammar, Vec<DictionaryError>) {
+        build(&syntax(source))
+    }
+
+    /// Writes the rule `name` defines as a compact expression, such as
+    /// `seq(alt('x', 'y'), opt(b))`.
+    pub(super) fn render(grammar: &Grammar, name: &str) -> String {
+        let rule = grammar
+            .syntax_rules
+            .iter()
+            .find(|rule| rule.meta_identifier.as_str() == name)
+            .expect("the grammar defines the rule");
+        render_expression(grammar, &rule.definitions_list)
+    }
+
+    fn render_expression(
+        grammar: &Grammar,
+        expression: &Expression,
+    ) -> String {
+        let list = |name: &str, expressions: &[Expression]| {
+            let items: Vec<String> = expressions
+                .iter()
+                .map(|expression| render_expression(grammar, expression))
+                .collect();
+            format!("{name}({})", items.join(", "))
+        };
+        match &expression.kind {
+            ExpressionKind::SingleDefinition(expressions) => {
+                list("seq", expressions)
+            }
+            ExpressionKind::DefinitionsList(expressions) => {
+                list("alt", expressions)
+            }
+            ExpressionKind::OptionalSequence(expression) => {
+                format!("opt({})", render_expression(grammar, expression))
+            }
+            ExpressionKind::RepeatedSequence(expression) => {
+                format!("rep({})", render_expression(grammar, expression))
+            }
+            ExpressionKind::SyntacticFactor {
+                integer,
+                syntactic_primary,
+            } => format!(
+                "{integer}*{}",
+                render_expression(grammar, syntactic_primary)
+            ),
+            ExpressionKind::SyntacticTerm {
+                syntactic_factor,
+                syntactic_exception,
+            } => format!(
+                "except({}, {})",
+                render_expression(grammar, syntactic_factor),
+                render_expression(grammar, syntactic_exception)
+            ),
+            ExpressionKind::MetaIdentifier(RuleId(position)) => grammar
+                .syntax_rules[*position]
+                .meta_identifier
+                .as_str()
+                .to_owned(),
+            ExpressionKind::TerminalString(string) => format!("'{string}'"),
+            ExpressionKind::SpecialSequence(range) => format!(
+                "U+{:04X}..U+{:04X}",
+                u32::from(*range.start()),
+                u32::from(*range.end())
+            ),
+            ExpressionKind::EmptySequence => "empty".to_owned(),
+        }
+    }
+
+    #[test]
+    fn builds_a_grammar_without_errors() {
+        let (grammar, errors) = grammar("a = b, 'x'; b = 'y' | 'z';");
+        assert_eq!(errors, []);
+        assert_eq!(render(&grammar, "a"), "seq(b, 'x')");
+        assert_eq!(render(&grammar, "b"), "alt('y', 'z')");
+    }
+
+    #[test]
+    fn collects_every_error_in_order() {
+        let (_, errors) = grammar("a = c; a = 'x'; b = 'y' - b, [b];");
+        let kinds: Vec<&str> = errors
+            .iter()
+            .map(|error| match error.kind {
+                DictionaryErrorKind::DuplicateDefinition { .. } => "duplicate",
+                DictionaryErrorKind::UndefinedMetaIdentifier { .. } => {
+                    "undefined"
+                }
+            })
+            .collect();
+        assert_eq!(kinds, ["undefined", "duplicate"]);
+    }
+
+    #[test]
+    fn keeps_every_rule_after_an_error() {
+        let (grammar, _) = grammar("a = c; b = 'x';");
+        assert_eq!(render(&grammar, "a"), "empty");
+        assert_eq!(render(&grammar, "b"), "'x'");
+    }
+
+    #[test]
+    fn builds_an_empty_grammar_without_errors() {
+        let (grammar, errors) = build(&parse("").0);
+        assert_eq!(grammar.syntax_rules, []);
+        assert_eq!(errors, []);
+    }
+
+    #[test]
+    fn error_displays_every_message() {
+        let cases = [("a = b;", "`b` is not defined")];
+        for (source, message) in cases {
+            let (_, errors) = grammar(source);
+            assert_eq!(errors[0].to_string(), message, "{source:?}");
+        }
+    }
 
     fn syntax(source: &str) -> Syntax {
         let (syntax, errors) = parse(source);

@@ -10,6 +10,11 @@ mod syntax_rule;
 
 use std::{error::Error, fmt};
 
+pub(crate) use definitions_list::DefinitionsList;
+pub(crate) use single_definition::SingleDefinition;
+pub(crate) use syntactic_factor::SyntacticFactor;
+pub(crate) use syntactic_primary::{SyntacticPrimary, SyntacticPrimaryKind};
+pub(crate) use syntactic_term::SyntacticTerm;
 pub(crate) use syntax::Syntax;
 pub(crate) use syntax_rule::SyntaxRule;
 

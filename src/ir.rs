@@ -6,7 +6,7 @@
 mod expression;
 mod rule;
 
-pub(crate) use expression::Expression;
+pub(crate) use expression::{Expression, ExpressionKind};
 pub(crate) use rule::{Rule, RuleId};
 
 /// A grammar is its rules, with every reference between them resolved.
