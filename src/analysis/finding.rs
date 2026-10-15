@@ -59,6 +59,9 @@ pub(crate) enum FindingKind {
         meta_identifier: MetaIdentifier,
         through: MetaIdentifier,
     },
+    /// An alternative is written the same way as an earlier alternative of the
+    /// same choice.
+    DuplicateAlternative,
     /// An optional sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to take it.
     OptionalFollowConflict { characters: CharacterSet },
@@ -79,6 +82,7 @@ impl FindingKind {
             Self::UnproductiveRule { .. } => Severity::Error,
             Self::UnreachableRule { .. } => Severity::Warning,
             Self::IndirectLeftRecursion { .. } => Severity::Error,
+            Self::DuplicateAlternative => Severity::Warning,
             Self::OptionalFollowConflict { .. }
             | Self::RepeatedFollowConflict { .. } => Severity::Warning,
         }
@@ -122,6 +126,7 @@ impl FindingKind {
                      from the left"
                 )
             }
+            Self::DuplicateAlternative => "remove this alternative".to_owned(),
             Self::OverlappingBranches { .. } => {
                 "move what the branches start with in common before the \
                  choice, or exclude it from one with `-`"
@@ -206,6 +211,10 @@ impl fmt::Display for Finding {
                  so its parser would never end",
                 meta_identifier.as_str(),
                 through.as_str()
+            ),
+            FindingKind::DuplicateAlternative => f.write_str(
+                "this alternative is written the same way as an earlier one, \
+                 so both always match the same input",
             ),
             FindingKind::OptionalFollowConflict { characters } => write!(
                 f,
@@ -327,6 +336,14 @@ mod tests {
                       anything, so its parser would never end",
             help: "replace `b` in `a` with its definition until the recursion \
                    is direct, then rewrite it as a repetition",
+        },
+        Case {
+            source: "a = 'x' | 'x';",
+            is_kind: |kind| *kind == FindingKind::DuplicateAlternative,
+            severity: Severity::Warning,
+            message: "this alternative is written the same way as an earlier \
+                      one, so both always match the same input",
+            help: "remove this alternative",
         },
         Case {
             source: "a = ['x'], 'x';",
