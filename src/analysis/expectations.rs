@@ -2,7 +2,8 @@
 //! them out.
 
 use crate::{
-    analysis::finding::{Finding, FindingCode, FindingKind, Label},
+    analysis::finding::{Finding, FindingCode, FindingKind},
+    diagnostic::Label,
     ir::Grammar,
 };
 

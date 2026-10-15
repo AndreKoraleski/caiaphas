@@ -4,8 +4,9 @@
 use crate::{
     analysis::{
         facts::Facts,
-        finding::{Finding, FindingKind, Label},
+        finding::{Finding, FindingKind},
     },
+    diagnostic::Label,
     ir::{Grammar, RuleId},
 };
 
@@ -39,10 +40,8 @@ pub(super) fn check(
 #[cfg(test)]
 mod tests {
     use crate::{
-        analysis::{
-            finding::{FindingKind, Label},
-            tests::findings,
-        },
+        analysis::{finding::FindingKind, tests::findings},
+        diagnostic::Label,
         span::Span,
     };
 

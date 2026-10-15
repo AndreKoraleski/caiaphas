@@ -8,8 +8,9 @@
 use crate::{
     analysis::{
         facts::Facts,
-        finding::{Finding, FindingKind, Label},
+        finding::{Finding, FindingKind},
     },
+    diagnostic::Label,
     ir::{Grammar, RuleId},
     span::Span,
 };

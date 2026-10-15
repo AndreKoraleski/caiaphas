@@ -2,9 +2,12 @@
 //! they can start with, so one character is not enough to pick between them.
 //! Optional and repeated sequences are left to the follow conflict check.
 
-use crate::analysis::{
-    choice_point::{ChoiceKind, ChoicePoint},
-    finding::{Finding, FindingKind, Label},
+use crate::{
+    analysis::{
+        choice_point::{ChoiceKind, ChoicePoint},
+        finding::{Finding, FindingKind},
+    },
+    diagnostic::Label,
 };
 
 /// Reports every pair of branches that share some, but not all, of the
@@ -38,10 +41,8 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
 #[cfg(test)]
 mod tests {
     use crate::{
-        analysis::{
-            finding::{FindingKind, Label},
-            tests::findings,
-        },
+        analysis::{finding::FindingKind, tests::findings},
+        diagnostic::Label,
         span::Span,
     };
 

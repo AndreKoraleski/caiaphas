@@ -9,8 +9,9 @@
 use crate::{
     analysis::{
         facts::Facts,
-        finding::{Finding, FindingKind, Label},
+        finding::{Finding, FindingKind},
     },
+    diagnostic::Label,
     ir::{ExpressionKind, Grammar},
 };
 

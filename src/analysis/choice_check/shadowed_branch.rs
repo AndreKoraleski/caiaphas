@@ -2,9 +2,12 @@
 //! another alternative of the same choice can start with too. Optional and
 //! repeated sequences are left to the follow conflict check.
 
-use crate::analysis::{
-    choice_point::{ChoiceKind, ChoicePoint},
-    finding::{Finding, FindingKind, Label},
+use crate::{
+    analysis::{
+        choice_point::{ChoiceKind, ChoicePoint},
+        finding::{Finding, FindingKind},
+    },
+    diagnostic::Label,
 };
 
 /// Reports every branch whose characters another branch has all of, once,

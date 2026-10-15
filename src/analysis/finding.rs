@@ -3,7 +3,10 @@
 use std::fmt;
 
 use crate::{
-    analysis::character_set::CharacterSet, lexer::MetaIdentifier, span::Span,
+    analysis::character_set::CharacterSet,
+    diagnostic::{Label, Severity},
+    lexer::MetaIdentifier,
+    span::Span,
 };
 
 /// A finding is one problem the analysis found, and where.
@@ -13,22 +16,6 @@ pub(crate) struct Finding {
     pub(crate) span: Span,
     /// Other places that explain the finding, such as another branch.
     pub(crate) labels: Vec<Label>,
-}
-
-/// A label points at another place a finding involves.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Label {
-    pub(crate) span: Span,
-    pub(crate) message: &'static str,
-}
-
-/// How serious a finding is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Severity {
-    /// The grammar cannot become a parser that works.
-    Error,
-    /// The parser works, but may choose a branch the grammar did not mean.
-    Warning,
 }
 
 /// What a [`Finding`] is.

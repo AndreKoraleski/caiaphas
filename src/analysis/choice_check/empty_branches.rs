@@ -1,9 +1,12 @@
 //! Empty branches can match nothing, and a choice with more than one of them
 //! has more than one way to match nothing.
 
-use crate::analysis::{
-    choice_point::{ChoiceKind, ChoicePoint},
-    finding::{Finding, FindingKind, Label},
+use crate::{
+    analysis::{
+        choice_point::{ChoiceKind, ChoicePoint},
+        finding::{Finding, FindingKind},
+    },
+    diagnostic::Label,
 };
 
 /// Reports every choice point with more than one branch that can match
