@@ -3,6 +3,7 @@
 mod ambiguous_recursion;
 mod left_recursion;
 mod unproductive_rule;
+mod unreachable_rule;
 
 use crate::{
     analysis::{facts::Facts, finding::Finding},
@@ -17,4 +18,5 @@ pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     left_recursion::check,
     ambiguous_recursion::check,
     unproductive_rule::check,
+    unreachable_rule::check,
 ];

@@ -51,6 +51,8 @@ pub(crate) enum FindingKind {
     EmptyRepetition,
     /// No input can ever finish matching a rule.
     UnproductiveRule { meta_identifier: MetaIdentifier },
+    /// No start rule can reach a rule, so no parser uses it.
+    UnreachableRule { meta_identifier: MetaIdentifier },
     /// An optional sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to take it.
     OptionalFollowConflict { characters: CharacterSet },
@@ -69,6 +71,7 @@ impl FindingKind {
             Self::AmbiguousEmptyBranches => Severity::Warning,
             Self::EmptyRepetition => Severity::Error,
             Self::UnproductiveRule { .. } => Severity::Error,
+            Self::UnreachableRule { .. } => Severity::Warning,
             Self::OptionalFollowConflict { .. }
             | Self::RepeatedFollowConflict { .. } => Severity::Warning,
         }
@@ -88,6 +91,10 @@ impl FindingKind {
             Self::UnproductiveRule { meta_identifier } => format!(
                 "give `{}` an alternative that only reads characters, or make \
                  the recursive part optional with `[...]` or `{{...}}`",
+                meta_identifier.as_str()
+            ),
+            Self::UnreachableRule { meta_identifier } => format!(
+                "remove `{}`, or reference it from a rule a parser uses",
                 meta_identifier.as_str()
             ),
             Self::AmbiguousRecursion { meta_identifier } => {
@@ -166,6 +173,12 @@ impl fmt::Display for Finding {
                 f,
                 "`{}` can never finish matching, since every way through it \
                  needs a rule that cannot either",
+                meta_identifier.as_str()
+            ),
+            FindingKind::UnreachableRule { meta_identifier } => write!(
+                f,
+                "`{}` cannot be reached from any start rule, so no parser \
+                 uses it",
                 meta_identifier.as_str()
             ),
             FindingKind::OptionalFollowConflict { characters } => write!(
@@ -267,6 +280,16 @@ mod tests {
                       it needs a rule that cannot either",
             help: "give `a` an alternative that only reads characters, or \
                    make the recursive part optional with `[...]` or `{...}`",
+        },
+        Case {
+            source: "s = 'x'; a = 'y', [b]; b = 'z', a;",
+            is_kind: |kind| {
+                matches!(kind, FindingKind::UnreachableRule { .. })
+            },
+            severity: Severity::Warning,
+            message: "`a` cannot be reached from any start rule, so no parser \
+                      uses it",
+            help: "remove `a`, or reference it from a rule a parser uses",
         },
         Case {
             source: "a = ['x'], 'x';",
