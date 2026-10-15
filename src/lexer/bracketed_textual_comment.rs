@@ -34,9 +34,9 @@ pub(crate) fn length(
             .next()
             .ok_or(ParseBracketedTextualCommentError::NoEndCommentSymbol)?;
         let (character, size) = TerminalCharacter::read(first, chars.next())
-            .map_err(|_| {
-            ParseBracketedTextualCommentError::InvalidCharacter(first)
-        })?;
+            .ok_or(
+            ParseBracketedTextualCommentError::InvalidCharacter(first),
+        )?;
         total += match character {
             TerminalCharacter::Symbol(Symbol::StartComment) => {
                 depth += 1;

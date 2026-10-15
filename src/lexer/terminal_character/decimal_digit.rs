@@ -1,7 +1,5 @@
 //! Decimal digits of ISO/IEC 14977 EBNF.
 
-use std::{error::Error, fmt};
-
 /// A decimal digit from `0` to `9`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum DecimalDigit {
@@ -17,11 +15,10 @@ pub(crate) enum DecimalDigit {
     Nine,
 }
 
-impl TryFrom<char> for DecimalDigit {
-    type Error = ParseDecimalDigitError;
-
-    fn try_from(value: char) -> Result<Self, Self::Error> {
-        Ok(match value {
+impl DecimalDigit {
+    /// Returns the decimal digit `c` is, if it is one.
+    pub(crate) fn from_char(c: char) -> Option<Self> {
+        Some(match c {
             '0' => Self::Zero,
             '1' => Self::One,
             '2' => Self::Two,
@@ -32,22 +29,10 @@ impl TryFrom<char> for DecimalDigit {
             '7' => Self::Seven,
             '8' => Self::Eight,
             '9' => Self::Nine,
-            _ => return Err(ParseDecimalDigitError(value)),
+            _ => return None,
         })
     }
 }
-
-/// Error returned when a character is not a [`DecimalDigit`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct ParseDecimalDigitError(char);
-
-impl fmt::Display for ParseDecimalDigitError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} is not a valid EBNF decimal digit", self.0)
-    }
-}
-
-impl Error for ParseDecimalDigitError {}
 
 #[cfg(test)]
 mod tests {
@@ -69,7 +54,7 @@ mod tests {
     #[test]
     fn parses_every_digit() {
         for (c, digit) in ('0'..='9').zip(DECIMAL_DIGITS) {
-            assert_eq!(DecimalDigit::try_from(c), Ok(digit), "{c:?}");
+            assert_eq!(DecimalDigit::from_char(c), Some(digit), "{c:?}");
         }
     }
 
@@ -77,11 +62,7 @@ mod tests {
     fn rejects_every_other_ascii_character() {
         for c in (0..=0x7F_u8).map(char::from) {
             if !c.is_ascii_digit() {
-                assert_eq!(
-                    DecimalDigit::try_from(c),
-                    Err(ParseDecimalDigitError(c)),
-                    "{c:?}"
-                );
+                assert_eq!(DecimalDigit::from_char(c), None, "{c:?}");
             }
         }
     }
@@ -99,11 +80,7 @@ mod tests {
             'Ⅳ',  // Roman numeral four
             '\u{10FFFF}',
         ] {
-            assert_eq!(
-                DecimalDigit::try_from(c),
-                Err(ParseDecimalDigitError(c)),
-                "{c:?}"
-            );
+            assert_eq!(DecimalDigit::from_char(c), None, "{c:?}");
         }
     }
 
@@ -111,19 +88,5 @@ mod tests {
     fn ordering_follows_numeric_value() {
         assert!(DECIMAL_DIGITS.is_sorted());
         assert!(DecimalDigit::Zero < DecimalDigit::Nine);
-    }
-
-    #[test]
-    fn error_displays_message() {
-        assert_eq!(
-            ParseDecimalDigitError('x').to_string(),
-            "'x' is not a valid EBNF decimal digit"
-        );
-    }
-
-    #[test]
-    fn error_implements_error_trait() {
-        let error: Box<dyn Error> = Box::new(ParseDecimalDigitError('x'));
-        assert!(error.source().is_none());
     }
 }

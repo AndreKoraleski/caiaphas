@@ -61,10 +61,9 @@ fn read_content(
         let first = chars
             .next()
             .ok_or(ParseSpecialSequenceError::NoClosingSymbol)?;
-        let (character, size) = TerminalCharacter::read(first, chars.next())
-            .map_err(|_| {
-            ParseSpecialSequenceError::InvalidCharacter(first)
-        })?;
+        let (character, size) =
+            TerminalCharacter::read(first, chars.next())
+                .ok_or(ParseSpecialSequenceError::InvalidCharacter(first))?;
         // No two-character symbol ends in a `?`.
         if character == TerminalCharacter::Symbol(Symbol::SpecialSequence) {
             return Ok((content, length + 1));

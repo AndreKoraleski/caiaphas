@@ -1,7 +1,5 @@
 //! Letters of ISO/IEC 14977 EBNF.
 
-use std::{error::Error, fmt};
-
 /// Whether a [`Letter`] is written in lowercase or uppercase.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Case {
@@ -40,17 +38,16 @@ pub(crate) enum Letter {
     Z(Case),
 }
 
-impl TryFrom<char> for Letter {
-    type Error = ParseLetterError;
-
-    fn try_from(value: char) -> Result<Self, Self::Error> {
-        let case = if value.is_ascii_lowercase() {
+impl Letter {
+    /// Returns the letter `c` is, if it is one.
+    pub(crate) fn from_char(c: char) -> Option<Self> {
+        let case = if c.is_ascii_lowercase() {
             Case::Lowercase
         } else {
             Case::Uppercase
         };
 
-        Ok(match value.to_ascii_uppercase() {
+        Some(match c.to_ascii_uppercase() {
             'A' => Self::A(case),
             'B' => Self::B(case),
             'C' => Self::C(case),
@@ -77,22 +74,10 @@ impl TryFrom<char> for Letter {
             'X' => Self::X(case),
             'Y' => Self::Y(case),
             'Z' => Self::Z(case),
-            _ => return Err(ParseLetterError(value)),
+            _ => return None,
         })
     }
 }
-
-/// Error returned when a character is not a [`Letter`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct ParseLetterError(char);
-
-impl fmt::Display for ParseLetterError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} is not a valid EBNF letter", self.0)
-    }
-}
-
-impl Error for ParseLetterError {}
 
 #[cfg(test)]
 mod tests {
@@ -131,8 +116,8 @@ mod tests {
     fn parses_every_lowercase_letter() {
         for (c, variant) in ('a'..='z').zip(LETTERS) {
             assert_eq!(
-                Letter::try_from(c),
-                Ok(variant(Case::Lowercase)),
+                Letter::from_char(c),
+                Some(variant(Case::Lowercase)),
                 "{c:?}"
             );
         }
@@ -142,8 +127,8 @@ mod tests {
     fn parses_every_uppercase_letter() {
         for (c, variant) in ('A'..='Z').zip(LETTERS) {
             assert_eq!(
-                Letter::try_from(c),
-                Ok(variant(Case::Uppercase)),
+                Letter::from_char(c),
+                Some(variant(Case::Uppercase)),
                 "{c:?}"
             );
         }
@@ -153,11 +138,7 @@ mod tests {
     fn rejects_every_other_ascii_character() {
         for c in (0..=0x7F_u8).map(char::from) {
             if !c.is_ascii_alphabetic() {
-                assert_eq!(
-                    Letter::try_from(c),
-                    Err(ParseLetterError(c)),
-                    "{c:?}"
-                );
+                assert_eq!(Letter::from_char(c), None, "{c:?}");
             }
         }
     }
@@ -177,13 +158,13 @@ mod tests {
             '\u{00A0}', // no-break space
             '\u{10FFFF}',
         ] {
-            assert_eq!(Letter::try_from(c), Err(ParseLetterError(c)), "{c:?}");
+            assert_eq!(Letter::from_char(c), None, "{c:?}");
         }
     }
 
     #[test]
     fn case_distinguishes_letters() {
-        assert_ne!(Letter::try_from('a'), Letter::try_from('A'));
+        assert_ne!(Letter::from_char('a'), Letter::from_char('A'));
     }
 
     #[test]
@@ -191,19 +172,5 @@ mod tests {
         assert!(Letter::A(Case::Uppercase) < Letter::B(Case::Lowercase));
         assert!(Letter::A(Case::Lowercase) < Letter::A(Case::Uppercase));
         assert!(Case::Lowercase < Case::Uppercase);
-    }
-
-    #[test]
-    fn error_displays_message() {
-        assert_eq!(
-            ParseLetterError('1').to_string(),
-            "'1' is not a valid EBNF letter"
-        );
-    }
-
-    #[test]
-    fn error_implements_error_trait() {
-        let error: Box<dyn Error> = Box::new(ParseLetterError('1'));
-        assert!(error.source().is_none());
     }
 }

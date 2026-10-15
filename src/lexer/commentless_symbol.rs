@@ -48,9 +48,7 @@ impl CommentlessSymbol {
             .next()
             .ok_or(ParseCommentlessSymbolError::EndOfInput)?;
         let (character, length) = TerminalCharacter::read(first, chars.next())
-            .map_err(|_| {
-                ParseCommentlessSymbolError::InvalidCharacter(first)
-            })?;
+            .ok_or(ParseCommentlessSymbolError::InvalidCharacter(first))?;
         Ok(match character {
             TerminalCharacter::Letter(_) => {
                 let (identifier, length) = MetaIdentifier::read(input).expect(

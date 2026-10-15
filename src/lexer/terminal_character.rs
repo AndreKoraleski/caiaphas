@@ -5,8 +5,6 @@ mod letter;
 mod other_character;
 mod symbol;
 
-use std::{error::Error, fmt};
-
 use decimal_digit::DecimalDigit;
 use letter::Letter;
 use other_character::OtherCharacter;
@@ -34,21 +32,20 @@ impl TerminalCharacter {
     pub(crate) fn read(
         first: char,
         second: Option<char>,
-    ) -> Result<(Self, usize), ParseTerminalCharacterError> {
-        if let Ok(letter) = Letter::try_from(first) {
-            return Ok((Self::Letter(letter), 1));
+    ) -> Option<(Self, usize)> {
+        if let Some(letter) = Letter::from_char(first) {
+            return Some((Self::Letter(letter), 1));
         }
-        if let Ok(digit) = DecimalDigit::try_from(first) {
-            return Ok((Self::DecimalDigit(digit), 1));
+        if let Some(digit) = DecimalDigit::from_char(first) {
+            return Some((Self::DecimalDigit(digit), 1));
         }
         // `:` alone is an other character, but `:)` is a symbol, so the
         // longer symbol is tried first.
-        if let Ok((symbol, length)) = Symbol::read(first, second) {
-            return Ok((Self::Symbol(symbol), length));
+        if let Some((symbol, length)) = Symbol::read(first, second) {
+            return Some((Self::Symbol(symbol), length));
         }
-        OtherCharacter::try_from(first)
+        OtherCharacter::from_char(first)
             .map(|other| (Self::OtherCharacter(other), 1))
-            .map_err(|_| ParseTerminalCharacterError(first))
     }
 
     /// Returns whether this is a first terminal character.
@@ -68,18 +65,6 @@ impl TerminalCharacter {
     }
 }
 
-/// Error returned when a character does not start a [`TerminalCharacter`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct ParseTerminalCharacterError(char);
-
-impl fmt::Display for ParseTerminalCharacterError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} is not a valid EBNF terminal character", self.0)
-    }
-}
-
-impl Error for ParseTerminalCharacterError {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,11 +73,17 @@ mod tests {
     fn reads_letters() {
         assert_eq!(
             TerminalCharacter::read('a', None),
-            Ok((TerminalCharacter::Letter(Letter::try_from('a').unwrap()), 1))
+            Some((
+                TerminalCharacter::Letter(Letter::from_char('a').unwrap()),
+                1
+            ))
         );
         assert_eq!(
             TerminalCharacter::read('Z', Some('*')),
-            Ok((TerminalCharacter::Letter(Letter::try_from('Z').unwrap()), 1))
+            Some((
+                TerminalCharacter::Letter(Letter::from_char('Z').unwrap()),
+                1
+            ))
         );
     }
 
@@ -100,9 +91,9 @@ mod tests {
     fn reads_digits() {
         assert_eq!(
             TerminalCharacter::read('7', Some(')')),
-            Ok((
+            Some((
                 TerminalCharacter::DecimalDigit(
-                    DecimalDigit::try_from('7').unwrap()
+                    DecimalDigit::from_char('7').unwrap()
                 ),
                 1
             ))
@@ -113,11 +104,11 @@ mod tests {
     fn reads_two_character_symbols() {
         assert_eq!(
             TerminalCharacter::read('(', Some('*')),
-            Ok((TerminalCharacter::Symbol(Symbol::StartComment), 2))
+            Some((TerminalCharacter::Symbol(Symbol::StartComment), 2))
         );
         assert_eq!(
             TerminalCharacter::read('(', Some(' ')),
-            Ok((TerminalCharacter::Symbol(Symbol::StartGroup), 1))
+            Some((TerminalCharacter::Symbol(Symbol::StartGroup), 1))
         );
     }
 
@@ -125,12 +116,12 @@ mod tests {
     fn reads_a_colon_as_a_symbol_only_before_an_end_group() {
         assert_eq!(
             TerminalCharacter::read(':', Some(')')),
-            Ok((TerminalCharacter::Symbol(Symbol::EndRepeat), 2))
+            Some((TerminalCharacter::Symbol(Symbol::EndRepeat), 2))
         );
         for second in [None, Some(' '), Some(':'), Some('a')] {
             assert_eq!(
                 TerminalCharacter::read(':', second),
-                Ok((
+                Some((
                     TerminalCharacter::OtherCharacter(OtherCharacter::Colon),
                     1
                 )),
@@ -143,11 +134,17 @@ mod tests {
     fn reads_other_characters() {
         assert_eq!(
             TerminalCharacter::read(' ', None),
-            Ok((TerminalCharacter::OtherCharacter(OtherCharacter::Space), 1))
+            Some((
+                TerminalCharacter::OtherCharacter(OtherCharacter::Space),
+                1
+            ))
         );
         assert_eq!(
             TerminalCharacter::read('~', None),
-            Ok((TerminalCharacter::OtherCharacter(OtherCharacter::Tilde), 1))
+            Some((
+                TerminalCharacter::OtherCharacter(OtherCharacter::Tilde),
+                1
+            ))
         );
     }
 
@@ -156,7 +153,7 @@ mod tests {
         for c in (0..=0x7F_u8).map(char::from) {
             let is_terminal = c == ' ' || c.is_ascii_graphic();
             assert_eq!(
-                TerminalCharacter::read(c, None).is_ok(),
+                TerminalCharacter::read(c, None).is_some(),
                 is_terminal,
                 "{c:?}"
             );
@@ -166,29 +163,21 @@ mod tests {
     #[test]
     fn rejects_non_ascii_characters() {
         for c in ['é', '\u{00A0}', '＊', '（', '\u{10FFFF}'] {
-            assert_eq!(
-                TerminalCharacter::read(c, None),
-                Err(ParseTerminalCharacterError(c)),
-                "{c:?}"
-            );
+            assert_eq!(TerminalCharacter::read(c, None), None, "{c:?}");
         }
     }
 
     #[test]
     fn rejects_control_characters() {
         for c in ['\0', '\t', '\n', '\r', '\x0B', '\x0C', '\x7F'] {
-            assert_eq!(
-                TerminalCharacter::read(c, None),
-                Err(ParseTerminalCharacterError(c)),
-                "{c:?}"
-            );
+            assert_eq!(TerminalCharacter::read(c, None), None, "{c:?}");
         }
     }
 
     #[test]
     fn first_terminal_characters_exclude_only_the_first_quote() {
         for c in (0..=0x7F_u8).map(char::from) {
-            if let Ok((character, _)) = TerminalCharacter::read(c, None) {
+            if let Some((character, _)) = TerminalCharacter::read(c, None) {
                 assert_eq!(
                     character.is_first_terminal_character(),
                     c != '\'',
@@ -201,7 +190,7 @@ mod tests {
     #[test]
     fn second_terminal_characters_exclude_only_the_second_quote() {
         for c in (0..=0x7F_u8).map(char::from) {
-            if let Ok((character, _)) = TerminalCharacter::read(c, None) {
+            if let Some((character, _)) = TerminalCharacter::read(c, None) {
                 assert_eq!(
                     character.is_second_terminal_character(),
                     c != '"',
@@ -209,20 +198,5 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn error_displays_message() {
-        assert_eq!(
-            ParseTerminalCharacterError('é').to_string(),
-            "'é' is not a valid EBNF terminal character"
-        );
-    }
-
-    #[test]
-    fn error_implements_error_trait() {
-        let error = ParseTerminalCharacterError('é');
-        let error: &dyn Error = &error;
-        assert!(error.source().is_none());
     }
 }

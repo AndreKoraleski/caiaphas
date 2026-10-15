@@ -1,7 +1,5 @@
 //! Other characters of ISO/IEC 14977 EBNF.
 
-use std::{error::Error, fmt};
-
 /// One of the 15 ASCII characters, space included, that may appear in terminal
 /// strings and comments but is not a symbol of its own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -23,11 +21,10 @@ pub(crate) enum OtherCharacter {
     Tilde,
 }
 
-impl TryFrom<char> for OtherCharacter {
-    type Error = ParseOtherCharacterError;
-
-    fn try_from(value: char) -> Result<Self, Self::Error> {
-        Ok(match value {
+impl OtherCharacter {
+    /// Returns the other character `c` is, if it is one.
+    pub(crate) fn from_char(c: char) -> Option<Self> {
+        Some(match c {
             ' ' => Self::Space,
             ':' => Self::Colon,
             '+' => Self::Plus,
@@ -43,22 +40,10 @@ impl TryFrom<char> for OtherCharacter {
             '^' => Self::Caret,
             '`' => Self::Backtick,
             '~' => Self::Tilde,
-            _ => return Err(ParseOtherCharacterError(value)),
+            _ => return None,
         })
     }
 }
-
-/// Error returned when a character is not an [`OtherCharacter`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct ParseOtherCharacterError(char);
-
-impl fmt::Display for ParseOtherCharacterError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} is not a valid EBNF other character", self.0)
-    }
-}
-
-impl Error for ParseOtherCharacterError {}
 
 #[cfg(test)]
 mod tests {
@@ -86,7 +71,7 @@ mod tests {
     #[test]
     fn parses_every_other_character() {
         for (c, other) in OTHER_CHARACTERS {
-            assert_eq!(OtherCharacter::try_from(c), Ok(other), "{c:?}");
+            assert_eq!(OtherCharacter::from_char(c), Some(other), "{c:?}");
         }
     }
 
@@ -94,11 +79,7 @@ mod tests {
     fn rejects_every_other_ascii_character() {
         for c in (0..=0x7F_u8).map(char::from) {
             if !OTHER_CHARACTERS.iter().any(|&(other, _)| other == c) {
-                assert_eq!(
-                    OtherCharacter::try_from(c),
-                    Err(ParseOtherCharacterError(c)),
-                    "{c:?}"
-                );
+                assert_eq!(OtherCharacter::from_char(c), None, "{c:?}");
             }
         }
     }
@@ -117,30 +98,12 @@ mod tests {
             '∼',        // tilde operator
             '\u{10FFFF}',
         ] {
-            assert_eq!(
-                OtherCharacter::try_from(c),
-                Err(ParseOtherCharacterError(c)),
-                "{c:?}"
-            );
+            assert_eq!(OtherCharacter::from_char(c), None, "{c:?}");
         }
     }
 
     #[test]
     fn ordering_follows_the_standard() {
         assert!(OTHER_CHARACTERS.map(|(_, other)| other).is_sorted());
-    }
-
-    #[test]
-    fn error_displays_message() {
-        assert_eq!(
-            ParseOtherCharacterError('a').to_string(),
-            "'a' is not a valid EBNF other character"
-        );
-    }
-
-    #[test]
-    fn error_implements_error_trait() {
-        let error: Box<dyn Error> = Box::new(ParseOtherCharacterError('a'));
-        assert!(error.source().is_none());
     }
 }

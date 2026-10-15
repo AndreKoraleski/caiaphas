@@ -32,8 +32,8 @@ impl TerminalString {
                 .next()
                 .ok_or(ParseTerminalStringError::NoClosingQuote)?;
             let (character, size) =
-                TerminalCharacter::read(first, chars.next()).map_err(
-                    |_| ParseTerminalStringError::InvalidCharacter(first),
+                TerminalCharacter::read(first, chars.next()).ok_or(
+                    ParseTerminalStringError::InvalidCharacter(first),
                 )?;
             // No two-character symbol ends in a quote.
             if !is_content(character) {
