@@ -2,4 +2,5 @@
 //! ambiguously.
 
 mod character_set;
+mod choice_point;
 mod facts;
