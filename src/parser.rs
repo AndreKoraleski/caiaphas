@@ -11,7 +11,7 @@ mod syntax_rule;
 use std::{error::Error, fmt};
 
 pub(crate) use syntax::Syntax;
-use syntax_rule::SyntaxRule;
+pub(crate) use syntax_rule::SyntaxRule;
 
 use crate::{
     lexer::{CommentlessSymbol, LexErrorKind, Lexer, Symbol, Token},
