@@ -354,6 +354,7 @@ pub(crate) mod tests {
     #[test]
     fn error_displays_every_message() {
         let cases = [
+            ("a = 'x'; a = 'y';", "`a` is already defined"),
             ("a = b;", "`b` is not defined"),
             (
                 "a = b; b = a;",
@@ -509,13 +510,5 @@ pub(crate) mod tests {
                 }
             ));
         }
-    }
-
-    #[test]
-    fn error_displays_message() {
-        let syntax = parse_valid("digit = '0'; digit = '1';");
-        let mut errors = Vec::new();
-        Index::new(&syntax, &mut errors);
-        assert_eq!(errors[0].to_string(), "`digit` is already defined");
     }
 }

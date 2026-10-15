@@ -4,6 +4,7 @@
 use crate::{
     dictionary::{DictionaryError, DictionaryErrorKind, Index},
     ir::{Expression, ExpressionKind, Rule},
+    lexer::Integer,
     parser::{
         DefinitionsList, SingleDefinition, SyntacticFactor, SyntacticPrimary,
         SyntacticPrimaryKind, SyntacticTerm, SyntaxRule,
@@ -106,8 +107,7 @@ impl Lowering<'_, '_> {
     ) -> Expression {
         let primary =
             self.syntactic_primary(&syntactic_factor.syntactic_primary);
-        let kind = match syntactic_factor.integer.map(|integer| integer.get())
-        {
+        let kind = match syntactic_factor.integer.map(Integer::get) {
             None | Some(1) => return primary,
             Some(0) => ExpressionKind::EmptySequence,
             Some(integer) => ExpressionKind::SyntacticFactor {

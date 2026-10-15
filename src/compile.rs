@@ -43,6 +43,15 @@ mod tests {
             .collect()
     }
 
+    fn codes(
+        diagnostics: &[Diagnostic],
+    ) -> Vec<(Severity, Option<&'static str>)> {
+        diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.severity, diagnostic.code))
+            .collect()
+    }
+
     #[test]
     fn returns_a_grammar_without_problems() {
         let (grammar, diagnostics) = compile("a = 'x', b; b = 'y';");
@@ -55,10 +64,7 @@ mod tests {
         let (grammar, diagnostics) = compile("a = ['xy'], 'x';");
         assert!(grammar.is_some());
         assert_eq!(
-            diagnostics
-                .iter()
-                .map(|diagnostic| (diagnostic.severity, diagnostic.code))
-                .collect::<Vec<_>>(),
+            codes(&diagnostics),
             [(Severity::Warning, Some("optional-follow-conflict"))]
         );
     }
@@ -85,10 +91,7 @@ mod tests {
         let (grammar, diagnostics) = compile("a = a, 'x' | 'y';");
         assert!(grammar.is_none());
         assert_eq!(
-            diagnostics
-                .iter()
-                .map(|diagnostic| (diagnostic.severity, diagnostic.code))
-                .collect::<Vec<_>>(),
+            codes(&diagnostics),
             [
                 (Severity::Error, Some("left-recursion")),
                 (Severity::Warning, Some("shadowed-branch")),
