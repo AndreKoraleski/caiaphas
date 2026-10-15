@@ -2,7 +2,7 @@
 //! which needs another `a` after every `x`.
 //!
 //! Grammar theory calls these non-generating or unproductive symbols. Every
-//! rule that references one in every alternative is unproductive too.
+//! rule that needs one in every alternative is unproductive too.
 
 use crate::{
     analysis::{

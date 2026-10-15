@@ -1,11 +1,8 @@
-//! The analysis finds what in a grammar would make its parser fail or choose
-//! ambiguously.
+//! The analysis finds what in a grammar would make its parser fail, choose
+//! ambiguously, or not match what the grammar seems to mean.
 //!
-//! It runs two kinds of checks. Grammar checks read the whole grammar, such as
-//! those about recursion. Choice checks read one choice point at a time, where
-//! a parser has to pick a branch, and compare what each branch can start with.
-//! A new check goes in its own file under `grammar_check` or `choice_check`,
-//! and in the list there.
+//! It runs the grammar checks, then the choice checks on every choice point,
+//! then leaves out the findings that expectations mark as intended.
 
 mod character_set;
 mod choice_check;

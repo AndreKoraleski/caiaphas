@@ -83,7 +83,8 @@ pub(crate) enum FindingKind {
     UnfulfilledExpectation { code: FindingCode },
 }
 
-/// The name of a kind of finding, in kebab case, as an expectation writes it.
+/// The kind of a finding without its details, which an expectation names in
+/// kebab case.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FindingCode {
     LeftRecursion,
@@ -198,8 +199,8 @@ impl FindingCode {
         self.intended_behaviour().is_some()
     }
 
-    /// Returns what happens when an expectation marks a finding with this
-    /// code as intended, if one can.
+    /// Returns what happens when an expectation marks a finding with this code
+    /// as intended, if one can.
     fn intended_behaviour(self) -> Option<&'static str> {
         match self {
             Self::OverlappingBranches

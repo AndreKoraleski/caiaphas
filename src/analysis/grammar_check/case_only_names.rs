@@ -35,7 +35,7 @@ pub(super) fn check(
                 span: rule.span,
                 labels: vec![Label {
                     span: earlier.span,
-                    message: "this rule has the same name in other case",
+                    message: "this rule has the same name in another case",
                 }],
             });
         }

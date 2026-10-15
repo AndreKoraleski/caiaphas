@@ -8,7 +8,8 @@ use crate::{
 };
 
 /// Removes every finding a rule expects, and reports every expectation that
-/// names no kind of finding, names an error, or finds nothing in its rule.
+/// names no kind of finding, names one that cannot be intended, or finds
+/// nothing in its rule.
 pub(super) fn apply(grammar: &Grammar, findings: &mut Vec<Finding>) {
     let mut reported = Vec::new();
     for rule in &grammar.syntax_rules {

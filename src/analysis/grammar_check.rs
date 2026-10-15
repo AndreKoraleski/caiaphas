@@ -1,4 +1,5 @@
-//! Grammar checks read the whole grammar, such as those about recursion.
+//! Grammar checks read the whole grammar at once, such as the checks about
+//! recursion.
 
 mod ambiguous_recursion;
 mod case_only_names;

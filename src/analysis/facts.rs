@@ -327,7 +327,8 @@ impl<'a> Facts<'a> {
 pub(crate) struct Follow {
     pub(crate) characters: CharacterSet,
     /// Whether the input can end right after it, since a parser reads the
-    /// whole input from a start rule.
+    /// whole input from a start rule. The end of what an exception reads
+    /// counts too, since the exception only reads what its factor matched.
     pub(crate) end_of_input: bool,
 }
 

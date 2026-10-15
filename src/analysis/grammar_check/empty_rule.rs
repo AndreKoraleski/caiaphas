@@ -3,7 +3,7 @@
 //!
 //! Grammar theory calls the rules that can match nothing nullable, and removes
 //! the ones that can only match nothing when it normalizes a grammar. A rule
-//! is one when it can match nothing but cannot start with any character.
+//! is empty when it can match nothing but cannot start with any character.
 
 use crate::{
     analysis::{

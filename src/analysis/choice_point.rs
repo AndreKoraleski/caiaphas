@@ -13,7 +13,8 @@ pub(crate) struct ChoicePoint {
     pub(crate) kind: ChoiceKind,
     pub(crate) span: Span,
     pub(crate) branches: Vec<Branch>,
-    /// Whether the input can end right after the choice point.
+    /// Whether the input, or what an exception reads, can end right after the
+    /// choice point.
     pub(crate) end_of_input: bool,
 }
 
