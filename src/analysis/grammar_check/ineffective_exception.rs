@@ -51,16 +51,13 @@ pub(super) fn check(
 #[cfg(test)]
 mod tests {
     use crate::{
-        analysis::{finding::FindingKind, tests::findings},
+        analysis::{finding::FindingCode, tests::findings_with},
         span::Span,
     };
 
     fn ineffective(source: &str) -> Vec<(Span, Span)> {
-        findings(source)
+        findings_with(source, FindingCode::IneffectiveException)
             .into_iter()
-            .filter(|finding| {
-                finding.kind == FindingKind::IneffectiveException
-            })
             .map(|finding| (finding.span, finding.labels[0].span))
             .collect()
     }

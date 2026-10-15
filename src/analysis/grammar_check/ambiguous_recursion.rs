@@ -49,16 +49,13 @@ pub(super) fn check(
 #[cfg(test)]
 mod tests {
     use crate::{
-        analysis::{finding::FindingKind, tests::findings},
+        analysis::{finding::FindingCode, tests::findings_with},
         span::Span,
     };
 
     fn ambiguous_recursions(source: &str) -> Vec<Span> {
-        findings(source)
+        findings_with(source, FindingCode::AmbiguousRecursion)
             .into_iter()
-            .filter(|finding| {
-                matches!(finding.kind, FindingKind::AmbiguousRecursion { .. })
-            })
             .map(|finding| finding.span)
             .collect()
     }

@@ -47,16 +47,25 @@ pub(crate) fn analyse(grammar: &Grammar) -> Vec<Finding> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dictionary::build, parser::parse};
+    use crate::{
+        analysis::finding::FindingCode, dictionary::tests::build_valid,
+    };
 
     /// Returns the findings about the grammar `source` defines, asserting it
     /// has no errors before the analysis.
     pub(super) fn findings(source: &str) -> Vec<Finding> {
-        let (syntax, errors) = parse(source);
-        assert_eq!(errors, [], "{source:?}");
-        let (grammar, errors) = build(&syntax);
-        assert_eq!(errors, [], "{source:?}");
-        analyse(&grammar)
+        analyse(&build_valid(source))
+    }
+
+    /// Returns the findings with `code` about the grammar `source` defines.
+    pub(super) fn findings_with(
+        source: &str,
+        code: FindingCode,
+    ) -> Vec<Finding> {
+        findings(source)
+            .into_iter()
+            .filter(|finding| finding.kind.code() == code)
+            .collect()
     }
 
     #[test]

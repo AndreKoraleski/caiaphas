@@ -40,17 +40,17 @@ pub(super) fn check(
 #[cfg(test)]
 mod tests {
     use crate::{
-        analysis::{finding::FindingKind, tests::findings},
+        analysis::{
+            finding::{FindingCode, FindingKind},
+            tests::{findings, findings_with},
+        },
         diagnostic::Label,
         span::Span,
     };
 
     fn left_recursions(source: &str) -> Vec<Span> {
-        findings(source)
+        findings_with(source, FindingCode::LeftRecursion)
             .into_iter()
-            .filter(|finding| {
-                matches!(finding.kind, FindingKind::LeftRecursion { .. })
-            })
             .map(|finding| finding.span)
             .collect()
     }

@@ -89,10 +89,10 @@ pub(crate) fn choice_points(facts: &Facts<'_>) -> Vec<ChoicePoint> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dictionary::build, parser::parse};
+    use crate::dictionary::tests::build_valid;
 
     fn choice_points_of(source: &str) -> Vec<ChoicePoint> {
-        let grammar = build(&parse(source).0).0;
+        let grammar = build_valid(source);
         choice_points(&Facts::new(&grammar))
     }
 

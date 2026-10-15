@@ -45,14 +45,13 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
 #[cfg(test)]
 mod tests {
     use crate::{
-        analysis::{finding::FindingKind, tests::findings},
+        analysis::{finding::FindingCode, tests::findings_with},
         span::Span,
     };
 
     fn shadowed(source: &str) -> Vec<(Span, Span)> {
-        findings(source)
+        findings_with(source, FindingCode::ShadowedBranch)
             .into_iter()
-            .filter(|finding| finding.kind == FindingKind::ShadowedBranch)
             .map(|finding| (finding.span, finding.labels[0].span))
             .collect()
     }

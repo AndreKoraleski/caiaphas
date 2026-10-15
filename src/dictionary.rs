@@ -214,16 +214,23 @@ impl From<DictionaryError> for Diagnostic {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::{
         ir::{Expression, ExpressionKind},
-        parser::parse,
+        parser::{parse, tests::parse_valid},
     };
 
     /// Returns the grammar `source` defines, and the dictionary errors in it.
     pub(super) fn grammar(source: &str) -> (Grammar, Vec<DictionaryError>) {
-        build(&syntax(source))
+        build(&parse_valid(source))
+    }
+
+    /// Returns the grammar `source` defines, asserting it has no errors.
+    pub(crate) fn build_valid(source: &str) -> Grammar {
+        let (grammar, errors) = grammar(source);
+        assert_eq!(errors, [], "{source:?}");
+        grammar
     }
 
     /// Writes the rule `name` defines as a compact expression, such as
@@ -418,12 +425,6 @@ mod tests {
         assert_eq!(Diagnostic::from(errors[0].clone()).labels, []);
     }
 
-    fn syntax(source: &str) -> Syntax {
-        let (syntax, errors) = parse(source);
-        assert_eq!(errors, [], "{source:?}");
-        syntax
-    }
-
     fn names<'a>(index: &Index<'a>) -> Vec<&'a str> {
         index
             .syntax_rules
@@ -434,7 +435,7 @@ mod tests {
 
     #[test]
     fn indexes_every_syntax_rule_in_order() {
-        let syntax = syntax("a = b; b = 'x'; c = a;");
+        let syntax = parse_valid("a = b; b = 'x'; c = a;");
         let mut errors = Vec::new();
         let index = Index::new(&syntax, &mut errors);
         assert_eq!(errors, []);
@@ -449,15 +450,15 @@ mod tests {
 
     #[test]
     fn finds_nothing_for_an_undefined_meta_identifier() {
-        let defined = syntax("a = b;");
-        let other = syntax("c = d;");
+        let defined = parse_valid("a = b;");
+        let other = parse_valid("c = d;");
         let index = Index::new(&defined, &mut Vec::new());
         assert_eq!(index.get(&other.syntax_rules[0].meta_identifier), None);
     }
 
     #[test]
     fn matches_meta_identifiers_without_their_gaps() {
-        let syntax = syntax("syntax rule = 'x'; a = syntaxrule;");
+        let syntax = parse_valid("syntax rule = 'x'; a = syntaxrule;");
         let index = Index::new(&syntax, &mut Vec::new());
         assert_eq!(names(&index), ["syntaxrule", "a"]);
     }
@@ -465,7 +466,7 @@ mod tests {
     #[test]
     fn rejects_a_meta_identifier_defined_twice() {
         let source = "a = 'x'; b = 'y'; a = 'z';";
-        let syntax = syntax(source);
+        let syntax = parse_valid(source);
         let mut errors = Vec::new();
         let index = Index::new(&syntax, &mut errors);
         assert_eq!(names(&index), ["a", "b"]);
@@ -485,7 +486,7 @@ mod tests {
 
     #[test]
     fn keeps_rule_ids_in_order_after_a_duplicate() {
-        let syntax = syntax("a = 'x'; a = 'y'; b = 'z';");
+        let syntax = parse_valid("a = 'x'; a = 'y'; b = 'z';");
         let index = Index::new(&syntax, &mut Vec::new());
         assert_eq!(
             index.get(&syntax.syntax_rules[2].meta_identifier),
@@ -495,7 +496,7 @@ mod tests {
 
     #[test]
     fn rejects_every_extra_definition() {
-        let syntax = syntax("a = 'x'; a = 'y'; a = 'z';");
+        let syntax = parse_valid("a = 'x'; a = 'y'; a = 'z';");
         let mut errors = Vec::new();
         Index::new(&syntax, &mut errors);
         assert_eq!(errors.len(), 2);
@@ -512,7 +513,7 @@ mod tests {
 
     #[test]
     fn error_displays_message() {
-        let syntax = syntax("digit = '0'; digit = '1';");
+        let syntax = parse_valid("digit = '0'; digit = '1';");
         let mut errors = Vec::new();
         Index::new(&syntax, &mut errors);
         assert_eq!(errors[0].to_string(), "`digit` is already defined");

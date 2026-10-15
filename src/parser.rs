@@ -315,7 +315,7 @@ impl From<ParseError> for Diagnostic {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::fmt::Write;
 
     use super::{
@@ -389,7 +389,8 @@ mod tests {
         text.push(close);
     }
 
-    fn parse_valid(source: &str) -> Syntax {
+    /// Returns the syntax of `source`, asserting it has no errors.
+    pub(crate) fn parse_valid(source: &str) -> Syntax {
         let (syntax, errors) = parse(source);
         assert_eq!(errors, [], "{source:?}");
         syntax

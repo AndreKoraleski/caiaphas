@@ -550,11 +550,7 @@ fn single_characters_with(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dictionary::build, parser::parse};
-
-    fn grammar(source: &str) -> Grammar {
-        build(&parse(source).0).0
-    }
+    use crate::dictionary::tests::build_valid;
 
     fn rule(grammar: &Grammar, position: usize) -> &Expression {
         &grammar.syntax_rules[position].definitions_list
@@ -562,7 +558,7 @@ mod tests {
 
     #[test]
     fn finds_rules_that_can_match_nothing() {
-        let grammar = grammar("a = b, ['x']; b = {'y'} | c; c = 'z';");
+        let grammar = build_valid("a = b, ['x']; b = {'y'} | c; c = 'z';");
         let facts = Facts::new(&grammar);
         let nullable: Vec<bool> = (0..3)
             .map(|position| facts.is_nullable(rule(&grammar, position)))
@@ -572,8 +568,9 @@ mod tests {
 
     #[test]
     fn finds_rules_that_can_finish_matching() {
-        let grammar =
-            grammar("s = a | b | c; a = 'x', a; b = a | 'y'; c = [c], 'z';");
+        let grammar = build_valid(
+            "s = a | b | c; a = 'x', a; b = a | 'y'; c = [c], 'z';",
+        );
         let facts = Facts::new(&grammar);
         let productive: Vec<bool> = (0..4)
             .map(|position| facts.is_productive(rule(&grammar, position)))
@@ -583,7 +580,7 @@ mod tests {
 
     #[test]
     fn finds_rules_that_only_match_single_characters() {
-        let grammar = grammar(
+        let grammar = build_valid(
             "s = a | b | c | d | e; a = 'x' | ? U+0061..U+0063 ?; \
              b = 'xy'; c = a - 'b'; d = a, 'x'; e = 'x' | e;",
         );
@@ -610,7 +607,7 @@ mod tests {
 
     #[test]
     fn starts_a_term_with_what_its_exception_leaves() {
-        let grammar = grammar("s = ? U+0061..U+007A ? - ('x' | 'b');");
+        let grammar = build_valid("s = ? U+0061..U+007A ? - ('x' | 'b');");
         let facts = Facts::new(&grammar);
         assert_eq!(
             facts.first(rule(&grammar, 0)).to_string(),
@@ -620,7 +617,7 @@ mod tests {
 
     #[test]
     fn finds_what_rules_start_with_through_nullable_parts() {
-        let grammar = grammar("a = ['x'], b, 'w'; b = {'y'}, 'z';");
+        let grammar = build_valid("a = ['x'], b, 'w'; b = {'y'}, 'z';");
         let facts = Facts::new(&grammar);
         assert_eq!(facts.first(rule(&grammar, 0)).to_string(), "'x'..='z'");
         assert_eq!(facts.first(rule(&grammar, 1)).to_string(), "'y'..='z'");
@@ -628,7 +625,7 @@ mod tests {
 
     #[test]
     fn finds_what_follows_each_rule() {
-        let grammar = grammar("a = b, 'x' | c; b = 'y'; c = b, [b], 'z';");
+        let grammar = build_valid("a = b, 'x' | c; b = 'y'; c = b, [b], 'z';");
         let facts = Facts::new(&grammar);
         let follow = |position: usize| {
             facts.follow_rules()[position].characters.to_string()
@@ -646,7 +643,8 @@ mod tests {
 
     #[test]
     fn finds_meta_identifiers_at_either_edge() {
-        let grammar = grammar("a = [b], c, 'x', [b], c; b = 'y'; c = 'z';");
+        let grammar =
+            build_valid("a = [b], c, 'x', [b], c; b = 'y'; c = 'z';");
         let facts = Facts::new(&grammar);
         let names = |found: Vec<(RuleId, Span)>| -> Vec<usize> {
             found
@@ -663,7 +661,7 @@ mod tests {
 
     #[test]
     fn walks_every_expression_with_what_follows_it() {
-        let grammar = grammar("a = 'x' - 'u', {'y'}, 'z', {'w'};");
+        let grammar = build_valid("a = 'x' - 'u', {'y'}, 'z', {'w'};");
         let facts = Facts::new(&grammar);
         let mut seen = Vec::new();
         facts.walk(&mut |expression, after| {
