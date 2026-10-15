@@ -3,6 +3,7 @@
 
 mod lower;
 mod start_rules;
+mod syntactic_exception;
 
 use std::{
     collections::{HashMap, hash_map::Entry},
@@ -37,6 +38,7 @@ pub(crate) fn build(syntax: &Syntax) -> (Grammar, Vec<DictionaryError>) {
             });
         }
     }
+    syntactic_exception::check(&syntax_rules, &mut errors);
     errors.sort_by_key(|error| error.span.start);
     (
         Grammar {
@@ -130,6 +132,9 @@ pub(crate) enum DictionaryErrorKind {
     /// A rule such as `grammar = expression;` that nothing references fixes
     /// it.
     NoStartSyntaxRule,
+    /// A syntactic exception uses a meta identifier whose rule is recursive,
+    /// so it could not be replaced by one without meta identifiers.
+    RecursiveSyntacticException { meta_identifier: MetaIdentifier },
 }
 
 impl fmt::Display for DictionaryError {
@@ -149,6 +154,13 @@ impl fmt::Display for DictionaryError {
             DictionaryErrorKind::NoStartSyntaxRule => f.write_str(
                 "every syntax rule is referenced by another, so none starts \
                  the grammar",
+            ),
+            DictionaryErrorKind::RecursiveSyntacticException {
+                meta_identifier,
+            } => write!(
+                f,
+                "`{}` is recursive, so a syntactic exception cannot use it",
+                meta_identifier.as_str()
             ),
         }
     }
@@ -262,9 +274,12 @@ mod tests {
                     "undefined"
                 }
                 DictionaryErrorKind::NoStartSyntaxRule => "no start",
+                DictionaryErrorKind::RecursiveSyntacticException {
+                    ..
+                } => "recursive",
             })
             .collect();
-        assert_eq!(kinds, ["undefined", "duplicate"]);
+        assert_eq!(kinds, ["undefined", "duplicate", "recursive"]);
     }
 
     #[test]
@@ -289,6 +304,10 @@ mod tests {
                 "a = b; b = a;",
                 "every syntax rule is referenced by another, so none starts \
                  the grammar",
+            ),
+            (
+                "s = 'x' - b; b = 'y', [b];",
+                "`b` is recursive, so a syntactic exception cannot use it",
             ),
         ];
         for (source, message) in cases {
