@@ -58,6 +58,25 @@ fn accepts_arithmetic_with_repetition_for_each_operator() {
 }
 
 #[test]
+fn accepts_lambda_calculus_that_expects_bodies_to_extend_right() {
+    let source = r"
+        program     = term;
+        term        = abstraction | application;
+        abstraction = lambda, variable, '.', term;
+        lambda      = '\' | ? U+03BB ?;
+        (* expect repeated-follow-conflict: the body of an abstraction
+           extends as far right as it can *)
+        application = atom, {' ', argument};
+        argument    = atom | abstraction;
+        atom        = variable | '(', term, ')';
+        variable    = letter, {letter | digit};
+        letter      = ? U+0061..U+007A ?;
+        digit       = ? U+0030..U+0039 ?;
+    ";
+    assert_eq!(summary(source), Vec::<String>::new());
+}
+
+#[test]
 fn finds_the_dangling_else() {
     let source = "
         program = statement;
