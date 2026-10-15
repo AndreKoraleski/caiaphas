@@ -76,6 +76,11 @@ pub(crate) enum FindingKind {
     /// A syntactic exception matches everything its factor matches, so the
     /// term can never match.
     ExhaustiveException,
+    /// Two rules have names that differ only in case.
+    CaseOnlyNames {
+        meta_identifier: MetaIdentifier,
+        other: MetaIdentifier,
+    },
 }
 
 impl FindingKind {
@@ -96,6 +101,7 @@ impl FindingKind {
             Self::OptionalFollowConflict { .. }
             | Self::RepeatedFollowConflict { .. } => Severity::Warning,
             Self::ExhaustiveException => Severity::Warning,
+            Self::CaseOnlyNames { .. } => Severity::Warning,
         }
     }
 
@@ -183,6 +189,14 @@ impl FindingKind {
                  left"
                     .to_owned()
             }
+            Self::CaseOnlyNames {
+                meta_identifier,
+                other,
+            } => format!(
+                "rename `{}` or `{}`, or merge them if they mean the same",
+                meta_identifier.as_str(),
+                other.as_str()
+            ),
         }
     }
 }
@@ -265,6 +279,16 @@ impl fmt::Display for Finding {
             FindingKind::ExhaustiveException => f.write_str(
                 "this term can never match, since the exception matches \
                  everything before the `-` does",
+            ),
+            FindingKind::CaseOnlyNames {
+                meta_identifier,
+                other,
+            } => write!(
+                f,
+                "`{}` differs from `{}` only in case, which is easy to \
+                 mistake",
+                meta_identifier.as_str(),
+                other.as_str()
             ),
         }
     }
@@ -432,6 +456,15 @@ mod tests {
                       everything before the `-` does",
             help: "remove this term, or narrow the exception so something is \
                    left",
+        },
+        Case {
+            source: "s = digit, Digit; digit = '0'; Digit = '1';",
+            is_kind: |kind| matches!(kind, FindingKind::CaseOnlyNames { .. }),
+            severity: Severity::Warning,
+            message: "`Digit` differs from `digit` only in case, which is \
+                      easy to mistake",
+            help: "rename `Digit` or `digit`, or merge them if they mean the \
+                   same",
         },
     ];
 
