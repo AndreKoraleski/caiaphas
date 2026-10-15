@@ -1,15 +1,20 @@
 //! The analysis finds what in a grammar would make its parser fail or choose
 //! ambiguously.
 //!
-//! Grammar checks read the whole grammar, such as those about recursion. A new
-//! one goes in its own file under `grammar_check`, and in the list there.
+//! It runs two kinds of checks. Grammar checks read the whole grammar, such as
+//! those about recursion. Choice checks read one choice point at a time, where
+//! a parser has to pick a branch, and compare what each branch can start with.
+//! A new check goes in its own file under `grammar_check` or `choice_check`,
+//! and in the list there.
 
 mod character_set;
+mod choice_check;
 mod choice_point;
 mod facts;
 mod finding;
 mod grammar_check;
 
+use choice_check::CHOICE_CHECKS;
 use facts::Facts;
 pub(crate) use finding::Finding;
 use grammar_check::GRAMMAR_CHECKS;
@@ -25,6 +30,11 @@ pub(crate) fn analyse(grammar: &Grammar) -> Vec<Finding> {
     let mut findings = Vec::new();
     for check in GRAMMAR_CHECKS {
         check(grammar, &facts, &mut findings);
+    }
+    for choice_point in choice_point::choice_points(&facts) {
+        for check in CHOICE_CHECKS {
+            check(&choice_point, &mut findings);
+        }
     }
     findings.sort_by_key(|finding| finding.span.start);
     findings
