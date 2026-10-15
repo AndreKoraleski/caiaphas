@@ -28,16 +28,26 @@ use crate::{
 /// Returns the syntax of `source`, and every error found while reading it.
 ///
 /// After an error in a syntax rule it skips to the next terminator symbol and
-/// goes on, so the syntax holds every rule that could be read.
+/// goes on, so the syntax holds every rule that could be read. Expectations
+/// right before a rule that could not be read are left out with it.
 pub(crate) fn parse(source: &str) -> (Syntax, Vec<ParseError>) {
     let mut parser = Parser::new(source);
     let mut rules = Vec::new();
-    while parser.peek().is_some() {
+    // Where each rule the parser tried to read is, even if it could not.
+    let mut attempts = Vec::new();
+    while let Some(start) = parser.peek().map(|token| token.span.start) {
         match SyntaxRule::parse(&mut parser) {
-            Ok(rule) => rules.push(rule),
+            Ok(rule) => {
+                attempts.push(rule.span);
+                rules.push(rule);
+            }
             Err(error) => {
                 parser.errors.push(error);
                 parser.skip_past_terminator();
+                attempts.push(Span {
+                    start,
+                    end: parser.previous_end,
+                });
             }
         }
     }
@@ -55,11 +65,17 @@ pub(crate) fn parse(source: &str) -> (Syntax, Vec<ParseError>) {
                 continue;
             }
         };
-        let inside = rules.iter().any(|rule| {
-            rule.span.start < span.start && span.end < rule.span.end
-        });
-        match rules.iter_mut().find(|rule| rule.span.start >= span.end) {
-            Some(rule) if !inside => rule.expectations.push(expectation),
+        let inside = attempts
+            .iter()
+            .any(|rule| rule.start < span.start && span.end < rule.end);
+        match attempts.iter().find(|rule| rule.start >= span.end) {
+            Some(next) if !inside => {
+                if let Some(rule) =
+                    rules.iter_mut().find(|rule| rule.span == *next)
+                {
+                    rule.expectations.push(expectation);
+                }
+            }
             _ => errors.push(ParseError {
                 kind: ParseErrorKind::ExpectationWithoutRule,
                 span,
@@ -611,6 +627,20 @@ mod tests {
         let expectation = &syntax.syntax_rules[0].expectations[0];
         assert_eq!(expectation.reason, "kept for later");
         assert_eq!(expectation.span, Span { start: 0, end: 39 });
+    }
+
+    #[test]
+    fn leaves_out_the_expectations_of_a_rule_it_could_not_read() {
+        let (syntax, errors) =
+            parse("(* expect empty-rule: kept *) a = (b; c = 'y';");
+        assert_eq!(expectations(&syntax), [Vec::<&str>::new()]);
+        assert_eq!(
+            errors,
+            [ParseError {
+                kind: ParseErrorKind::Expected(Expected::EndGroupSymbol),
+                span: Span { start: 36, end: 37 },
+            }]
+        );
     }
 
     #[test]
