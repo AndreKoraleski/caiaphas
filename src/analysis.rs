@@ -12,6 +12,7 @@ mod choice_check;
 mod choice_point;
 #[cfg(test)]
 mod corpus;
+mod expectations;
 mod facts;
 mod finding;
 mod grammar_check;
@@ -38,6 +39,7 @@ pub(crate) fn analyse(grammar: &Grammar) -> Vec<Finding> {
             check(&choice_point, &mut findings);
         }
     }
+    expectations::apply(grammar, &mut findings);
     findings.sort_by_key(|finding| finding.span.start);
     findings
 }

@@ -81,6 +81,13 @@ pub(crate) enum FindingKind {
         meta_identifier: MetaIdentifier,
         other: MetaIdentifier,
     },
+    /// An expectation names no kind of finding.
+    UnknownExpectation { code: String },
+    /// An expectation names a kind of finding that cannot be intended, such as
+    /// an error.
+    UnexpectableFinding { code: FindingCode },
+    /// An expectation finds no finding of its kind in its rule.
+    UnfulfilledExpectation { code: FindingCode },
 }
 
 /// The name of a kind of finding, in kebab case, as an expectation writes it.
@@ -102,11 +109,14 @@ pub(crate) enum FindingCode {
     EmptyRule,
     ExhaustiveException,
     CaseOnlyNames,
+    UnknownExpectation,
+    UnexpectableFinding,
+    UnfulfilledExpectation,
 }
 
 impl FindingCode {
     /// Every code, so a name can be looked up.
-    pub(crate) const ALL: [Self; 16] = [
+    pub(crate) const ALL: [Self; 19] = [
         Self::LeftRecursion,
         Self::IndirectLeftRecursion,
         Self::UnproductiveRule,
@@ -123,6 +133,9 @@ impl FindingCode {
         Self::EmptyRule,
         Self::ExhaustiveException,
         Self::CaseOnlyNames,
+        Self::UnknownExpectation,
+        Self::UnexpectableFinding,
+        Self::UnfulfilledExpectation,
     ];
 
     pub(crate) fn name(self) -> &'static str {
@@ -143,6 +156,9 @@ impl FindingCode {
             Self::EmptyRule => "empty-rule",
             Self::ExhaustiveException => "exhaustive-exception",
             Self::CaseOnlyNames => "case-only-names",
+            Self::UnknownExpectation => "unknown-expectation",
+            Self::UnexpectableFinding => "unexpectable-finding",
+            Self::UnfulfilledExpectation => "unfulfilled-expectation",
         }
     }
 
@@ -156,7 +172,9 @@ impl FindingCode {
             Self::LeftRecursion
             | Self::IndirectLeftRecursion
             | Self::UnproductiveRule
-            | Self::EmptyRepetition => Severity::Error,
+            | Self::EmptyRepetition
+            | Self::UnknownExpectation
+            | Self::UnexpectableFinding => Severity::Error,
             Self::OverlappingBranches
             | Self::OptionalFollowConflict
             | Self::RepeatedFollowConflict
@@ -168,8 +186,16 @@ impl FindingCode {
             | Self::IneffectiveException
             | Self::EmptyRule
             | Self::ExhaustiveException
-            | Self::CaseOnlyNames => Severity::Warning,
+            | Self::CaseOnlyNames
+            | Self::UnfulfilledExpectation => Severity::Warning,
         }
+    }
+
+    /// Returns whether an expectation can mark a finding with this code as
+    /// intended. Only warnings about the grammar itself can be.
+    pub(crate) fn is_expectable(self) -> bool {
+        self.severity() == Severity::Warning
+            && self != Self::UnfulfilledExpectation
     }
 }
 
@@ -202,6 +228,13 @@ impl FindingKind {
             Self::EmptyRule { .. } => FindingCode::EmptyRule,
             Self::ExhaustiveException => FindingCode::ExhaustiveException,
             Self::CaseOnlyNames { .. } => FindingCode::CaseOnlyNames,
+            Self::UnknownExpectation { .. } => FindingCode::UnknownExpectation,
+            Self::UnexpectableFinding { .. } => {
+                FindingCode::UnexpectableFinding
+            }
+            Self::UnfulfilledExpectation { .. } => {
+                FindingCode::UnfulfilledExpectation
+            }
         }
     }
 
@@ -301,6 +334,21 @@ impl FindingKind {
                 meta_identifier.as_str(),
                 other.as_str()
             ),
+            Self::UnknownExpectation { .. } => {
+                "write the code a finding reports, such as \
+                 `repeated-follow-conflict`"
+                    .to_owned()
+            }
+            Self::UnexpectableFinding { .. } => {
+                "fix the grammar instead, since no parser can work with an \
+                 error in it"
+                    .to_owned()
+            }
+            Self::UnfulfilledExpectation { .. } => {
+                "remove the expectation, since the rule no longer has that \
+                 finding"
+                    .to_owned()
+            }
         }
     }
 }
@@ -393,6 +441,26 @@ impl fmt::Display for Finding {
                  mistake",
                 meta_identifier.as_str(),
                 other.as_str()
+            ),
+            FindingKind::UnknownExpectation { code } => {
+                write!(f, "`{code}` is not the code of any finding")
+            }
+            FindingKind::UnexpectableFinding { code } => {
+                let reason = if code.severity() == Severity::Error {
+                    "an error"
+                } else {
+                    "about expectations"
+                };
+                write!(
+                    f,
+                    "`{}` is {reason}, so it cannot be expected",
+                    code.name()
+                )
+            }
+            FindingKind::UnfulfilledExpectation { code } => write!(
+                f,
+                "this expectation finds no `{}` in its rule",
+                code.name()
             ),
         }
     }
@@ -555,6 +623,30 @@ mod tests {
                       easy to mistake",
             help: "rename `Digit` or `digit`, or merge them if they mean the \
                    same",
+        },
+        Case {
+            source: "(* expect no-such-finding: none *) a = 'x';",
+            code: FindingCode::UnknownExpectation,
+            severity: Severity::Error,
+            message: "`no-such-finding` is not the code of any finding",
+            help: "write the code a finding reports, such as \
+                   `repeated-follow-conflict`",
+        },
+        Case {
+            source: "(* expect left-recursion: wanted *) a = a, 'x' | 'y';",
+            code: FindingCode::UnexpectableFinding,
+            severity: Severity::Error,
+            message: "`left-recursion` is an error, so it cannot be expected",
+            help: "fix the grammar instead, since no parser can work with an \
+                   error in it",
+        },
+        Case {
+            source: "(* expect empty-rule: kept *) a = 'x';",
+            code: FindingCode::UnfulfilledExpectation,
+            severity: Severity::Warning,
+            message: "this expectation finds no `empty-rule` in its rule",
+            help: "remove the expectation, since the rule no longer has that \
+                   finding",
         },
     ];
 
