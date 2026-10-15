@@ -67,11 +67,11 @@ mod tests {
 
     #[test]
     fn leaves_out_an_expected_finding() {
-        assert_eq!(codes("a = ['x'], 'x';"), ["optional-follow-conflict"]);
+        assert_eq!(codes("a = ['xy'], 'x';"), ["optional-follow-conflict"]);
         assert_eq!(
             codes(
                 "(* expect optional-follow-conflict: taken whenever it can \
-                 be *) a = ['x'], 'x';"
+                 be *) a = ['xy'], 'x';"
             ),
             Vec::<&str>::new()
         );
@@ -82,7 +82,7 @@ mod tests {
         assert_eq!(
             codes(
                 "(* expect optional-follow-conflict: wanted *) \
-                 a = ['x'], 'x' | 'x';"
+                 a = ['xy'], 'x' | 'x';"
             ),
             ["shadowed-branch"]
         );
@@ -93,7 +93,7 @@ mod tests {
         assert_eq!(
             codes(
                 "(* expect optional-follow-conflict: wanted *) \
-                 a = ['x'], 'x', ['y'], 'y';"
+                 a = ['xy'], 'x', ['yz'], 'y';"
             ),
             Vec::<&str>::new()
         );
@@ -104,7 +104,7 @@ mod tests {
         assert_eq!(
             codes(
                 "(* expect optional-follow-conflict: wanted *) \
-                 a = ['x'], 'x', b; b = ['y'], 'y';"
+                 a = ['xy'], 'x', b; b = ['yz'], 'y';"
             ),
             ["optional-follow-conflict"]
         );
@@ -114,9 +114,9 @@ mod tests {
     fn leaves_findings_in_rules_before_it() {
         assert_eq!(
             codes(
-                "s = b; b = ['y'], 'y', a; \
+                "s = b; b = ['yz'], 'y', a; \
                  (* expect optional-follow-conflict: wanted *) \
-                 a = ['x'], 'x';"
+                 a = ['xy'], 'x';"
             ),
             ["optional-follow-conflict"]
         );
@@ -139,9 +139,20 @@ mod tests {
             codes(
                 "(* expect optional-follow-conflict: wanted *) \
                  (* expect shadowed-branch: also wanted *) \
-                 a = ['x'], 'x' | 'x';"
+                 a = ['xy'], 'x' | 'x';"
             ),
             Vec::<&str>::new()
+        );
+    }
+
+    #[test]
+    fn does_not_hide_a_repetition_that_takes_everything_after_it() {
+        assert_eq!(
+            codes(
+                "(* expect repeated-follow-conflict: wanted *) \
+                 a = {'x'}, 'x';"
+            ),
+            ["unfulfilled-expectation", "dead-end-repetition"]
         );
     }
 
@@ -186,7 +197,7 @@ mod tests {
             codes(
                 "(* expect optional-follow-conflict: wanted *) \
                  (* expect optional-follow-conflict: again *) \
-                 a = ['x'], 'x';"
+                 a = ['xy'], 'x';"
             ),
             ["unfulfilled-expectation"]
         );

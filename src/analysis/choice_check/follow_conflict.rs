@@ -6,6 +6,12 @@
 //! LL(1) parsing calls this a FIRST/FOLLOW conflict. A parser that sees one of
 //! those characters cannot tell whether to take the sequence, or whether to
 //! repeat it again, so it has to pick one, usually the sequence.
+//!
+//! When the sequence only ever matches one character, every character that can
+//! come after it is one of those, and the input cannot end there, a parser
+//! that picks the sequence takes them all. Skipping an optional sequence then
+//! never leads to a match, and nothing after a repeated sequence ever matches,
+//! as in `s = {'x'}, 'x';`. That is reported instead of the conflict.
 
 use crate::analysis::{
     choice_point::{ChoiceKind, ChoicePoint},
@@ -26,14 +32,23 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
     if characters.is_empty() {
         return;
     }
-    let kind = match choice_point.kind {
-        ChoiceKind::OptionalSequence => {
+    let takes_everything_after = !choice_point.end_of_input
+        && sequence
+            .single_characters
+            .as_ref()
+            .is_some_and(|taken| end.first.is_subset(taken));
+    let kind = match (choice_point.kind, takes_everything_after) {
+        (ChoiceKind::OptionalSequence, false) => {
             FindingKind::OptionalFollowConflict { characters }
         }
-        ChoiceKind::RepeatedSequence => {
+        (ChoiceKind::OptionalSequence, true) => {
+            FindingKind::RequiredOptionalSequence
+        }
+        (ChoiceKind::RepeatedSequence, false) => {
             FindingKind::RepeatedFollowConflict { characters }
         }
-        ChoiceKind::DefinitionsList => return,
+        (ChoiceKind::RepeatedSequence, true) => FindingKind::DeadEndRepetition,
+        (ChoiceKind::DefinitionsList, _) => return,
     };
     findings.push(Finding {
         kind,
@@ -59,6 +74,12 @@ mod tests {
                 FindingKind::RepeatedFollowConflict { characters } => {
                     Some((format!("repeated {characters}"), finding.span))
                 }
+                FindingKind::RequiredOptionalSequence => {
+                    Some(("required".to_owned(), finding.span))
+                }
+                FindingKind::DeadEndRepetition => {
+                    Some(("dead end".to_owned(), finding.span))
+                }
                 _ => None,
             })
             .collect()
@@ -67,8 +88,8 @@ mod tests {
     #[test]
     fn finds_an_optional_sequence_that_starts_like_what_follows_it() {
         assert_eq!(
-            conflicts("a = ['x'], 'x';"),
-            [("optional 'x'".to_owned(), Span { start: 4, end: 9 })]
+            conflicts("a = ['xy'], 'x';"),
+            [("optional 'x'".to_owned(), Span { start: 4, end: 10 })]
         );
     }
 
@@ -83,8 +104,8 @@ mod tests {
     #[test]
     fn finds_what_follows_through_other_rules() {
         assert_eq!(
-            conflicts("s = a, 'x'; a = 'y', ['x'];"),
-            [("optional 'x'".to_owned(), Span { start: 21, end: 26 })]
+            conflicts("s = a, 'x'; a = 'y', ['xy'];"),
+            [("optional 'x'".to_owned(), Span { start: 21, end: 27 })]
         );
     }
 
@@ -96,5 +117,37 @@ mod tests {
     #[test]
     fn leaves_a_sequence_that_can_match_nothing_to_the_empty_branches_check() {
         assert_eq!(conflicts("a = [{'x'}], 'y';"), []);
+    }
+
+    #[test]
+    fn finds_an_optional_sequence_that_takes_everything_after_it() {
+        assert_eq!(
+            conflicts("a = ['x'], 'x';"),
+            [("required".to_owned(), Span { start: 4, end: 9 })]
+        );
+    }
+
+    #[test]
+    fn finds_a_repeated_sequence_that_takes_everything_after_it() {
+        assert_eq!(
+            conflicts("a = {? U+0061..U+007A ?}, 'x';"),
+            [("dead end".to_owned(), Span { start: 4, end: 24 })]
+        );
+    }
+
+    #[test]
+    fn leaves_a_way_past_a_sequence_where_the_input_can_end() {
+        assert_eq!(
+            conflicts("a = {'x'}, ['x'];"),
+            [("repeated 'x'".to_owned(), Span { start: 4, end: 9 })]
+        );
+    }
+
+    #[test]
+    fn leaves_a_way_past_a_sequence_of_more_than_one_character() {
+        assert_eq!(
+            conflicts("a = {'xy'}, 'x';"),
+            [("repeated 'x'".to_owned(), Span { start: 4, end: 10 })]
+        );
     }
 }

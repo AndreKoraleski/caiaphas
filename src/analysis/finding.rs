@@ -81,6 +81,12 @@ pub(crate) enum FindingKind {
         meta_identifier: MetaIdentifier,
         other: MetaIdentifier,
     },
+    /// An optional sequence takes every character that can come after it, so
+    /// skipping it never leads to a match.
+    RequiredOptionalSequence,
+    /// A repeated sequence takes every character that can come after it, so
+    /// nothing after it can ever match.
+    DeadEndRepetition,
     /// An expectation names no kind of finding.
     UnknownExpectation { code: String },
     /// An expectation names a kind of finding that cannot be intended, such as
@@ -100,6 +106,8 @@ pub(crate) enum FindingCode {
     OverlappingBranches,
     OptionalFollowConflict,
     RepeatedFollowConflict,
+    RequiredOptionalSequence,
+    DeadEndRepetition,
     AmbiguousRecursion,
     ShadowedBranch,
     AmbiguousEmptyBranches,
@@ -116,7 +124,7 @@ pub(crate) enum FindingCode {
 
 impl FindingCode {
     /// Every code, so a name can be looked up.
-    pub(crate) const ALL: [Self; 19] = [
+    pub(crate) const ALL: [Self; 21] = [
         Self::LeftRecursion,
         Self::IndirectLeftRecursion,
         Self::UnproductiveRule,
@@ -124,6 +132,8 @@ impl FindingCode {
         Self::OverlappingBranches,
         Self::OptionalFollowConflict,
         Self::RepeatedFollowConflict,
+        Self::RequiredOptionalSequence,
+        Self::DeadEndRepetition,
         Self::AmbiguousRecursion,
         Self::ShadowedBranch,
         Self::AmbiguousEmptyBranches,
@@ -147,6 +157,8 @@ impl FindingCode {
             Self::OverlappingBranches => "overlapping-branches",
             Self::OptionalFollowConflict => "optional-follow-conflict",
             Self::RepeatedFollowConflict => "repeated-follow-conflict",
+            Self::RequiredOptionalSequence => "required-optional-sequence",
+            Self::DeadEndRepetition => "dead-end-repetition",
             Self::AmbiguousRecursion => "ambiguous-recursion",
             Self::ShadowedBranch => "shadowed-branch",
             Self::AmbiguousEmptyBranches => "ambiguous-empty-branches",
@@ -178,6 +190,8 @@ impl FindingCode {
             Self::OverlappingBranches
             | Self::OptionalFollowConflict
             | Self::RepeatedFollowConflict
+            | Self::RequiredOptionalSequence
+            | Self::DeadEndRepetition
             | Self::AmbiguousRecursion
             | Self::ShadowedBranch
             | Self::AmbiguousEmptyBranches
@@ -215,7 +229,9 @@ impl FindingCode {
                 "the parser repeats the sequence whenever the next character \
                  can start it, so it extends as far as it can",
             ),
-            Self::AmbiguousRecursion
+            Self::RequiredOptionalSequence
+            | Self::DeadEndRepetition
+            | Self::AmbiguousRecursion
             | Self::UnreachableRule
             | Self::IneffectiveException
             | Self::EmptyRule
@@ -261,6 +277,10 @@ impl FindingKind {
             Self::EmptyRule { .. } => FindingCode::EmptyRule,
             Self::ExhaustiveException => FindingCode::ExhaustiveException,
             Self::CaseOnlyNames { .. } => FindingCode::CaseOnlyNames,
+            Self::RequiredOptionalSequence => {
+                FindingCode::RequiredOptionalSequence
+            }
+            Self::DeadEndRepetition => FindingCode::DeadEndRepetition,
             Self::UnknownExpectation { .. } => FindingCode::UnknownExpectation,
             Self::UnexpectableFinding { .. } => {
                 FindingCode::UnexpectableFinding
@@ -379,6 +399,17 @@ impl FindingKind {
                 meta_identifier.as_str(),
                 other.as_str()
             ),
+            Self::RequiredOptionalSequence => {
+                "remove the `[...]` if the sequence is always needed, or make \
+                 what comes after it start with a character it cannot take"
+                    .to_owned()
+            }
+            Self::DeadEndRepetition => {
+                "move what comes after the repetition before it, so `{'x'}, \
+                 'x'` becomes `'x', {'x'}`, or make what comes after it start \
+                 with a character it cannot take"
+                    .to_owned()
+            }
             Self::UnknownExpectation { .. } => {
                 "write the code a finding reports, such as \
                  `repeated-follow-conflict`"
@@ -486,6 +517,14 @@ impl fmt::Display for Finding {
                  mistake",
                 meta_identifier.as_str(),
                 other.as_str()
+            ),
+            FindingKind::RequiredOptionalSequence => f.write_str(
+                "this optional sequence takes every character that can come \
+                 after it, so skipping it never leads to a match",
+            ),
+            FindingKind::DeadEndRepetition => f.write_str(
+                "this repeated sequence takes every character that can come \
+                 after it, so nothing after it can ever match",
             ),
             FindingKind::UnknownExpectation { code } => {
                 write!(f, "`{code}` is not the code of any finding")
@@ -652,7 +691,7 @@ mod tests {
                    grammar stays as it is",
         },
         Case {
-            source: "a = ['x'], 'x';",
+            source: "a = ['xy'], 'x';",
             code: FindingCode::OptionalFollowConflict,
             severity: Severity::Warning,
             message: "this optional sequence and what comes after it can both \
@@ -665,7 +704,7 @@ mod tests {
                    character can start it, as usual for a dangling else",
         },
         Case {
-            source: "a = {'x'}, 'x';",
+            source: "a = {'xy'}, 'x';",
             code: FindingCode::RepeatedFollowConflict,
             severity: Severity::Warning,
             message: "this repeated sequence and what comes after it can both \
@@ -677,6 +716,30 @@ mod tests {
                    reason *)` right before the rule, and the parser repeats \
                    the sequence whenever the next character can start it, so \
                    it extends as far as it can",
+        },
+        Case {
+            source: "a = ['x'], 'x';",
+            code: FindingCode::RequiredOptionalSequence,
+            severity: Severity::Warning,
+            message: "this optional sequence takes every character that can \
+                      come after it, so skipping it never leads to a match",
+            help: "remove the `[...]` if the sequence is always needed, or \
+                   make what comes after it start with a character it cannot \
+                   take; if this is intended, write `(* expect \
+                   required-optional-sequence: reason *)` right before the \
+                   rule, and the grammar stays as it is",
+        },
+        Case {
+            source: "a = {'x'}, 'x';",
+            code: FindingCode::DeadEndRepetition,
+            severity: Severity::Warning,
+            message: "this repeated sequence takes every character that can \
+                      come after it, so nothing after it can ever match",
+            help: "move what comes after the repetition before it, so `{'x'}, \
+                   'x'` becomes `'x', {'x'}`, or make what comes after it \
+                   start with a character it cannot take; if this is \
+                   intended, write `(* expect dead-end-repetition: reason *)` \
+                   right before the rule, and the grammar stays as it is",
         },
         Case {
             source: "a = 'x' - ? U+0061..U+007A ?;",

@@ -13,6 +13,8 @@ pub(crate) struct ChoicePoint {
     pub(crate) kind: ChoiceKind,
     pub(crate) span: Span,
     pub(crate) branches: Vec<Branch>,
+    /// Whether the input can end right after the choice point.
+    pub(crate) end_of_input: bool,
 }
 
 /// What makes a [`ChoicePoint`].
@@ -35,6 +37,9 @@ pub(crate) struct Branch {
     /// choice point when the branch can match nothing.
     pub(crate) first: CharacterSet,
     pub(crate) nullable: bool,
+    /// The characters the branch matches, when it only ever matches one
+    /// character.
+    pub(crate) single_characters: Option<CharacterSet>,
 }
 
 /// Returns every choice point of the grammar `facts` answers about.
@@ -45,6 +50,7 @@ pub(crate) fn choice_points(facts: &Facts<'_>) -> Vec<ChoicePoint> {
             span: branch.span,
             first: facts.first_before(branch, &after.characters),
             nullable: facts.is_nullable(branch),
+            single_characters: facts.single_characters(branch),
         };
         let end = || Branch {
             span: Span {
@@ -53,6 +59,7 @@ pub(crate) fn choice_points(facts: &Facts<'_>) -> Vec<ChoicePoint> {
             },
             first: after.characters.clone(),
             nullable: true,
+            single_characters: None,
         };
         let (kind, branches) = match &expression.kind {
             ExpressionKind::DefinitionsList(expressions) => (
@@ -73,6 +80,7 @@ pub(crate) fn choice_points(facts: &Facts<'_>) -> Vec<ChoicePoint> {
             kind,
             span: expression.span,
             branches,
+            end_of_input: after.end_of_input,
         });
     });
     choice_points
