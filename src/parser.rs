@@ -207,8 +207,7 @@ impl<'a> Parser<'a> {
     }
 }
 
-/// Error returned when part of the source of a grammar cannot be read as a
-/// syntax rule.
+/// Error returned when part of the source of a grammar is not valid syntax.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ParseError {
     pub(crate) kind: ParseErrorKind,

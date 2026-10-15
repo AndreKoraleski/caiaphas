@@ -116,8 +116,6 @@ pub(crate) enum DictionaryErrorKind {
     /// No syntax rule defines a meta identifier that is used.
     UndefinedMetaIdentifier { meta_identifier: MetaIdentifier },
     /// Every syntax rule is referenced by another, so none can start a parser.
-    /// A rule such as `grammar = expression;` that nothing references fixes
-    /// it.
     NoStartSyntaxRule,
     /// A syntactic exception uses a meta identifier whose rule is recursive or
     /// references a recursive rule, so it could not be replaced by one without

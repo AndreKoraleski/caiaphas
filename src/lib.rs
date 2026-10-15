@@ -13,7 +13,7 @@
     not(test),
     expect(
         dead_code,
-        reason = "nothing outside the crate calls the parser yet"
+        reason = "nothing outside the crate compiles a grammar yet"
     )
 )]
 

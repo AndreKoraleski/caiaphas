@@ -13,6 +13,8 @@ pub(crate) struct RuleId(pub(crate) usize);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Rule {
     pub(crate) meta_identifier: MetaIdentifier,
+    /// What the definitions list of the syntax rule lowers to, which is only a
+    /// definitions list when it has more than one single definition.
     pub(crate) definitions_list: Expression,
     /// The findings the rule marks as intended.
     pub(crate) expectations: Vec<Expectation>,
