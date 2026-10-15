@@ -318,11 +318,7 @@ impl From<ParseError> for Diagnostic {
 pub(crate) mod tests {
     use std::fmt::Write;
 
-    use super::{
-        definitions_list::DefinitionsList,
-        syntactic_primary::{SyntacticPrimary, SyntacticPrimaryKind},
-        *,
-    };
+    use super::*;
     use crate::lexer::ParseCommentlessSymbolError;
 
     /// Writes `syntax` back as EBNF, in the canonical spelling.
@@ -346,16 +342,20 @@ pub(crate) mod tests {
                 if index > 0 {
                     text.push_str(", ");
                 }
-                if let Some(count) = term.syntactic_factor.integer {
-                    write!(text, "{} * ", count.get()).unwrap();
-                }
-                render_primary(text, &term.syntactic_factor.syntactic_primary);
+                render_factor(text, &term.syntactic_factor);
                 if let Some(exception) = &term.syntactic_exception {
                     text.push_str(" - ");
-                    render_primary(text, &exception.syntactic_primary);
+                    render_factor(text, exception);
                 }
             }
         }
+    }
+
+    fn render_factor(text: &mut String, factor: &SyntacticFactor) {
+        if let Some(count) = factor.integer {
+            write!(text, "{} * ", count.get()).unwrap();
+        }
+        render_primary(text, &factor.syntactic_primary);
     }
 
     fn render_primary(text: &mut String, primary: &SyntacticPrimary) {
@@ -424,7 +424,7 @@ pub(crate) mod tests {
     fn parses_terms_factors_and_exceptions() {
         assert_eq!(
             render(&parse_valid("a = b, 3 * c - d, e - 2 * f;")),
-            "a = b, 3 * c - d, e - f;"
+            "a = b, 3 * c - d, e - 2 * f;"
         );
     }
 
