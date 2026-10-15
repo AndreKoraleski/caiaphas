@@ -12,8 +12,8 @@ use crate::{
 /// `digit = '0' | '1';`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SyntaxRule {
-    pub(crate) name: MetaIdentifier,
-    pub(crate) definitions: DefinitionsList,
+    pub(crate) meta_identifier: MetaIdentifier,
+    pub(crate) definitions_list: DefinitionsList,
     /// From the meta identifier to the terminator, both included.
     pub(crate) span: Span,
 }
@@ -32,12 +32,12 @@ impl SyntaxRule {
         };
         parser.bump();
         parser.expect(Symbol::Defining, Expected::DefiningSymbol)?;
-        let definitions = DefinitionsList::parse(parser)?;
+        let definitions_list = DefinitionsList::parse(parser)?;
         let end =
             parser.expect(Symbol::Terminator, Expected::TerminatorSymbol)?;
         Ok(Self {
-            name,
-            definitions,
+            meta_identifier: name,
+            definitions_list,
             span: start.to(end),
         })
     }

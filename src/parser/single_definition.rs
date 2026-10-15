@@ -10,7 +10,7 @@ use crate::{
 /// match one after another.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SingleDefinition {
-    pub(crate) terms: Vec<SyntacticTerm>,
+    pub(crate) syntactic_terms: Vec<SyntacticTerm>,
     pub(crate) span: Span,
 }
 
@@ -18,12 +18,15 @@ impl SingleDefinition {
     pub(super) fn parse(parser: &mut Parser<'_>) -> Result<Self, ParseError> {
         let first = SyntacticTerm::parse(parser)?;
         let mut span = first.span;
-        let mut terms = vec![first];
+        let mut syntactic_terms = vec![first];
         while parser.eat(Symbol::Concatenate).is_some() {
             let term = SyntacticTerm::parse(parser)?;
             span = span.to(term.span);
-            terms.push(term);
+            syntactic_terms.push(term);
         }
-        Ok(Self { terms, span })
+        Ok(Self {
+            syntactic_terms,
+            span,
+        })
     }
 }

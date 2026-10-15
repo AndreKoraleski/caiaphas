@@ -10,7 +10,7 @@ use crate::{
 /// or `!`. Each is an alternative to the others.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DefinitionsList {
-    pub(crate) definitions: Vec<SingleDefinition>,
+    pub(crate) single_definitions: Vec<SingleDefinition>,
     pub(crate) span: Span,
 }
 
@@ -18,12 +18,15 @@ impl DefinitionsList {
     pub(super) fn parse(parser: &mut Parser<'_>) -> Result<Self, ParseError> {
         let first = SingleDefinition::parse(parser)?;
         let mut span = first.span;
-        let mut definitions = vec![first];
+        let mut single_definitions = vec![first];
         while parser.eat(Symbol::DefinitionSeparator).is_some() {
             let definition = SingleDefinition::parse(parser)?;
             span = span.to(definition.span);
-            definitions.push(definition);
+            single_definitions.push(definition);
         }
-        Ok(Self { definitions, span })
+        Ok(Self {
+            single_definitions,
+            span,
+        })
     }
 }

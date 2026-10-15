@@ -10,10 +10,10 @@ use crate::{
 /// matches if one follows a `-`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SyntacticTerm {
-    pub(crate) factor: SyntacticFactor,
+    pub(crate) syntactic_factor: SyntacticFactor,
     /// The standard restricts a syntactic exception to factors that could be
     /// written without meta identifiers.
-    pub(crate) exception: Option<SyntacticFactor>,
+    pub(crate) syntactic_exception: Option<SyntacticFactor>,
     pub(crate) span: Span,
 }
 
@@ -29,8 +29,8 @@ impl SyntacticTerm {
             .as_ref()
             .map_or(factor.span, |exception| factor.span.to(exception.span));
         Ok(Self {
-            factor,
-            exception,
+            syntactic_factor: factor,
+            syntactic_exception: exception,
             span,
         })
     }

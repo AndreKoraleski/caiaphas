@@ -24,16 +24,16 @@ pub(crate) struct SyntacticPrimary {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum SyntacticPrimaryKind {
     /// Matches the definitions between `[` and `]` once or not at all.
-    Optional(DefinitionsList),
+    OptionalSequence(DefinitionsList),
     /// Matches the definitions between `{` and `}` any number of times.
-    Repeated(DefinitionsList),
+    RepeatedSequence(DefinitionsList),
     /// Matches the definitions between `(` and `)` once.
-    Grouped(DefinitionsList),
+    GroupedSequence(DefinitionsList),
     MetaIdentifier(MetaIdentifier),
     TerminalString(TerminalString),
     SpecialSequence(SpecialSequence),
     /// Matches without reading anything.
-    Empty,
+    EmptySequence,
 }
 
 impl SyntacticPrimary {
@@ -59,7 +59,7 @@ impl SyntacticPrimary {
                     parser,
                     Symbol::EndOption,
                     Expected::EndOptionSymbol,
-                    SyntacticPrimaryKind::Optional,
+                    SyntacticPrimaryKind::OptionalSequence,
                 );
             }
             CommentlessSymbol::Symbol(Symbol::StartRepeat) => {
@@ -67,7 +67,7 @@ impl SyntacticPrimary {
                     parser,
                     Symbol::EndRepeat,
                     Expected::EndRepeatSymbol,
-                    SyntacticPrimaryKind::Repeated,
+                    SyntacticPrimaryKind::RepeatedSequence,
                 );
             }
             CommentlessSymbol::Symbol(Symbol::StartGroup) => {
@@ -75,7 +75,7 @@ impl SyntacticPrimary {
                     parser,
                     Symbol::EndGroup,
                     Expected::EndGroupSymbol,
-                    SyntacticPrimaryKind::Grouped,
+                    SyntacticPrimaryKind::GroupedSequence,
                 );
             }
             _ => return Ok(Self::empty(parser)),
@@ -102,7 +102,7 @@ impl SyntacticPrimary {
 
     fn empty(parser: &Parser<'_>) -> Self {
         Self {
-            kind: SyntacticPrimaryKind::Empty,
+            kind: SyntacticPrimaryKind::EmptySequence,
             span: parser.empty_span(),
         }
     }

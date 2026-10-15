@@ -45,7 +45,12 @@ pub(crate) fn parse(source: &str) -> (Syntax, Vec<ParseError>) {
         });
     }
     errors.sort_by_key(|error| error.span.start);
-    (Syntax { rules }, errors)
+    (
+        Syntax {
+            syntax_rules: rules,
+        },
+        errors,
+    )
 }
 
 /// Reads tokens one at a time, with one token of lookahead.
@@ -243,30 +248,31 @@ mod tests {
     /// Writes `syntax` back as EBNF, in the canonical spelling.
     fn render(syntax: &Syntax) -> String {
         let mut text = String::new();
-        for rule in &syntax.rules {
-            write!(text, "{} = ", rule.name.as_str()).unwrap();
-            render_definitions(&mut text, &rule.definitions);
+        for rule in &syntax.syntax_rules {
+            write!(text, "{} = ", rule.meta_identifier.as_str()).unwrap();
+            render_definitions(&mut text, &rule.definitions_list);
             text.push(';');
         }
         text
     }
 
     fn render_definitions(text: &mut String, list: &DefinitionsList) {
-        for (index, definition) in list.definitions.iter().enumerate() {
+        for (index, definition) in list.single_definitions.iter().enumerate() {
             if index > 0 {
                 text.push_str(" | ");
             }
-            for (index, term) in definition.terms.iter().enumerate() {
+            for (index, term) in definition.syntactic_terms.iter().enumerate()
+            {
                 if index > 0 {
                     text.push_str(", ");
                 }
-                if let Some(count) = term.factor.repetitions {
+                if let Some(count) = term.syntactic_factor.integer {
                     write!(text, "{} * ", count.get()).unwrap();
                 }
-                render_primary(text, &term.factor.primary);
-                if let Some(exception) = &term.exception {
+                render_primary(text, &term.syntactic_factor.syntactic_primary);
+                if let Some(exception) = &term.syntactic_exception {
                     text.push_str(" - ");
-                    render_primary(text, &exception.primary);
+                    render_primary(text, &exception.syntactic_primary);
                 }
             }
         }
@@ -274,9 +280,9 @@ mod tests {
 
     fn render_primary(text: &mut String, primary: &SyntacticPrimary) {
         let (open, list, close) = match &primary.kind {
-            SyntacticPrimaryKind::Optional(list) => ('[', list, ']'),
-            SyntacticPrimaryKind::Repeated(list) => ('{', list, '}'),
-            SyntacticPrimaryKind::Grouped(list) => ('(', list, ')'),
+            SyntacticPrimaryKind::OptionalSequence(list) => ('[', list, ']'),
+            SyntacticPrimaryKind::RepeatedSequence(list) => ('{', list, '}'),
+            SyntacticPrimaryKind::GroupedSequence(list) => ('(', list, ')'),
             SyntacticPrimaryKind::MetaIdentifier(name) => {
                 text.push_str(name.as_str());
                 return;
@@ -296,7 +302,7 @@ mod tests {
                 .unwrap();
                 return;
             }
-            SyntacticPrimaryKind::Empty => return,
+            SyntacticPrimaryKind::EmptySequence => return,
         };
         text.push(open);
         render_definitions(text, list);
@@ -376,20 +382,24 @@ mod tests {
     fn spans_cover_each_node() {
         let source = "a = b, 3 * [c];";
         let syntax = parse_valid(source);
-        let rule = &syntax.rules[0];
+        let rule = &syntax.syntax_rules[0];
         let text = |span: Span| &source[span.start..span.end];
         assert_eq!(text(rule.span), "a = b, 3 * [c];");
-        assert_eq!(text(rule.definitions.span), "b, 3 * [c]");
-        let terms = &rule.definitions.definitions[0].terms;
+        assert_eq!(text(rule.definitions_list.span), "b, 3 * [c]");
+        let terms =
+            &rule.definitions_list.single_definitions[0].syntactic_terms;
         assert_eq!(text(terms[0].span), "b");
         assert_eq!(text(terms[1].span), "3 * [c]");
-        assert_eq!(text(terms[1].factor.primary.span), "[c]");
+        assert_eq!(
+            text(terms[1].syntactic_factor.syntactic_primary.span),
+            "[c]"
+        );
     }
 
     #[test]
     fn empty_sequences_have_an_empty_span_after_the_last_token() {
         let syntax = parse_valid("a =  ;");
-        let span = syntax.rules[0].definitions.span;
+        let span = syntax.syntax_rules[0].definitions_list.span;
         assert_eq!(span, Span { start: 3, end: 3 });
     }
 

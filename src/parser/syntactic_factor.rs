@@ -13,8 +13,8 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SyntacticFactor {
     /// How many times the primary repeats, if written before a `*`.
-    pub(crate) repetitions: Option<Integer>,
-    pub(crate) primary: SyntacticPrimary,
+    pub(crate) integer: Option<Integer>,
+    pub(crate) syntactic_primary: SyntacticPrimary,
     pub(crate) span: Span,
 }
 
@@ -32,8 +32,8 @@ impl SyntacticFactor {
         let span =
             count.map_or(primary.span, |(_, start)| start.to(primary.span));
         Ok(Self {
-            repetitions: count.map(|(integer, _)| integer),
-            primary,
+            integer: count.map(|(integer, _)| integer),
+            syntactic_primary: primary,
             span,
         })
     }
