@@ -278,11 +278,19 @@ impl Error for ParseError {
 }
 
 impl From<ParseError> for Diagnostic {
+    /// Ends the message with every error that caused this one, since only
+    /// the innermost says what is wrong, such as an empty terminal string.
     fn from(error: ParseError) -> Self {
+        let mut message = error.to_string();
+        let mut cause = error.source();
+        while let Some(error) = cause {
+            message = format!("{message}: {error}");
+            cause = error.source();
+        }
         Self {
             severity: Severity::Error,
             code: None,
-            message: error.to_string(),
+            message,
             span: error.span,
             labels: Vec::new(),
             help: None,
@@ -660,6 +668,15 @@ mod tests {
                 labels: Vec::new(),
                 help: None,
             }
+        );
+    }
+
+    #[test]
+    fn keeps_what_caused_an_error_in_its_diagnostic() {
+        let (_, errors) = parse("a = '';");
+        assert_eq!(
+            Diagnostic::from(errors[0]).message,
+            "invalid EBNF terminal string: EBNF terminal string is empty"
         );
     }
 
