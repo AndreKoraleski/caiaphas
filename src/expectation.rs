@@ -50,7 +50,7 @@ impl Comment {
         else {
             return Self::Ordinary;
         };
-        if rest.chars().next().is_some_and(|c| !is_gap(c)) {
+        if rest.chars().next().is_some_and(|c| !is_gap(c) && c != ':') {
             return Self::Ordinary;
         }
         let Some((code, reason)) = rest.split_once(':') else {
@@ -152,6 +152,7 @@ mod tests {
             "(* expect shadowed-branch *)",
             "(* expect shadowed-branch: *)",
             "(* expect : no code *)",
+            "(* expect: no code *)",
             "(* expect Shadowed-Branch: case *)",
             "(* expect shadowed_branch: underscore *)",
             "(* expect shadowed--branch: empty word *)",
