@@ -57,6 +57,7 @@ impl SyntacticPrimary {
             CommentlessSymbol::Symbol(Symbol::StartOption) => {
                 return Self::parse_bracketed(
                     parser,
+                    span,
                     Symbol::EndOption,
                     Expected::EndOptionSymbol,
                     SyntacticPrimaryKind::OptionalSequence,
@@ -65,6 +66,7 @@ impl SyntacticPrimary {
             CommentlessSymbol::Symbol(Symbol::StartRepeat) => {
                 return Self::parse_bracketed(
                     parser,
+                    span,
                     Symbol::EndRepeat,
                     Expected::EndRepeatSymbol,
                     SyntacticPrimaryKind::RepeatedSequence,
@@ -73,6 +75,7 @@ impl SyntacticPrimary {
             CommentlessSymbol::Symbol(Symbol::StartGroup) => {
                 return Self::parse_bracketed(
                     parser,
+                    span,
                     Symbol::EndGroup,
                     Expected::EndGroupSymbol,
                     SyntacticPrimaryKind::GroupedSequence,
@@ -84,19 +87,21 @@ impl SyntacticPrimary {
         Ok(Self { kind, span })
     }
 
-    /// Reads a definitions list between the next token and `close`.
+    /// Reads a definitions list between the next token, found at `open`, and
+    /// `close`.
     fn parse_bracketed(
         parser: &mut Parser<'_>,
+        open: Span,
         close: Symbol,
         expected: Expected,
         kind: fn(DefinitionsList) -> SyntacticPrimaryKind,
     ) -> Result<Self, ParseError> {
-        let open = parser.bump().map(|token| token.span);
+        parser.bump();
         let definitions = DefinitionsList::parse(parser)?;
         let close = parser.expect(close, expected)?;
         Ok(Self {
             kind: kind(definitions),
-            span: open.map_or(close, |open| open.to(close)),
+            span: open.to(close),
         })
     }
 
