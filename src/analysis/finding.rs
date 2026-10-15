@@ -24,8 +24,30 @@ pub(crate) enum FindingKind {
     /// A rule can reach itself before reading anything, so its parser would
     /// never end.
     LeftRecursion { meta_identifier: MetaIdentifier },
+    /// A rule can reach itself through other rules before reading anything, so
+    /// its parser would never end.
+    IndirectLeftRecursion {
+        meta_identifier: MetaIdentifier,
+        through: MetaIdentifier,
+    },
+    /// No input can ever finish matching a rule.
+    UnproductiveRule { meta_identifier: MetaIdentifier },
+    /// A repeated sequence can match nothing, so it could repeat forever.
+    EmptyRepetition,
     /// Two branches of a choice can start with some of the same characters.
     OverlappingBranches { characters: CharacterSet },
+    /// An optional sequence can start with characters that can also come right
+    /// after it, so a parser cannot tell whether to take it.
+    OptionalFollowConflict { characters: CharacterSet },
+    /// A repeated sequence can start with characters that can also come right
+    /// after it, so a parser cannot tell whether to repeat it again.
+    RepeatedFollowConflict { characters: CharacterSet },
+    /// An optional sequence takes every character that can come after it, so
+    /// skipping it never leads to a match.
+    RequiredOptionalSequence,
+    /// A repeated sequence takes every character that can come after it, so
+    /// nothing after it can ever match.
+    DeadEndRepetition,
     /// An alternative starts and ends with its own rule, so it can group
     /// either way.
     AmbiguousRecursion { meta_identifier: MetaIdentifier },
@@ -34,18 +56,8 @@ pub(crate) enum FindingKind {
     ShadowedBranch,
     /// More than one branch of a choice can match nothing.
     AmbiguousEmptyBranches,
-    /// A repeated sequence can match nothing, so it could repeat forever.
-    EmptyRepetition,
-    /// No input can ever finish matching a rule.
-    UnproductiveRule { meta_identifier: MetaIdentifier },
     /// No start rule can reach a rule, so no parser uses it.
     UnreachableRule { meta_identifier: MetaIdentifier },
-    /// A rule can reach itself through other rules before reading anything, so
-    /// its parser would never end.
-    IndirectLeftRecursion {
-        meta_identifier: MetaIdentifier,
-        through: MetaIdentifier,
-    },
     /// An alternative is written the same way as an earlier alternative of the
     /// same choice.
     DuplicateAlternative,
@@ -54,12 +66,6 @@ pub(crate) enum FindingKind {
     IneffectiveException,
     /// A rule can match nothing and nothing else, so it never reads input.
     EmptyRule { meta_identifier: MetaIdentifier },
-    /// An optional sequence can start with characters that can also come right
-    /// after it, so a parser cannot tell whether to take it.
-    OptionalFollowConflict { characters: CharacterSet },
-    /// A repeated sequence can start with characters that can also come right
-    /// after it, so a parser cannot tell whether to repeat it again.
-    RepeatedFollowConflict { characters: CharacterSet },
     /// A syntactic exception matches everything its factor matches, so the
     /// term can never match.
     ExhaustiveException,
@@ -68,12 +74,6 @@ pub(crate) enum FindingKind {
         meta_identifier: MetaIdentifier,
         other: MetaIdentifier,
     },
-    /// An optional sequence takes every character that can come after it, so
-    /// skipping it never leads to a match.
-    RequiredOptionalSequence,
-    /// A repeated sequence takes every character that can come after it, so
-    /// nothing after it can ever match.
-    DeadEndRepetition,
     /// An expectation names no kind of finding.
     UnknownExpectation { code: String },
     /// An expectation names a kind of finding that cannot be intended, such as
@@ -254,6 +254,10 @@ impl FindingKind {
             Self::RepeatedFollowConflict { .. } => {
                 FindingCode::RepeatedFollowConflict
             }
+            Self::RequiredOptionalSequence => {
+                FindingCode::RequiredOptionalSequence
+            }
+            Self::DeadEndRepetition => FindingCode::DeadEndRepetition,
             Self::AmbiguousRecursion { .. } => FindingCode::AmbiguousRecursion,
             Self::ShadowedBranch => FindingCode::ShadowedBranch,
             Self::AmbiguousEmptyBranches => {
@@ -265,10 +269,6 @@ impl FindingKind {
             Self::EmptyRule { .. } => FindingCode::EmptyRule,
             Self::ExhaustiveException => FindingCode::ExhaustiveException,
             Self::CaseOnlyNames { .. } => FindingCode::CaseOnlyNames,
-            Self::RequiredOptionalSequence => {
-                FindingCode::RequiredOptionalSequence
-            }
-            Self::DeadEndRepetition => FindingCode::DeadEndRepetition,
             Self::UnknownExpectation { .. } => FindingCode::UnknownExpectation,
             Self::UnexpectableFinding { .. } => {
                 FindingCode::UnexpectableFinding
@@ -322,47 +322,14 @@ impl FindingKind {
                  the recursive part optional with `[...]` or `{{...}}`",
                 meta_identifier.as_str()
             ),
-            Self::UnreachableRule { meta_identifier } => format!(
-                "remove `{}`, or reference it from a rule a parser uses",
-                meta_identifier.as_str()
-            ),
-            Self::AmbiguousRecursion { meta_identifier } => {
-                let name = meta_identifier.as_str();
-                format!(
-                    "replace one end with a rule that does not start with \
-                     `{name}`, so `{name} = {name}, '+', {name} | 'n';` \
-                     becomes `{name} = {name}, '+', term | term;` to group \
-                     from the left"
-                )
-            }
-            Self::DuplicateAlternative => "remove this alternative".to_owned(),
-            Self::EmptyRule { meta_identifier } => format!(
-                "give `{}` something to read, or remove it and every \
-                 reference to it",
-                meta_identifier.as_str()
-            ),
-            Self::IneffectiveException => {
-                "remove the exception, or write the one that was meant"
+            Self::EmptyRepetition => {
+                "make what repeats read something, such as by removing \
+                 `[...]` inside the `{...}`"
                     .to_owned()
             }
             Self::OverlappingBranches { .. } => {
                 "move what the branches start with in common before the \
                  choice, or exclude it from one with `-`"
-                    .to_owned()
-            }
-            Self::ShadowedBranch => {
-                "remove this branch if the other already matches what it \
-                 does, or exclude it from the other with `-`"
-                    .to_owned()
-            }
-            Self::AmbiguousEmptyBranches => {
-                "make all but one of these branches read something, such as \
-                 by removing `[...]` around one of them"
-                    .to_owned()
-            }
-            Self::EmptyRepetition => {
-                "make what repeats read something, such as by removing \
-                 `[...]` inside the `{...}`"
                     .to_owned()
             }
             Self::OptionalFollowConflict { .. } => {
@@ -374,6 +341,50 @@ impl FindingKind {
                  make what comes after it start differently"
                     .to_owned()
             }
+            Self::RequiredOptionalSequence => {
+                "remove the `[...]` if the sequence is always needed, or make \
+                 what comes after it start with a character it cannot take"
+                    .to_owned()
+            }
+            Self::DeadEndRepetition => {
+                "move what comes after the repetition before it, so `{'x'}, \
+                 'x'` becomes `'x', {'x'}`, or make what comes after it start \
+                 with a character it cannot take"
+                    .to_owned()
+            }
+            Self::AmbiguousRecursion { meta_identifier } => {
+                let name = meta_identifier.as_str();
+                format!(
+                    "replace one end with a rule that does not start with \
+                     `{name}`, so `{name} = {name}, '+', {name} | 'n';` \
+                     becomes `{name} = {name}, '+', term | term;` to group \
+                     from the left"
+                )
+            }
+            Self::ShadowedBranch => {
+                "remove this branch if the other already matches what it \
+                 does, or exclude it from the other with `-`"
+                    .to_owned()
+            }
+            Self::AmbiguousEmptyBranches => {
+                "make all but one of these branches read something, such as \
+                 by removing `[...]` around one of them"
+                    .to_owned()
+            }
+            Self::UnreachableRule { meta_identifier } => format!(
+                "remove `{}`, or reference it from a rule a parser uses",
+                meta_identifier.as_str()
+            ),
+            Self::DuplicateAlternative => "remove this alternative".to_owned(),
+            Self::IneffectiveException => {
+                "remove the exception, or write the one that was meant"
+                    .to_owned()
+            }
+            Self::EmptyRule { meta_identifier } => format!(
+                "give `{}` something to read, or remove it and every \
+                 reference to it",
+                meta_identifier.as_str()
+            ),
             Self::ExhaustiveException => {
                 "remove this term, or narrow the exception so something is \
                  left"
@@ -387,17 +398,6 @@ impl FindingKind {
                 meta_identifier.as_str(),
                 other.as_str()
             ),
-            Self::RequiredOptionalSequence => {
-                "remove the `[...]` if the sequence is always needed, or make \
-                 what comes after it start with a character it cannot take"
-                    .to_owned()
-            }
-            Self::DeadEndRepetition => {
-                "move what comes after the repetition before it, so `{'x'}, \
-                 'x'` becomes `'x', {'x'}`, or make what comes after it start \
-                 with a character it cannot take"
-                    .to_owned()
-            }
             Self::UnknownExpectation { .. } => {
                 "write the code a finding reports, such as \
                  `repeated-follow-conflict`"
@@ -426,9 +426,49 @@ impl fmt::Display for Finding {
                  would never end",
                 meta_identifier.as_str()
             ),
+            FindingKind::IndirectLeftRecursion {
+                meta_identifier,
+                through,
+            } => write!(
+                f,
+                "`{}` can reach itself through `{}` before reading anything, \
+                 so its parser would never end",
+                meta_identifier.as_str(),
+                through.as_str()
+            ),
+            FindingKind::UnproductiveRule { meta_identifier } => write!(
+                f,
+                "`{}` can never finish matching, since every way through it \
+                 needs a rule that cannot either",
+                meta_identifier.as_str()
+            ),
+            FindingKind::EmptyRepetition => f.write_str(
+                "this repeated sequence can match nothing, so it could repeat \
+                 forever",
+            ),
             FindingKind::OverlappingBranches { characters } => {
                 write!(f, "these branches can both start with {characters}")
             }
+            FindingKind::OptionalFollowConflict { characters } => write!(
+                f,
+                "this optional sequence and what comes after it can both \
+                 start with {characters}, so a parser cannot tell whether to \
+                 take it"
+            ),
+            FindingKind::RepeatedFollowConflict { characters } => write!(
+                f,
+                "this repeated sequence and what comes after it can both \
+                 start with {characters}, so a parser cannot tell whether to \
+                 repeat it again"
+            ),
+            FindingKind::RequiredOptionalSequence => f.write_str(
+                "this optional sequence takes every character that can come \
+                 after it, so skipping it never leads to a match",
+            ),
+            FindingKind::DeadEndRepetition => f.write_str(
+                "this repeated sequence takes every character that can come \
+                 after it, so nothing after it can ever match",
+            ),
             FindingKind::AmbiguousRecursion { meta_identifier } => write!(
                 f,
                 "this alternative starts and ends with `{}`, so it can group \
@@ -441,31 +481,11 @@ impl fmt::Display for Finding {
             FindingKind::AmbiguousEmptyBranches => {
                 f.write_str("more than one branch can match nothing")
             }
-            FindingKind::EmptyRepetition => f.write_str(
-                "this repeated sequence can match nothing, so it could repeat \
-                 forever",
-            ),
-            FindingKind::UnproductiveRule { meta_identifier } => write!(
-                f,
-                "`{}` can never finish matching, since every way through it \
-                 needs a rule that cannot either",
-                meta_identifier.as_str()
-            ),
             FindingKind::UnreachableRule { meta_identifier } => write!(
                 f,
                 "`{}` cannot be reached from any start rule, so no parser \
                  uses it",
                 meta_identifier.as_str()
-            ),
-            FindingKind::IndirectLeftRecursion {
-                meta_identifier,
-                through,
-            } => write!(
-                f,
-                "`{}` can reach itself through `{}` before reading anything, \
-                 so its parser would never end",
-                meta_identifier.as_str(),
-                through.as_str()
             ),
             FindingKind::DuplicateAlternative => f.write_str(
                 "this alternative is written the same way as an earlier one, \
@@ -480,18 +500,6 @@ impl fmt::Display for Finding {
                 "`{}` can only match nothing, so it never reads any input",
                 meta_identifier.as_str()
             ),
-            FindingKind::OptionalFollowConflict { characters } => write!(
-                f,
-                "this optional sequence and what comes after it can both \
-                 start with {characters}, so a parser cannot tell whether to \
-                 take it"
-            ),
-            FindingKind::RepeatedFollowConflict { characters } => write!(
-                f,
-                "this repeated sequence and what comes after it can both \
-                 start with {characters}, so a parser cannot tell whether to \
-                 repeat it again"
-            ),
             FindingKind::ExhaustiveException => f.write_str(
                 "this term can never match, since the exception matches \
                  everything before the `-` does",
@@ -505,14 +513,6 @@ impl fmt::Display for Finding {
                  mistake",
                 meta_identifier.as_str(),
                 other.as_str()
-            ),
-            FindingKind::RequiredOptionalSequence => f.write_str(
-                "this optional sequence takes every character that can come \
-                 after it, so skipping it never leads to a match",
-            ),
-            FindingKind::DeadEndRepetition => f.write_str(
-                "this repeated sequence takes every character that can come \
-                 after it, so nothing after it can ever match",
             ),
             FindingKind::UnknownExpectation { code } => {
                 write!(f, "`{code}` is not the code of any finding")
@@ -577,59 +577,13 @@ mod tests {
                    becomes `a = y, {x};`",
         },
         Case {
-            source: "a = ? U+0061..U+0063 ? | ? U+0062..U+0064 ?;",
-            code: FindingCode::OverlappingBranches,
-            severity: Severity::Warning,
-            message: "these branches can both start with 'b'..='c'",
-            help: "move what the branches start with in common before the \
-                   choice, or exclude it from one with `-`; if this is \
-                   intended, write `(* expect overlapping-branches: reason \
-                   *)` right before the rule, and the parser takes the first \
-                   branch that matches",
-        },
-        Case {
-            source: "e = e, '+', e | 'n';",
-            code: FindingCode::AmbiguousRecursion,
-            severity: Severity::Warning,
-            message: "this alternative starts and ends with `e`, so it can \
-                      group either way",
-            help: "replace one end with a rule that does not start with `e`, \
-                   so `e = e, '+', e | 'n';` becomes `e = e, '+', term | \
-                   term;` to group from the left; if this is intended, write \
-                   `(* expect ambiguous-recursion: reason *)` right before \
-                   the rule, and the grammar stays as it is",
-        },
-        Case {
-            source: "a = ? U+0061..U+007A ? | 'x';",
-            code: FindingCode::ShadowedBranch,
-            severity: Severity::Warning,
-            message: "another branch can start with every character this one \
-                      can",
-            help: "remove this branch if the other already matches what it \
-                   does, or exclude it from the other with `-`; if this is \
-                   intended, write `(* expect shadowed-branch: reason *)` \
-                   right before the rule, and the parser takes the first \
-                   branch that matches",
-        },
-        Case {
-            source: "a = ['x'] | ['y'];",
-            code: FindingCode::AmbiguousEmptyBranches,
-            severity: Severity::Warning,
-            message: "more than one branch can match nothing",
-            help: "make all but one of these branches read something, such as \
-                   by removing `[...]` around one of them; if this is \
-                   intended, write `(* expect ambiguous-empty-branches: \
-                   reason *)` right before the rule, and the parser takes the \
-                   first branch that matches",
-        },
-        Case {
-            source: "a = {['x']};",
-            code: FindingCode::EmptyRepetition,
+            source: "s = a; a = b, 'x' | 'y'; b = a, 'z' | 'w';",
+            code: FindingCode::IndirectLeftRecursion,
             severity: Severity::Error,
-            message: "this repeated sequence can match nothing, so it could \
-                      repeat forever",
-            help: "make what repeats read something, such as by removing \
-                   `[...]` inside the `{...}`",
+            message: "`a` can reach itself through `b` before reading \
+                      anything, so its parser would never end",
+            help: "replace `b` in `a` with its definition until the recursion \
+                   is direct, then rewrite it as a repetition",
         },
         Case {
             source: "a = 'x', a;",
@@ -641,55 +595,24 @@ mod tests {
                    make the recursive part optional with `[...]` or `{...}`",
         },
         Case {
-            source: "s = 'x'; a = 'y', [b]; b = 'z', a;",
-            code: FindingCode::UnreachableRule,
-            severity: Severity::Warning,
-            message: "`a` cannot be reached from any start rule, so no parser \
-                      uses it",
-            help: "remove `a`, or reference it from a rule a parser uses; if \
-                   this is intended, write `(* expect unreachable-rule: \
-                   reason *)` right before the rule, and the grammar stays as \
-                   it is",
-        },
-        Case {
-            source: "s = a; a = b, 'x' | 'y'; b = a, 'z' | 'w';",
-            code: FindingCode::IndirectLeftRecursion,
+            source: "a = {['x']};",
+            code: FindingCode::EmptyRepetition,
             severity: Severity::Error,
-            message: "`a` can reach itself through `b` before reading \
-                      anything, so its parser would never end",
-            help: "replace `b` in `a` with its definition until the recursion \
-                   is direct, then rewrite it as a repetition",
+            message: "this repeated sequence can match nothing, so it could \
+                      repeat forever",
+            help: "make what repeats read something, such as by removing \
+                   `[...]` inside the `{...}`",
         },
         Case {
-            source: "a = 'x' | 'x';",
-            code: FindingCode::DuplicateAlternative,
+            source: "a = ? U+0061..U+0063 ? | ? U+0062..U+0064 ?;",
+            code: FindingCode::OverlappingBranches,
             severity: Severity::Warning,
-            message: "this alternative is written the same way as an earlier \
-                      one, so both always match the same input",
-            help: "remove this alternative; if this is intended, write `(* \
-                   expect duplicate-alternative: reason *)` right before the \
-                   rule, and the parser takes the first branch that matches",
-        },
-        Case {
-            source: "a = 'x' - 'y';",
-            code: FindingCode::IneffectiveException,
-            severity: Severity::Warning,
-            message: "this exception can never apply, since nothing before \
-                      the `-` matches the same input",
-            help: "remove the exception, or write the one that was meant; if \
-                   this is intended, write `(* expect ineffective-exception: \
-                   reason *)` right before the rule, and the grammar stays as \
-                   it is",
-        },
-        Case {
-            source: "s = a, 'x'; a = ;",
-            code: FindingCode::EmptyRule,
-            severity: Severity::Warning,
-            message: "`a` can only match nothing, so it never reads any input",
-            help: "give `a` something to read, or remove it and every \
-                   reference to it; if this is intended, write `(* expect \
-                   empty-rule: reason *)` right before the rule, and the \
-                   grammar stays as it is",
+            message: "these branches can both start with 'b'..='c'",
+            help: "move what the branches start with in common before the \
+                   choice, or exclude it from one with `-`; if this is \
+                   intended, write `(* expect overlapping-branches: reason \
+                   *)` right before the rule, and the parser takes the first \
+                   branch that matches",
         },
         Case {
             source: "a = ['xy'], 'x';",
@@ -741,6 +664,83 @@ mod tests {
                    start with a character it cannot take; if this is \
                    intended, write `(* expect dead-end-repetition: reason *)` \
                    right before the rule, and the grammar stays as it is",
+        },
+        Case {
+            source: "e = e, '+', e | 'n';",
+            code: FindingCode::AmbiguousRecursion,
+            severity: Severity::Warning,
+            message: "this alternative starts and ends with `e`, so it can \
+                      group either way",
+            help: "replace one end with a rule that does not start with `e`, \
+                   so `e = e, '+', e | 'n';` becomes `e = e, '+', term | \
+                   term;` to group from the left; if this is intended, write \
+                   `(* expect ambiguous-recursion: reason *)` right before \
+                   the rule, and the grammar stays as it is",
+        },
+        Case {
+            source: "a = ? U+0061..U+007A ? | 'x';",
+            code: FindingCode::ShadowedBranch,
+            severity: Severity::Warning,
+            message: "another branch can start with every character this one \
+                      can",
+            help: "remove this branch if the other already matches what it \
+                   does, or exclude it from the other with `-`; if this is \
+                   intended, write `(* expect shadowed-branch: reason *)` \
+                   right before the rule, and the parser takes the first \
+                   branch that matches",
+        },
+        Case {
+            source: "a = ['x'] | ['y'];",
+            code: FindingCode::AmbiguousEmptyBranches,
+            severity: Severity::Warning,
+            message: "more than one branch can match nothing",
+            help: "make all but one of these branches read something, such as \
+                   by removing `[...]` around one of them; if this is \
+                   intended, write `(* expect ambiguous-empty-branches: \
+                   reason *)` right before the rule, and the parser takes the \
+                   first branch that matches",
+        },
+        Case {
+            source: "s = 'x'; a = 'y', [b]; b = 'z', a;",
+            code: FindingCode::UnreachableRule,
+            severity: Severity::Warning,
+            message: "`a` cannot be reached from any start rule, so no parser \
+                      uses it",
+            help: "remove `a`, or reference it from a rule a parser uses; if \
+                   this is intended, write `(* expect unreachable-rule: \
+                   reason *)` right before the rule, and the grammar stays as \
+                   it is",
+        },
+        Case {
+            source: "a = 'x' | 'x';",
+            code: FindingCode::DuplicateAlternative,
+            severity: Severity::Warning,
+            message: "this alternative is written the same way as an earlier \
+                      one, so both always match the same input",
+            help: "remove this alternative; if this is intended, write `(* \
+                   expect duplicate-alternative: reason *)` right before the \
+                   rule, and the parser takes the first branch that matches",
+        },
+        Case {
+            source: "a = 'x' - 'y';",
+            code: FindingCode::IneffectiveException,
+            severity: Severity::Warning,
+            message: "this exception can never apply, since nothing before \
+                      the `-` matches the same input",
+            help: "remove the exception, or write the one that was meant; if \
+                   this is intended, write `(* expect ineffective-exception: \
+                   reason *)` right before the rule, and the grammar stays as \
+                   it is",
+        },
+        Case {
+            source: "s = a, 'x'; a = ;",
+            code: FindingCode::EmptyRule,
+            severity: Severity::Warning,
+            message: "`a` can only match nothing, so it never reads any input",
+            help: "give `a` something to read, or remove it and every \
+                   reference to it; if this is intended, write `(* expect \
+                   empty-rule: reason *)` right before the rule, and the \
+                   grammar stays as it is",
         },
         Case {
             source: "a = 'x' - ? U+0061..U+007A ?;",
