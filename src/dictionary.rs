@@ -12,6 +12,7 @@ use std::{
 };
 
 use crate::{
+    diagnostic::{Diagnostic, Label, Severity},
     ir::{Expression, ExpressionKind, Grammar, RuleId},
     lexer::MetaIdentifier,
     parser::{Syntax, SyntaxRule},
@@ -168,6 +169,62 @@ impl fmt::Display for DictionaryError {
 
 impl Error for DictionaryError {}
 
+impl DictionaryError {
+    /// Returns how to fix the grammar.
+    fn help(&self) -> String {
+        match &self.kind {
+            DictionaryErrorKind::DuplicateDefinition { .. } => {
+                "join both definitions into one rule with `|`, or rename one \
+                 of them"
+                    .to_owned()
+            }
+            DictionaryErrorKind::UndefinedMetaIdentifier {
+                meta_identifier,
+            } => {
+                format!(
+                    "define `{}` with a syntax rule, or correct its spelling",
+                    meta_identifier.as_str()
+                )
+            }
+            DictionaryErrorKind::NoStartSyntaxRule => {
+                "add a rule that no other rule references to start the \
+                 grammar, such as `grammar = expression;`"
+                    .to_owned()
+            }
+            DictionaryErrorKind::RecursiveSyntacticException {
+                meta_identifier,
+            } => format!(
+                "write the exception with terminal strings and special \
+                 sequences instead of `{}`",
+                meta_identifier.as_str()
+            ),
+        }
+    }
+}
+
+impl From<DictionaryError> for Diagnostic {
+    fn from(error: DictionaryError) -> Self {
+        let labels = match &error.kind {
+            DictionaryErrorKind::DuplicateDefinition {
+                first_definition,
+                ..
+            } => vec![Label {
+                span: *first_definition,
+                message: "first defined here",
+            }],
+            _ => Vec::new(),
+        };
+        Self {
+            severity: Severity::Error,
+            code: None,
+            message: error.to_string(),
+            span: error.span,
+            labels,
+            help: Some(error.help()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -314,6 +371,54 @@ mod tests {
             let (_, errors) = grammar(source);
             assert_eq!(errors[0].to_string(), message, "{source:?}");
         }
+    }
+
+    #[test]
+    fn turns_every_error_into_a_diagnostic_with_help() {
+        let cases = [
+            (
+                "a = b;",
+                "define `b` with a syntax rule, or correct its spelling",
+            ),
+            (
+                "a = 'x'; a = 'y';",
+                "join both definitions into one rule with `|`, or rename one \
+                 of them",
+            ),
+            (
+                "a = b; b = a;",
+                "add a rule that no other rule references to start the \
+                 grammar, such as `grammar = expression;`",
+            ),
+            (
+                "s = 'x' - b; b = 'y', [b];",
+                "write the exception with terminal strings and special \
+                 sequences instead of `b`",
+            ),
+        ];
+        for (source, help) in cases {
+            let (_, errors) = grammar(source);
+            let diagnostic = Diagnostic::from(errors[0].clone());
+            assert_eq!(diagnostic.severity, Severity::Error, "{source:?}");
+            assert_eq!(diagnostic.code, None, "{source:?}");
+            assert_eq!(diagnostic.message, errors[0].to_string());
+            assert_eq!(diagnostic.span, errors[0].span, "{source:?}");
+            assert_eq!(diagnostic.help.as_deref(), Some(help), "{source:?}");
+        }
+    }
+
+    #[test]
+    fn points_at_the_first_definition_of_a_duplicate() {
+        let (_, errors) = grammar("a = 'x'; a = 'y';");
+        assert_eq!(
+            Diagnostic::from(errors[0].clone()).labels,
+            [Label {
+                span: Span { start: 0, end: 8 },
+                message: "first defined here",
+            }]
+        );
+        let (_, errors) = grammar("a = b;");
+        assert_eq!(Diagnostic::from(errors[0].clone()).labels, []);
     }
 
     fn syntax(source: &str) -> Syntax {

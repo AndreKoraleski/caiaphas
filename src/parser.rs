@@ -19,6 +19,7 @@ pub(crate) use syntax::Syntax;
 pub(crate) use syntax_rule::SyntaxRule;
 
 use crate::{
+    diagnostic::{Diagnostic, Severity},
     expectation::Comment,
     lexer::{CommentlessSymbol, LexErrorKind, Lexer, Symbol, Token},
     span::Span,
@@ -272,6 +273,19 @@ impl Error for ParseError {
         match &self.kind {
             ParseErrorKind::Lex(kind) => kind.source(),
             _ => None,
+        }
+    }
+}
+
+impl From<ParseError> for Diagnostic {
+    fn from(error: ParseError) -> Self {
+        Self {
+            severity: Severity::Error,
+            code: None,
+            message: error.to_string(),
+            span: error.span,
+            labels: Vec::new(),
+            help: None,
         }
     }
 }
@@ -630,6 +644,23 @@ mod tests {
                 "{source:?}"
             );
         }
+    }
+
+    #[test]
+    fn turns_an_error_into_a_diagnostic() {
+        let (_, errors) = parse("a = 'x'");
+        assert_eq!(
+            Diagnostic::from(errors[0]),
+            Diagnostic {
+                severity: Severity::Error,
+                code: None,
+                message: "expected `;` or `.`, found the end of the grammar"
+                    .to_owned(),
+                span: Span { start: 7, end: 7 },
+                labels: Vec::new(),
+                help: None,
+            }
+        );
     }
 
     #[test]

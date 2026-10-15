@@ -4,7 +4,7 @@ use std::fmt;
 
 use crate::{
     analysis::character_set::CharacterSet,
-    diagnostic::{Label, Severity},
+    diagnostic::{Diagnostic, Label, Severity},
     lexer::MetaIdentifier,
     span::Span,
 };
@@ -537,6 +537,19 @@ impl fmt::Display for Finding {
     }
 }
 
+impl From<Finding> for Diagnostic {
+    fn from(finding: Finding) -> Self {
+        Self {
+            severity: finding.kind.severity(),
+            code: Some(finding.kind.code().name()),
+            message: finding.to_string(),
+            help: Some(finding.kind.help()),
+            span: finding.span,
+            labels: finding.labels,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -821,5 +834,31 @@ mod tests {
             assert_eq!(finding.to_string(), case.message, "{:?}", case.source);
             assert_eq!(finding.kind.help(), case.help, "{:?}", case.source);
         }
+    }
+
+    #[test]
+    fn turns_a_finding_into_a_diagnostic_with_its_code() {
+        let finding =
+            crate::analysis::tests::findings("a = ['x'] | ['y'];").remove(0);
+        let labels = finding.labels.clone();
+        assert!(!labels.is_empty());
+        assert_eq!(
+            Diagnostic::from(finding),
+            Diagnostic {
+                severity: Severity::Warning,
+                code: Some("ambiguous-empty-branches"),
+                message: "more than one branch can match nothing".to_owned(),
+                span: Span { start: 4, end: 17 },
+                labels,
+                help: Some(
+                    "make all but one of these branches read something, such \
+                     as by removing `[...]` around one of them; if this is \
+                     intended, write `(* expect ambiguous-empty-branches: \
+                     reason *)` right before the rule, and the parser takes \
+                     the first branch that matches"
+                        .to_owned()
+                ),
+            }
+        );
     }
 }
