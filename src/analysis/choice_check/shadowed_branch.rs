@@ -87,6 +87,11 @@ mod tests {
     }
 
     #[test]
+    fn accepts_a_branch_another_excludes_with_an_exception() {
+        assert_eq!(shadowed("a = ? U+0061..U+007A ? - 'x' | 'x';"), []);
+    }
+
+    #[test]
     fn accepts_branches_that_start_differently() {
         assert_eq!(shadowed("a = 'x' | 'y';"), []);
     }

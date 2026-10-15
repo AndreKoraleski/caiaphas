@@ -5,7 +5,7 @@ use std::cell::OnceCell;
 
 use crate::{
     analysis::character_set::CharacterSet,
-    ir::{Expression, ExpressionKind, Grammar, RuleId},
+    ir::{Expression, ExpressionKind, Grammar, Rule, RuleId},
     span::Span,
 };
 
@@ -20,6 +20,9 @@ pub(crate) struct Facts<'a> {
     first: OnceCell<Vec<CharacterSet>>,
     /// The characters that can come right after each rule.
     follow: OnceCell<Vec<CharacterSet>>,
+    /// The characters each rule matches, when it only ever matches one
+    /// character.
+    characters: OnceCell<Vec<Option<CharacterSet>>>,
 }
 
 impl<'a> Facts<'a> {
@@ -30,6 +33,7 @@ impl<'a> Facts<'a> {
             productive: OnceCell::new(),
             first: OnceCell::new(),
             follow: OnceCell::new(),
+            characters: OnceCell::new(),
         }
     }
 
@@ -52,7 +56,24 @@ impl<'a> Facts<'a> {
 
     /// Returns the characters `expression` can start with.
     pub(crate) fn first(&self, expression: &Expression) -> CharacterSet {
-        first(expression, self.nullable_rules(), self.first_rules())
+        first(
+            expression,
+            self.nullable_rules(),
+            self.first_rules(),
+            self.single_character_rules(),
+        )
+    }
+
+    /// Returns the characters `expression` matches, when it only ever matches
+    /// one character.
+    ///
+    /// A syntactic term matches exactly the characters of its factor that its
+    /// exception does not, when both only ever match one character.
+    pub(crate) fn single_characters(
+        &self,
+        expression: &Expression,
+    ) -> Option<CharacterSet> {
+        single_characters(expression, self.single_character_rules())
     }
 
     /// Returns the characters `expression` can start with when `after` comes
@@ -230,12 +251,18 @@ impl<'a> Facts<'a> {
         self.first.get_or_init(|| {
             let rules = &self.grammar.syntax_rules;
             let nullable = self.nullable_rules();
+            let characters = self.single_character_rules();
             let mut sets = vec![CharacterSet::default(); rules.len()];
             let mut changed = true;
             while changed {
                 changed = false;
                 for (position, rule) in rules.iter().enumerate() {
-                    let set = first(&rule.definitions_list, nullable, &sets);
+                    let set = first(
+                        &rule.definitions_list,
+                        nullable,
+                        &sets,
+                        characters,
+                    );
                     if set != sets[position] {
                         sets[position] = set;
                         changed = true;
@@ -243,6 +270,16 @@ impl<'a> Facts<'a> {
                 }
             }
             sets
+        })
+    }
+
+    fn single_character_rules(&self) -> &[Option<CharacterSet>] {
+        self.characters.get_or_init(|| {
+            let rules = &self.grammar.syntax_rules;
+            let mut states = vec![Characters::Unvisited; rules.len()];
+            (0..rules.len())
+                .map(|position| rule_characters(rules, &mut states, position))
+                .collect()
         })
     }
 
@@ -341,12 +378,14 @@ fn first(
     expression: &Expression,
     nullable: &[bool],
     rules: &[CharacterSet],
+    characters: &[Option<CharacterSet>],
 ) -> CharacterSet {
+    let first = |expression| first(expression, nullable, rules, characters);
     match &expression.kind {
         ExpressionKind::SingleDefinition(expressions) => {
             let mut set = CharacterSet::default();
             for expression in expressions {
-                set = set.union(&first(expression, nullable, rules));
+                set = set.union(&first(expression));
                 if !is_nullable(expression, nullable) {
                     break;
                 }
@@ -356,18 +395,24 @@ fn first(
         ExpressionKind::DefinitionsList(expressions) => expressions
             .iter()
             .fold(CharacterSet::default(), |set, expression| {
-                set.union(&first(expression, nullable, rules))
+                set.union(&first(expression))
             }),
         ExpressionKind::OptionalSequence(expression)
         | ExpressionKind::RepeatedSequence(expression)
         | ExpressionKind::SyntacticFactor {
             syntactic_primary: expression,
             ..
-        }
-        | ExpressionKind::SyntacticTerm {
-            syntactic_factor: expression,
-            ..
-        } => first(expression, nullable, rules),
+        } => first(expression),
+        ExpressionKind::SyntacticTerm {
+            syntactic_factor,
+            syntactic_exception,
+        } => match (
+            single_characters(syntactic_factor, characters),
+            single_characters(syntactic_exception, characters),
+        ) {
+            (Some(factor), Some(exception)) => factor.difference(&exception),
+            _ => first(syntactic_factor),
+        },
         ExpressionKind::MetaIdentifier(RuleId(position)) => {
             rules[*position].clone()
         }
@@ -379,6 +424,88 @@ fn first(
             CharacterSet::from_range(range.clone())
         }
         ExpressionKind::EmptySequence => CharacterSet::default(),
+    }
+}
+
+/// What is known so far about the characters a rule matches.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Characters {
+    Unvisited,
+    /// Being worked out, so reaching it again means recursion.
+    Visiting,
+    Known(Option<CharacterSet>),
+}
+
+/// Returns the characters the rule at `position` matches when it only ever
+/// matches one character, working out the rules it references first.
+///
+/// A recursive rule gets no answer.
+fn rule_characters(
+    rules: &[Rule],
+    states: &mut [Characters],
+    position: usize,
+) -> Option<CharacterSet> {
+    match &states[position] {
+        Characters::Known(characters) => return characters.clone(),
+        Characters::Visiting => return None,
+        Characters::Unvisited => {}
+    }
+    states[position] = Characters::Visiting;
+    let characters = single_characters_with(
+        &rules[position].definitions_list,
+        &mut |RuleId(target)| rule_characters(rules, states, target),
+    );
+    states[position] = Characters::Known(characters.clone());
+    characters
+}
+
+/// Returns the characters `expression` matches when it only ever matches one
+/// character, given the same for each rule in `characters`.
+fn single_characters(
+    expression: &Expression,
+    characters: &[Option<CharacterSet>],
+) -> Option<CharacterSet> {
+    single_characters_with(expression, &mut |RuleId(position)| {
+        characters[position].clone()
+    })
+}
+
+fn single_characters_with(
+    expression: &Expression,
+    rule: &mut impl FnMut(RuleId) -> Option<CharacterSet>,
+) -> Option<CharacterSet> {
+    match &expression.kind {
+        ExpressionKind::TerminalString(string) => {
+            let mut chars = string.chars();
+            match (chars.next(), chars.next()) {
+                (Some(c), None) => Some(CharacterSet::single(c)),
+                _ => None,
+            }
+        }
+        ExpressionKind::SpecialSequence(range) => {
+            Some(CharacterSet::from_range(range.clone()))
+        }
+        ExpressionKind::DefinitionsList(expressions) => {
+            let mut set = CharacterSet::default();
+            for expression in expressions {
+                set = set.union(&single_characters_with(expression, rule)?);
+            }
+            Some(set)
+        }
+        ExpressionKind::MetaIdentifier(rule_id) => rule(*rule_id),
+        ExpressionKind::SyntacticTerm {
+            syntactic_factor,
+            syntactic_exception,
+        } => {
+            let factor = single_characters_with(syntactic_factor, rule)?;
+            let exception = single_characters_with(syntactic_exception, rule)?;
+            Some(factor.difference(&exception))
+        }
+        ExpressionKind::SingleDefinition(_)
+        | ExpressionKind::OptionalSequence(_)
+        | ExpressionKind::RepeatedSequence(_)
+        | ExpressionKind::SyntacticFactor { .. }
+        | ExpressionKind::EmptySequence => None,
     }
 }
 
@@ -414,6 +541,43 @@ mod tests {
             .map(|position| facts.is_productive(rule(&grammar, position)))
             .collect();
         assert_eq!(productive, [true, false, true, true]);
+    }
+
+    #[test]
+    fn finds_rules_that_only_match_single_characters() {
+        let grammar = grammar(
+            "s = a | b | c | d | e; a = 'x' | ? U+0061..U+0063 ?; \
+             b = 'xy'; c = a - 'b'; d = a, 'x'; e = 'x' | e;",
+        );
+        let facts = Facts::new(&grammar);
+        let characters: Vec<Option<String>> = (0..6)
+            .map(|position| {
+                facts
+                    .single_characters(rule(&grammar, position))
+                    .map(|set| set.to_string())
+            })
+            .collect();
+        assert_eq!(
+            characters,
+            [
+                None,
+                Some("'a'..='c', 'x'".to_owned()),
+                None,
+                Some("'a', 'c', 'x'".to_owned()),
+                None,
+                None,
+            ]
+        );
+    }
+
+    #[test]
+    fn starts_a_term_with_what_its_exception_leaves() {
+        let grammar = grammar("s = ? U+0061..U+007A ? - ('x' | 'b');");
+        let facts = Facts::new(&grammar);
+        assert_eq!(
+            facts.first(rule(&grammar, 0)).to_string(),
+            "'a', 'c'..='w', 'y'..='z'"
+        );
     }
 
     #[test]

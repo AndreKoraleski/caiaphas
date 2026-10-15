@@ -69,6 +69,50 @@ impl CharacterSet {
     pub(crate) fn is_subset(&self, other: &Self) -> bool {
         self.intersection(other) == *self
     }
+
+    /// Returns the characters of this set that are not in `other`.
+    pub(crate) fn difference(&self, other: &Self) -> Self {
+        let mut ranges = Vec::new();
+        for range in &self.ranges {
+            let mut start = Some(*range.start());
+            for cut in &other.ranges {
+                let Some(from) = start else {
+                    break;
+                };
+                if cut.end() < &from || cut.start() > range.end() {
+                    continue;
+                }
+                if let Some(before) =
+                    previous(*cut.start()).filter(|before| *before >= from)
+                {
+                    ranges.push(from..=before);
+                }
+                start = next(*cut.end()).filter(|after| after <= range.end());
+            }
+            if let Some(from) = start {
+                ranges.push(from..=*range.end());
+            }
+        }
+        Self { ranges }
+    }
+}
+
+/// Returns the character right before `c`, skipping the surrogates.
+fn previous(c: char) -> Option<char> {
+    match c {
+        '\0' => None,
+        '\u{E000}' => Some('\u{D7FF}'),
+        _ => char::from_u32(u32::from(c) - 1),
+    }
+}
+
+/// Returns the character right after `c`, skipping the surrogates.
+fn next(c: char) -> Option<char> {
+    if c == '\u{D7FF}' {
+        Some('\u{E000}')
+    } else {
+        char::from_u32(u32::from(c) + 1)
+    }
 }
 
 impl fmt::Display for CharacterSet {
@@ -127,6 +171,46 @@ mod tests {
         assert!(set(&['a'..='z']).is_subset(&set(&['a'..='z'])));
         assert!(!set(&['a'..='z']).is_subset(&set(&['b'..='c'])));
         assert!(CharacterSet::default().is_subset(&set(&['a'..='a'])));
+    }
+
+    #[test]
+    fn subtracts_sets() {
+        let letters = set(&['a'..='z']);
+        assert_eq!(
+            letters.difference(&set(&['x'..='x'])),
+            set(&['a'..='w', 'y'..='z'])
+        );
+        assert_eq!(letters.difference(&set(&['a'..='c'])), set(&['d'..='z']));
+        assert_eq!(letters.difference(&set(&['x'..='z'])), set(&['a'..='w']));
+        assert_eq!(
+            letters.difference(&set(&['b'..='c', 'm'..='n', 'y'..='y'])),
+            set(&['a'..='a', 'd'..='l', 'o'..='x', 'z'..='z'])
+        );
+        assert_eq!(letters.difference(&set(&['0'..='9'])), letters);
+        assert!(letters.difference(&set(&['\0'..=char::MAX])).is_empty());
+    }
+
+    #[test]
+    fn subtracts_across_ranges_and_the_surrogates() {
+        let two = set(&['a'..='c', 'x'..='z']);
+        assert_eq!(
+            two.difference(&set(&['b'..='y'])),
+            set(&['a'..='a', 'z'..='z'])
+        );
+        let around = set(&['\u{D000}'..='\u{F000}']);
+        assert_eq!(
+            around.difference(&set(&['\u{E000}'..='\u{E000}'])),
+            set(&['\u{D000}'..='\u{D7FF}', '\u{E001}'..='\u{F000}'])
+        );
+        assert_eq!(
+            around.difference(&set(&['\u{D7FF}'..='\u{D7FF}'])),
+            set(&['\u{D000}'..='\u{D7FE}', '\u{E000}'..='\u{F000}'])
+        );
+        let all = set(&['\0'..=char::MAX]);
+        assert_eq!(
+            all.difference(&set(&['\0'..='\0', char::MAX..=char::MAX])),
+            set(&['\u{1}'..='\u{10FFFE}'])
+        );
     }
 
     #[test]
