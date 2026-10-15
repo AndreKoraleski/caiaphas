@@ -83,26 +83,130 @@ pub(crate) enum FindingKind {
     },
 }
 
-impl FindingKind {
-    pub(crate) fn severity(&self) -> Severity {
+/// The name of a kind of finding, in kebab case, as an expectation writes it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FindingCode {
+    LeftRecursion,
+    IndirectLeftRecursion,
+    UnproductiveRule,
+    EmptyRepetition,
+    OverlappingBranches,
+    OptionalFollowConflict,
+    RepeatedFollowConflict,
+    AmbiguousRecursion,
+    ShadowedBranch,
+    AmbiguousEmptyBranches,
+    UnreachableRule,
+    DuplicateAlternative,
+    IneffectiveException,
+    EmptyRule,
+    ExhaustiveException,
+    CaseOnlyNames,
+}
+
+impl FindingCode {
+    /// Every code, so a name can be looked up.
+    pub(crate) const ALL: [Self; 16] = [
+        Self::LeftRecursion,
+        Self::IndirectLeftRecursion,
+        Self::UnproductiveRule,
+        Self::EmptyRepetition,
+        Self::OverlappingBranches,
+        Self::OptionalFollowConflict,
+        Self::RepeatedFollowConflict,
+        Self::AmbiguousRecursion,
+        Self::ShadowedBranch,
+        Self::AmbiguousEmptyBranches,
+        Self::UnreachableRule,
+        Self::DuplicateAlternative,
+        Self::IneffectiveException,
+        Self::EmptyRule,
+        Self::ExhaustiveException,
+        Self::CaseOnlyNames,
+    ];
+
+    pub(crate) fn name(self) -> &'static str {
         match self {
-            Self::LeftRecursion { .. } => Severity::Error,
-            Self::OverlappingBranches { .. } => Severity::Warning,
-            Self::AmbiguousRecursion { .. } => Severity::Warning,
-            Self::ShadowedBranch => Severity::Warning,
-            Self::AmbiguousEmptyBranches => Severity::Warning,
-            Self::EmptyRepetition => Severity::Error,
-            Self::UnproductiveRule { .. } => Severity::Error,
-            Self::UnreachableRule { .. } => Severity::Warning,
-            Self::IndirectLeftRecursion { .. } => Severity::Error,
-            Self::DuplicateAlternative => Severity::Warning,
-            Self::IneffectiveException => Severity::Warning,
-            Self::EmptyRule { .. } => Severity::Warning,
-            Self::OptionalFollowConflict { .. }
-            | Self::RepeatedFollowConflict { .. } => Severity::Warning,
-            Self::ExhaustiveException => Severity::Warning,
-            Self::CaseOnlyNames { .. } => Severity::Warning,
+            Self::LeftRecursion => "left-recursion",
+            Self::IndirectLeftRecursion => "indirect-left-recursion",
+            Self::UnproductiveRule => "unproductive-rule",
+            Self::EmptyRepetition => "empty-repetition",
+            Self::OverlappingBranches => "overlapping-branches",
+            Self::OptionalFollowConflict => "optional-follow-conflict",
+            Self::RepeatedFollowConflict => "repeated-follow-conflict",
+            Self::AmbiguousRecursion => "ambiguous-recursion",
+            Self::ShadowedBranch => "shadowed-branch",
+            Self::AmbiguousEmptyBranches => "ambiguous-empty-branches",
+            Self::UnreachableRule => "unreachable-rule",
+            Self::DuplicateAlternative => "duplicate-alternative",
+            Self::IneffectiveException => "ineffective-exception",
+            Self::EmptyRule => "empty-rule",
+            Self::ExhaustiveException => "exhaustive-exception",
+            Self::CaseOnlyNames => "case-only-names",
         }
+    }
+
+    /// Returns the code with `name`, if any.
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|code| code.name() == name)
+    }
+
+    pub(crate) fn severity(self) -> Severity {
+        match self {
+            Self::LeftRecursion
+            | Self::IndirectLeftRecursion
+            | Self::UnproductiveRule
+            | Self::EmptyRepetition => Severity::Error,
+            Self::OverlappingBranches
+            | Self::OptionalFollowConflict
+            | Self::RepeatedFollowConflict
+            | Self::AmbiguousRecursion
+            | Self::ShadowedBranch
+            | Self::AmbiguousEmptyBranches
+            | Self::UnreachableRule
+            | Self::DuplicateAlternative
+            | Self::IneffectiveException
+            | Self::EmptyRule
+            | Self::ExhaustiveException
+            | Self::CaseOnlyNames => Severity::Warning,
+        }
+    }
+}
+
+impl FindingKind {
+    pub(crate) fn code(&self) -> FindingCode {
+        match self {
+            Self::LeftRecursion { .. } => FindingCode::LeftRecursion,
+            Self::IndirectLeftRecursion { .. } => {
+                FindingCode::IndirectLeftRecursion
+            }
+            Self::UnproductiveRule { .. } => FindingCode::UnproductiveRule,
+            Self::EmptyRepetition => FindingCode::EmptyRepetition,
+            Self::OverlappingBranches { .. } => {
+                FindingCode::OverlappingBranches
+            }
+            Self::OptionalFollowConflict { .. } => {
+                FindingCode::OptionalFollowConflict
+            }
+            Self::RepeatedFollowConflict { .. } => {
+                FindingCode::RepeatedFollowConflict
+            }
+            Self::AmbiguousRecursion { .. } => FindingCode::AmbiguousRecursion,
+            Self::ShadowedBranch => FindingCode::ShadowedBranch,
+            Self::AmbiguousEmptyBranches => {
+                FindingCode::AmbiguousEmptyBranches
+            }
+            Self::UnreachableRule { .. } => FindingCode::UnreachableRule,
+            Self::DuplicateAlternative => FindingCode::DuplicateAlternative,
+            Self::IneffectiveException => FindingCode::IneffectiveException,
+            Self::EmptyRule { .. } => FindingCode::EmptyRule,
+            Self::ExhaustiveException => FindingCode::ExhaustiveException,
+            Self::CaseOnlyNames { .. } => FindingCode::CaseOnlyNames,
+        }
+    }
+
+    pub(crate) fn severity(&self) -> Severity {
+        self.code().severity()
     }
 
     /// Returns how to fix the grammar, as the usual remedy for this kind of
@@ -302,7 +406,7 @@ mod tests {
     /// and how to fix it.
     struct Case {
         source: &'static str,
-        is_kind: fn(&FindingKind) -> bool,
+        code: FindingCode,
         severity: Severity,
         message: &'static str,
         help: &'static str,
@@ -312,7 +416,7 @@ mod tests {
     const CASES: &[Case] = &[
         Case {
             source: "a = a, 'x' | 'y';",
-            is_kind: |kind| matches!(kind, FindingKind::LeftRecursion { .. }),
+            code: FindingCode::LeftRecursion,
             severity: Severity::Error,
             message: "`a` can reach itself before reading anything, so its \
                       parser would never end",
@@ -321,9 +425,7 @@ mod tests {
         },
         Case {
             source: "a = ? U+0061..U+0063 ? | ? U+0062..U+0064 ?;",
-            is_kind: |kind| {
-                matches!(kind, FindingKind::OverlappingBranches { .. })
-            },
+            code: FindingCode::OverlappingBranches,
             severity: Severity::Warning,
             message: "these branches can both start with 'b'..='c'",
             help: "move what the branches start with in common before the \
@@ -331,9 +433,7 @@ mod tests {
         },
         Case {
             source: "e = e, '+', e | 'n';",
-            is_kind: |kind| {
-                matches!(kind, FindingKind::AmbiguousRecursion { .. })
-            },
+            code: FindingCode::AmbiguousRecursion,
             severity: Severity::Warning,
             message: "this alternative starts and ends with `e`, so it can \
                       group either way",
@@ -343,7 +443,7 @@ mod tests {
         },
         Case {
             source: "a = ? U+0061..U+007A ? | 'x';",
-            is_kind: |kind| *kind == FindingKind::ShadowedBranch,
+            code: FindingCode::ShadowedBranch,
             severity: Severity::Warning,
             message: "another branch can start with every character this one \
                       can",
@@ -352,7 +452,7 @@ mod tests {
         },
         Case {
             source: "a = ['x'] | ['y'];",
-            is_kind: |kind| *kind == FindingKind::AmbiguousEmptyBranches,
+            code: FindingCode::AmbiguousEmptyBranches,
             severity: Severity::Warning,
             message: "more than one branch can match nothing",
             help: "make all but one of these branches read something, such as \
@@ -360,7 +460,7 @@ mod tests {
         },
         Case {
             source: "a = {['x']};",
-            is_kind: |kind| *kind == FindingKind::EmptyRepetition,
+            code: FindingCode::EmptyRepetition,
             severity: Severity::Error,
             message: "this repeated sequence can match nothing, so it could \
                       repeat forever",
@@ -369,9 +469,7 @@ mod tests {
         },
         Case {
             source: "a = 'x', a;",
-            is_kind: |kind| {
-                matches!(kind, FindingKind::UnproductiveRule { .. })
-            },
+            code: FindingCode::UnproductiveRule,
             severity: Severity::Error,
             message: "`a` can never finish matching, since every way through \
                       it needs a rule that cannot either",
@@ -380,9 +478,7 @@ mod tests {
         },
         Case {
             source: "s = 'x'; a = 'y', [b]; b = 'z', a;",
-            is_kind: |kind| {
-                matches!(kind, FindingKind::UnreachableRule { .. })
-            },
+            code: FindingCode::UnreachableRule,
             severity: Severity::Warning,
             message: "`a` cannot be reached from any start rule, so no parser \
                       uses it",
@@ -390,9 +486,7 @@ mod tests {
         },
         Case {
             source: "s = a; a = b, 'x' | 'y'; b = a, 'z' | 'w';",
-            is_kind: |kind| {
-                matches!(kind, FindingKind::IndirectLeftRecursion { .. })
-            },
+            code: FindingCode::IndirectLeftRecursion,
             severity: Severity::Error,
             message: "`a` can reach itself through `b` before reading \
                       anything, so its parser would never end",
@@ -401,7 +495,7 @@ mod tests {
         },
         Case {
             source: "a = 'x' | 'x';",
-            is_kind: |kind| *kind == FindingKind::DuplicateAlternative,
+            code: FindingCode::DuplicateAlternative,
             severity: Severity::Warning,
             message: "this alternative is written the same way as an earlier \
                       one, so both always match the same input",
@@ -409,7 +503,7 @@ mod tests {
         },
         Case {
             source: "a = 'x' - 'y';",
-            is_kind: |kind| *kind == FindingKind::IneffectiveException,
+            code: FindingCode::IneffectiveException,
             severity: Severity::Warning,
             message: "this exception can never apply, since nothing before \
                       the `-` matches the same input",
@@ -417,7 +511,7 @@ mod tests {
         },
         Case {
             source: "s = a, 'x'; a = ;",
-            is_kind: |kind| matches!(kind, FindingKind::EmptyRule { .. }),
+            code: FindingCode::EmptyRule,
             severity: Severity::Warning,
             message: "`a` can only match nothing, so it never reads any input",
             help: "give `a` something to read, or remove it and every \
@@ -425,9 +519,7 @@ mod tests {
         },
         Case {
             source: "a = ['x'], 'x';",
-            is_kind: |kind| {
-                matches!(kind, FindingKind::OptionalFollowConflict { .. })
-            },
+            code: FindingCode::OptionalFollowConflict,
             severity: Severity::Warning,
             message: "this optional sequence and what comes after it can both \
                       start with 'x', so a parser cannot tell whether to take \
@@ -438,9 +530,7 @@ mod tests {
         },
         Case {
             source: "a = {'x'}, 'x';",
-            is_kind: |kind| {
-                matches!(kind, FindingKind::RepeatedFollowConflict { .. })
-            },
+            code: FindingCode::RepeatedFollowConflict,
             severity: Severity::Warning,
             message: "this repeated sequence and what comes after it can both \
                       start with 'x', so a parser cannot tell whether to \
@@ -450,7 +540,7 @@ mod tests {
         },
         Case {
             source: "a = 'x' - ? U+0061..U+007A ?;",
-            is_kind: |kind| *kind == FindingKind::ExhaustiveException,
+            code: FindingCode::ExhaustiveException,
             severity: Severity::Warning,
             message: "this term can never match, since the exception matches \
                       everything before the `-` does",
@@ -459,7 +549,7 @@ mod tests {
         },
         Case {
             source: "s = digit, Digit; digit = '0'; Digit = '1';",
-            is_kind: |kind| matches!(kind, FindingKind::CaseOnlyNames { .. }),
+            code: FindingCode::CaseOnlyNames,
             severity: Severity::Warning,
             message: "`Digit` differs from `digit` only in case, which is \
                       easy to mistake",
@@ -469,11 +559,38 @@ mod tests {
     ];
 
     #[test]
+    fn has_a_case_for_every_code() {
+        for code in FindingCode::ALL {
+            assert!(
+                CASES.iter().any(|case| case.code == code),
+                "no case for {}",
+                code.name()
+            );
+        }
+    }
+
+    #[test]
+    fn names_every_code_once_in_kebab_case() {
+        for code in FindingCode::ALL {
+            let name = code.name();
+            assert!(
+                name.split('-').all(|word| {
+                    !word.is_empty()
+                        && word.chars().all(|c| c.is_ascii_lowercase())
+                }),
+                "{name}"
+            );
+            assert_eq!(FindingCode::from_name(name), Some(code));
+        }
+        assert_eq!(FindingCode::from_name("left_recursion"), None);
+    }
+
+    #[test]
     fn describes_every_kind_of_finding() {
         for case in CASES {
             let finding = crate::analysis::tests::findings(case.source)
                 .into_iter()
-                .find(|finding| (case.is_kind)(&finding.kind))
+                .find(|finding| finding.kind.code() == case.code)
                 .unwrap_or_else(|| {
                     panic!("no such finding in {:?}", case.source)
                 });
