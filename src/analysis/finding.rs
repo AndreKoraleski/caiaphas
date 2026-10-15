@@ -45,6 +45,10 @@ pub(crate) enum FindingKind {
     /// Every character a branch can start with, another branch of the same
     /// choice can start with too.
     ShadowedBranch,
+    /// More than one branch of a choice can match nothing.
+    AmbiguousEmptyBranches,
+    /// A repeated sequence can match nothing, so it could repeat forever.
+    EmptyRepetition,
     /// An optional sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to take it.
     OptionalFollowConflict { characters: CharacterSet },
@@ -60,6 +64,8 @@ impl FindingKind {
             Self::OverlappingBranches { .. } => Severity::Warning,
             Self::AmbiguousRecursion { .. } => Severity::Warning,
             Self::ShadowedBranch => Severity::Warning,
+            Self::AmbiguousEmptyBranches => Severity::Warning,
+            Self::EmptyRepetition => Severity::Error,
             Self::OptionalFollowConflict { .. }
             | Self::RepeatedFollowConflict { .. } => Severity::Warning,
         }
@@ -93,6 +99,16 @@ impl FindingKind {
             Self::ShadowedBranch => {
                 "remove this branch if the other already matches what it \
                  does, or exclude it from the other with `-`"
+                    .to_owned()
+            }
+            Self::AmbiguousEmptyBranches => {
+                "make all but one of these branches read something, such as \
+                 by removing `[...]` around one of them"
+                    .to_owned()
+            }
+            Self::EmptyRepetition => {
+                "make what repeats read something, such as by removing \
+                 `[...]` inside the `{...}`"
                     .to_owned()
             }
             Self::OptionalFollowConflict { .. } => {
@@ -130,6 +146,13 @@ impl fmt::Display for Finding {
             ),
             FindingKind::ShadowedBranch => f.write_str(
                 "another branch can start with every character this one can",
+            ),
+            FindingKind::AmbiguousEmptyBranches => {
+                f.write_str("more than one branch can match nothing")
+            }
+            FindingKind::EmptyRepetition => f.write_str(
+                "this repeated sequence can match nothing, so it could repeat \
+                 forever",
             ),
             FindingKind::OptionalFollowConflict { characters } => write!(
                 f,
@@ -202,6 +225,23 @@ mod tests {
                       can",
             help: "remove this branch if the other already matches what it \
                    does, or exclude it from the other with `-`",
+        },
+        Case {
+            source: "a = ['x'] | ['y'];",
+            is_kind: |kind| *kind == FindingKind::AmbiguousEmptyBranches,
+            severity: Severity::Warning,
+            message: "more than one branch can match nothing",
+            help: "make all but one of these branches read something, such as \
+                   by removing `[...]` around one of them",
+        },
+        Case {
+            source: "a = {['x']};",
+            is_kind: |kind| *kind == FindingKind::EmptyRepetition,
+            severity: Severity::Error,
+            message: "this repeated sequence can match nothing, so it could \
+                      repeat forever",
+            help: "make what repeats read something, such as by removing \
+                   `[...]` inside the `{...}`",
         },
         Case {
             source: "a = ['x'], 'x';",

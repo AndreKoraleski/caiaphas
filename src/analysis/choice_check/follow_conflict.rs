@@ -13,7 +13,8 @@ use crate::analysis::{
 };
 
 /// Reports every optional or repeated sequence that can start with what can
-/// come right after it, unless it can match nothing.
+/// come right after it. A sequence that can match nothing is left to the empty
+/// branches check.
 pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
     let [sequence, end] = choice_point.branches.as_slice() else {
         return;
@@ -93,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn skips_a_sequence_that_can_match_nothing() {
+    fn leaves_a_sequence_that_can_match_nothing_to_the_empty_branches_check() {
         assert_eq!(conflicts("a = [{'x'}], 'y';"), []);
     }
 }
