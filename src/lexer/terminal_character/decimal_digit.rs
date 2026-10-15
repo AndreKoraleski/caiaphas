@@ -2,7 +2,7 @@
 
 use std::{error::Error, fmt};
 
-/// A decimal digit, `0` to `9`.
+/// A decimal digit from `0` to `9`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum DecimalDigit {
     Zero,

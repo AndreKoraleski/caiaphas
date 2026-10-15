@@ -2,12 +2,11 @@
 
 use std::ops::Range;
 
-/// Where something is in the source, as byte offsets from its start.
+/// Where something is in the source, as byte offsets from the start of the
+/// source.
 ///
 /// `start` is the first byte, and `end` the byte after the last one, so an
 /// empty span has `start == end`.
-///
-/// This means that the span of something can be denoted as [start, end).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Span {
     pub(crate) start: usize,

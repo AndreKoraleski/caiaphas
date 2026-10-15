@@ -130,7 +130,7 @@ impl Iterator for Lexer<'_> {
 fn recovery_length(error: ParseCommentlessSymbolError, input: &str) -> usize {
     let first = input.chars().next().map_or(0, char::len_utf8);
     let length = match error {
-        // The digits are clear, only their value is not.
+        // Only the value of the integer is wrong, so every digit is skipped.
         ParseCommentlessSymbolError::Integer(_) => {
             gap_separator::remove(input, |c| c.is_ascii_digit()).1
         }

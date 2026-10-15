@@ -1,4 +1,4 @@
-//! Tokens lexer reads from the source.
+//! Tokens the lexer reads from the source.
 
 use crate::{lexer::commentless_symbol::CommentlessSymbol, span::Span};
 

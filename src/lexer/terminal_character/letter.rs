@@ -9,7 +9,7 @@ pub(crate) enum Case {
     Uppercase,
 }
 
-/// An ASCII letter, `a` to `z` or `A` to `Z`, with its [`Case`].
+/// An ASCII letter from `a` to `z` or `A` to `Z`, with its [`Case`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Letter {
     A(Case),

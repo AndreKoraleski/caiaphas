@@ -1,8 +1,8 @@
 //! Expectations mark a finding in a syntax rule as intended, so the analysis
 //! does not report it.
 //!
-//! An expectation is a comment right before the rule, holding `expect`, the
-//! code of the finding in kebab case, a colon and the reason:
+//! An expectation is a comment right before the rule, holding `expect`, then
+//! the code of the finding in kebab case, then a colon and the reason:
 //!
 //! ```text
 //! (* expect repeated-follow-conflict: the body of an abstraction extends as

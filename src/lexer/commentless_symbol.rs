@@ -17,12 +17,13 @@ pub(crate) use terminal_string::TerminalString;
 
 use crate::lexer::terminal_character::{Symbol, TerminalCharacter};
 
-/// A commentless symbol is what's left of a grammar once its gaps and comments
-/// are removed.
+/// A commentless symbol is one of the symbols a grammar is made of once its
+/// gaps and comments are removed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum CommentlessSymbol {
-    /// Any symbol but a quote, a comment or a special sequence symbol, since
-    /// those start or end another commentless symbol or a comment.
+    /// Any symbol but a quote, a start or end comment symbol or a special
+    /// sequence symbol, since those start or end another commentless symbol or
+    /// a comment.
     Symbol(Symbol),
     MetaIdentifier(MetaIdentifier),
     Integer(Integer),

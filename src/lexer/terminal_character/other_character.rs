@@ -64,7 +64,7 @@ impl Error for ParseOtherCharacterError {}
 mod tests {
     use super::*;
 
-    // Order ISO/IEC 14977 lists them.
+    // In the order ISO/IEC 14977 lists them.
     const OTHER_CHARACTERS: [(char, OtherCharacter); 15] = [
         (' ', OtherCharacter::Space),
         (':', OtherCharacter::Colon),
