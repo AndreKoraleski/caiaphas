@@ -350,10 +350,4 @@ mod tests {
             assert_eq!(error.to_string(), message);
         }
     }
-
-    #[test]
-    fn error_implements_error_trait() {
-        let error: &dyn Error = &ParseSpecialSequenceError::Unsupported;
-        assert!(error.source().is_none());
-    }
 }

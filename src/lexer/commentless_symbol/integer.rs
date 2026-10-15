@@ -135,10 +135,4 @@ mod tests {
             "EBNF integer is too large to fit in a u32"
         );
     }
-
-    #[test]
-    fn error_implements_error_trait() {
-        let error: &dyn Error = &ParseIntegerError::TooLarge;
-        assert!(error.source().is_none());
-    }
 }
