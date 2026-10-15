@@ -27,10 +27,12 @@ fn check_expression(
     errors: &mut Vec<DictionaryError>,
 ) {
     if let ExpressionKind::SyntacticTerm {
+        syntactic_factor,
         syntactic_exception,
-        ..
     } = &expression.kind
     {
+        // This checks every meta identifier in the exception, even in the
+        // exceptions nested inside it, so only the factor is left to check.
         meta_identifiers(syntactic_exception, &mut |rule_id, span| {
             if !replaceable.is_replaceable(rule_id) {
                 let RuleId(position) = rule_id;
@@ -44,6 +46,8 @@ fn check_expression(
                 });
             }
         });
+        check_expression(syntactic_factor, replaceable, errors);
+        return;
     }
     for child in expression.children() {
         check_expression(child, replaceable, errors);
@@ -168,6 +172,20 @@ mod tests {
     #[test]
     fn checks_exceptions_nested_in_other_expressions() {
         let errors = errors("s = ['x' - b]; b = [b];");
+        assert_eq!(errors.len(), 1);
+        assert!(is_recursive(&errors[0], "b", 11), "{errors:?}");
+    }
+
+    #[test]
+    fn checks_an_exception_nested_in_an_exception_once() {
+        let errors = errors("s = 'x' - ('y' - b); b = [b];");
+        assert_eq!(errors.len(), 1);
+        assert!(is_recursive(&errors[0], "b", 17), "{errors:?}");
+    }
+
+    #[test]
+    fn checks_an_exception_nested_in_a_factor() {
+        let errors = errors("s = ('x' - b) - 'y'; b = [b];");
         assert_eq!(errors.len(), 1);
         assert!(is_recursive(&errors[0], "b", 11), "{errors:?}");
     }
