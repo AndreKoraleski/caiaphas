@@ -194,18 +194,14 @@ impl<'a> Facts<'a> {
         found: &mut Vec<(RuleId, Span)>,
     ) {
         match &expression.kind {
-            ExpressionKind::SingleDefinition(expressions) => {
-                let ordered: Vec<&Expression> = match edge {
-                    Edge::Start => expressions.iter().collect(),
-                    Edge::End => expressions.iter().rev().collect(),
-                };
-                for expression in ordered {
-                    self.edge_meta_identifiers(expression, edge, found);
-                    if !self.is_nullable(expression) {
-                        break;
-                    }
+            ExpressionKind::SingleDefinition(expressions) => match edge {
+                Edge::Start => {
+                    self.sequence_edge(expressions.iter(), edge, found);
                 }
-            }
+                Edge::End => {
+                    self.sequence_edge(expressions.iter().rev(), edge, found);
+                }
+            },
             ExpressionKind::DefinitionsList(expressions) => {
                 for expression in expressions {
                     self.edge_meta_identifiers(expression, edge, found);
@@ -227,6 +223,23 @@ impl<'a> Facts<'a> {
             ExpressionKind::TerminalString(_)
             | ExpressionKind::SpecialSequence(_)
             | ExpressionKind::EmptySequence => {}
+        }
+    }
+
+    /// Adds the meta identifiers at `edge` of a sequence, whose `expressions`
+    /// come from that edge inward. The edge reaches past every expression that
+    /// can match nothing.
+    fn sequence_edge<'e>(
+        &self,
+        expressions: impl Iterator<Item = &'e Expression>,
+        edge: Edge,
+        found: &mut Vec<(RuleId, Span)>,
+    ) {
+        for expression in expressions {
+            self.edge_meta_identifiers(expression, edge, found);
+            if !self.is_nullable(expression) {
+                break;
+            }
         }
     }
 

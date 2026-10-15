@@ -47,27 +47,29 @@ pub(crate) enum ExpressionKind {
 
 impl Expression {
     /// Returns the expressions directly inside this one.
-    pub(crate) fn children(&self) -> Vec<&Self> {
-        match &self.kind {
-            ExpressionKind::SingleDefinition(expressions)
-            | ExpressionKind::DefinitionsList(expressions) => {
-                expressions.iter().collect()
-            }
-            ExpressionKind::OptionalSequence(expression)
-            | ExpressionKind::RepeatedSequence(expression)
-            | ExpressionKind::SyntacticFactor {
-                syntactic_primary: expression,
-                ..
-            } => vec![expression],
-            ExpressionKind::SyntacticTerm {
-                syntactic_factor,
-                syntactic_exception,
-            } => vec![syntactic_factor, syntactic_exception],
-            ExpressionKind::MetaIdentifier(_)
-            | ExpressionKind::TerminalString(_)
-            | ExpressionKind::SpecialSequence(_)
-            | ExpressionKind::EmptySequence => Vec::new(),
-        }
+    pub(crate) fn children(&self) -> impl Iterator<Item = &Self> {
+        let (list, first, second): (&[Self], Option<&Self>, Option<&Self>) =
+            match &self.kind {
+                ExpressionKind::SingleDefinition(expressions)
+                | ExpressionKind::DefinitionsList(expressions) => {
+                    (expressions, None, None)
+                }
+                ExpressionKind::OptionalSequence(expression)
+                | ExpressionKind::RepeatedSequence(expression)
+                | ExpressionKind::SyntacticFactor {
+                    syntactic_primary: expression,
+                    ..
+                } => (&[], Some(expression), None),
+                ExpressionKind::SyntacticTerm {
+                    syntactic_factor,
+                    syntactic_exception,
+                } => (&[], Some(syntactic_factor), Some(syntactic_exception)),
+                ExpressionKind::MetaIdentifier(_)
+                | ExpressionKind::TerminalString(_)
+                | ExpressionKind::SpecialSequence(_)
+                | ExpressionKind::EmptySequence => (&[], None, None),
+            };
+        list.iter().chain(first).chain(second)
     }
 
     /// Calls `visit` with this expression and every expression inside it, each

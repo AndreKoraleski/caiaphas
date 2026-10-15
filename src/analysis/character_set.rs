@@ -28,11 +28,17 @@ impl CharacterSet {
     }
 
     pub(crate) fn union(&self, other: &Self) -> Self {
-        let mut all: Vec<RangeInclusive<char>> =
-            self.ranges.iter().chain(&other.ranges).cloned().collect();
-        all.sort_by_key(|range| *range.start());
         let mut ranges: Vec<RangeInclusive<char>> = Vec::new();
-        for range in all {
+        let mut left = self.ranges.iter().peekable();
+        let mut right = other.ranges.iter().peekable();
+        // Both sets are sorted, so taking the range that starts first from
+        // either keeps the result sorted.
+        while let Some(range) = match (left.peek(), right.peek()) {
+            (Some(a), Some(b)) if b.start() < a.start() => right.next(),
+            (Some(_), _) => left.next(),
+            (None, _) => right.next(),
+        } {
+            let range = range.clone();
             if let Some(last) = ranges.last_mut() {
                 let touches = next(*last.end())
                     .is_none_or(|after| *range.start() <= after);
@@ -67,8 +73,23 @@ impl CharacterSet {
     }
 
     /// Returns whether every character of this set is in `other`.
+    ///
+    /// The ranges of `other` never touch, so each range of this set has to
+    /// fit inside one of them.
     pub(crate) fn is_subset(&self, other: &Self) -> bool {
-        self.intersection(other) == *self
+        let mut position = 0;
+        self.ranges.iter().all(|range| {
+            while other
+                .ranges
+                .get(position)
+                .is_some_and(|other| other.end() < range.start())
+            {
+                position += 1;
+            }
+            other.ranges.get(position).is_some_and(|other| {
+                other.start() <= range.start() && range.end() <= other.end()
+            })
+        })
     }
 
     /// Returns the characters of this set that are not in `other`.
