@@ -39,6 +39,9 @@ pub(crate) enum FindingKind {
     LeftRecursion { meta_identifier: MetaIdentifier },
     /// Two branches of a choice can start with some of the same characters.
     OverlappingBranches { characters: CharacterSet },
+    /// An alternative starts and ends with its own rule, so it can group
+    /// either way.
+    AmbiguousRecursion { meta_identifier: MetaIdentifier },
     /// An optional sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to take it.
     OptionalFollowConflict { characters: CharacterSet },
@@ -52,6 +55,7 @@ impl FindingKind {
         match self {
             Self::LeftRecursion { .. } => Severity::Error,
             Self::OverlappingBranches { .. } => Severity::Warning,
+            Self::AmbiguousRecursion { .. } => Severity::Warning,
             Self::OptionalFollowConflict { .. }
             | Self::RepeatedFollowConflict { .. } => Severity::Warning,
         }
@@ -66,6 +70,15 @@ impl FindingKind {
                 format!(
                     "rewrite the recursion as a repetition, so \
                      `{name} = {name}, x | y;` becomes `{name} = y, {{x}};`"
+                )
+            }
+            Self::AmbiguousRecursion { meta_identifier } => {
+                let name = meta_identifier.as_str();
+                format!(
+                    "replace one end with a rule that does not start with \
+                     `{name}`, so `{name} = {name}, '+', {name} | 'n';` \
+                     becomes `{name} = {name}, '+', term | term;` to group \
+                     from the left"
                 )
             }
             Self::OverlappingBranches { .. } => {
@@ -100,6 +113,12 @@ impl fmt::Display for Finding {
             FindingKind::OverlappingBranches { characters } => {
                 write!(f, "these branches can both start with {characters}")
             }
+            FindingKind::AmbiguousRecursion { meta_identifier } => write!(
+                f,
+                "this alternative starts and ends with `{}`, so it can group \
+                 either way",
+                meta_identifier.as_str()
+            ),
             FindingKind::OptionalFollowConflict { characters } => write!(
                 f,
                 "this optional sequence and what comes after it can both \
@@ -150,6 +169,18 @@ mod tests {
             message: "these branches can both start with 'b'..='c'",
             help: "move what the branches start with in common before the \
                    choice, or exclude it from one with `-`",
+        },
+        Case {
+            source: "e = e, '+', e | 'n';",
+            is_kind: |kind| {
+                matches!(kind, FindingKind::AmbiguousRecursion { .. })
+            },
+            severity: Severity::Warning,
+            message: "this alternative starts and ends with `e`, so it can \
+                      group either way",
+            help: "replace one end with a rule that does not start with `e`, \
+                   so `e = e, '+', e | 'n';` becomes `e = e, '+', term | \
+                   term;` to group from the left",
         },
         Case {
             source: "a = ['x'], 'x';",
