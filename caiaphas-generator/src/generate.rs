@@ -105,7 +105,7 @@ mod tests {
         .to_string();
         assert!(items.contains("Some ('x'))"), "{items}");
         assert!(items.contains("Some ('u' ..= 'v'))"), "{items}");
-        assert_eq!(items.matches("matches !").count(), 2, "{items}");
+        assert_eq!(items.matches("matches ! (parser").count(), 2, "{items}");
     }
 
     #[test]

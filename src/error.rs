@@ -17,11 +17,14 @@ pub struct Error {
 
 /// What a parser could have read where an [`Error`] is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Expected {
+pub enum Expected {
+    /// This text.
     Text(&'static str),
+    /// Any one character from the first to the last.
     Range(char, char),
     /// Any match of the rule with this name.
     Rule(&'static str),
+    /// The end of the input.
     End,
 }
 

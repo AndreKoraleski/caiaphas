@@ -22,9 +22,11 @@ use std::{ops::Range, sync::Arc};
 use rustc_hash::FxHashMap;
 
 use crate::{
-    error::{Error, Expected},
+    error::Error,
     span::{Input, Span},
 };
+
+pub use crate::error::Expected;
 
 /// Where a rule's match ends, with its node unless the rule is hidden, or
 /// `None` when it does not match.
@@ -236,14 +238,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
 
     /// Notes that `expected` could have been read at `position`.
     fn note(&mut self, position: usize, expected: Expected) {
-        if !REPORTS || position < self.furthest {
-            return;
-        }
-        if position > self.furthest {
-            self.furthest = position;
-            self.expected.clear();
-        }
-        self.expected.push(expected);
+        self.fail(position, &[expected]);
     }
 
     /// Returns the character at `position`, if the input goes on there.
@@ -278,6 +273,49 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         }
         self.note(position, Expected::Range(first, last));
         None
+    }
+
+    /// Returns where the character at `position` ends when `contains` holds
+    /// for it. Otherwise notes each of `expected`, which the set is made of.
+    pub fn set(
+        &mut self,
+        position: usize,
+        contains: impl Fn(char) -> bool,
+        expected: &[Expected],
+    ) -> Option<usize> {
+        if let Some(c) = self.character(position).filter(|&c| contains(c)) {
+            return Some(position + c.len_utf8());
+        }
+        self.fail(position, expected);
+        None
+    }
+
+    /// Returns where the characters from `position` on that `contains` holds
+    /// for end, and notes each of `expected`, which the set is made of, there.
+    pub fn span(
+        &mut self,
+        position: usize,
+        contains: impl Fn(char) -> bool,
+        expected: &[Expected],
+    ) -> usize {
+        let rest = &self.input[position..];
+        let end = position + rest.find(|c| !contains(c)).unwrap_or(rest.len());
+        self.fail(end, expected);
+        end
+    }
+
+    /// Notes each of `expected` as what could have been read where something
+    /// failed at `position`. With nothing to note, the failure still counts as
+    /// the furthest, as a hidden rule's does.
+    fn fail(&mut self, position: usize, expected: &[Expected]) {
+        if !REPORTS || position < self.furthest {
+            return;
+        }
+        if position > self.furthest {
+            self.furthest = position;
+            self.expected.clear();
+        }
+        self.expected.extend_from_slice(expected);
     }
 
     /// Returns how many nodes have been matched, to go back to with

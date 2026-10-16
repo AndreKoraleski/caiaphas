@@ -101,27 +101,25 @@ impl FunctionWriter<'_> {
                     })()
                 }
             }
-            ExpressionKind::DefinitionsList(expressions)
-                if self.first_match =>
-            {
-                let branches =
-                    expressions.iter().map(|branch| self.branch(branch));
-                quote! {
-                    (|| {
-                        let mark = parser.mark();
-                        #(
-                            if let #some(end) = #branches {
-                                return #some(end);
-                            }
-                            parser.truncate(mark);
-                        )*
-                        #none
-                    })()
-                }
-            }
             ExpressionKind::DefinitionsList(expressions) => {
-                let branches =
-                    expressions.iter().map(|branch| self.branch(branch));
+                let branches = self.branches(expressions);
+                if let [branch] = branches.as_slice() {
+                    return branch.clone();
+                }
+                if self.first_match {
+                    return quote! {
+                        (|| {
+                            let mark = parser.mark();
+                            #(
+                                if let #some(end) = #branches {
+                                    return #some(end);
+                                }
+                                parser.truncate(mark);
+                            )*
+                            #none
+                        })()
+                    };
+                }
                 quote! {
                     {
                         let mark = parser.mark();
@@ -143,6 +141,9 @@ impl FunctionWriter<'_> {
                 }
             }
             ExpressionKind::OptionalSequence(expression) => {
+                if let Some(single) = self.single(expression) {
+                    return quote! { #some(#single.unwrap_or(position)) };
+                }
                 let branch = self.branch(expression);
                 quote! {
                     {
@@ -160,6 +161,15 @@ impl FunctionWriter<'_> {
             // The analysis makes sure the body of a repeated sequence cannot
             // match nothing, so each round goes on.
             ExpressionKind::RepeatedSequence(expression) => {
+                if let Some((pattern, expected)) = self.set_parts(expression) {
+                    return quote! {
+                        #some(parser.span(
+                            position,
+                            |c| ::core::matches!(c, #pattern),
+                            &[#(#expected),*],
+                        ))
+                    };
+                }
                 let branch = self.branch(expression);
                 quote! {
                     {
@@ -232,6 +242,114 @@ impl FunctionWriter<'_> {
         }
     }
 
+    /// Returns the code of each of `alternatives` as a branch, with each run
+    /// of alternatives that only ever match one character and build no node
+    /// made into one set. Those alternatives all tie, and only their order
+    /// among themselves tells them apart, so taking them as one set matches
+    /// the same.
+    fn branches(&self, alternatives: &[Expression]) -> Vec<TokenStream> {
+        let mut branches = Vec::new();
+        let mut run: Vec<&Expression> = Vec::new();
+        for alternative in alternatives {
+            if self.set_parts(alternative).is_some() {
+                run.push(alternative);
+                continue;
+            }
+            if !run.is_empty() {
+                branches.push(self.run(&run));
+                run.clear();
+            }
+            branches.push(self.branch(alternative));
+        }
+        if !run.is_empty() {
+            branches.push(self.run(&run));
+        }
+        branches
+    }
+
+    /// Returns the code of the alternatives of `run` as one set, or of its
+    /// only alternative as it is.
+    fn run(&self, run: &[&Expression]) -> TokenStream {
+        if let [alternative] = run {
+            return self.branch(alternative);
+        }
+        let mut characters = CharacterSet::default();
+        let mut expected = Vec::new();
+        for alternative in run {
+            let (set, parts) = self
+                .characters(alternative)
+                .expect("an alternative of a run is a set");
+            characters = characters.union(&set);
+            expected.extend(parts);
+        }
+        set_code(&characters, &expected)
+    }
+
+    /// Returns the code of `expression` when it only ever matches one
+    /// character and builds no node, as one set unless it is a terminal string
+    /// or special sequence, which already check one character.
+    fn single(&self, expression: &Expression) -> Option<TokenStream> {
+        let (characters, expected) = self.characters(expression)?;
+        Some(match expression.kind {
+            ExpressionKind::TerminalString(_)
+            | ExpressionKind::SpecialSequence(_) => {
+                self.expression(expression)
+            }
+            _ => set_code(&characters, &expected),
+        })
+    }
+
+    /// Returns the pattern of the characters `expression` matches and what a
+    /// parser notes as expected where it fails, when it only ever matches one
+    /// character and builds no node.
+    fn set_parts(
+        &self,
+        expression: &Expression,
+    ) -> Option<(TokenStream, Vec<TokenStream>)> {
+        let (characters, expected) = self.characters(expression)?;
+        Some((pattern(&characters)?, expected))
+    }
+
+    /// Returns the characters `expression` matches and what a parser notes as
+    /// expected where it fails, when it only ever matches one character and
+    /// builds no node.
+    ///
+    /// A hidden rule notes nothing where it fails to start, so it adds nothing
+    /// to note. A syntactic term is left out, since the characters its
+    /// exception takes out fail without noting anything.
+    fn characters(
+        &self,
+        expression: &Expression,
+    ) -> Option<(CharacterSet, Vec<TokenStream>)> {
+        let characters = self.facts.single_characters(expression)?;
+        let expected = match &expression.kind {
+            ExpressionKind::TerminalString(text) => {
+                vec![quote! { __caiaphas::Expected::Text(#text) }]
+            }
+            ExpressionKind::SpecialSequence(range) => {
+                let (first, last) = (range.start(), range.end());
+                vec![quote! { __caiaphas::Expected::Range(#first, #last) }]
+            }
+            ExpressionKind::DefinitionsList(alternatives) => {
+                let mut expected = Vec::new();
+                for alternative in alternatives {
+                    expected.extend(self.characters(alternative)?.1);
+                }
+                expected
+            }
+            ExpressionKind::MetaIdentifier(RuleId(position)) => {
+                let rule = &self.facts.grammar().syntax_rules[*position];
+                if !rule.hidden {
+                    return None;
+                }
+                self.characters(&rule.expression)?;
+                Vec::new()
+            }
+            _ => return None,
+        };
+        Some((characters, expected))
+    }
+
     /// Returns the code of `expression` as a branch a parser can take or not,
     /// which a parse that only matches skips when the next character is none
     /// of those the branch can start with.
@@ -268,6 +386,21 @@ impl FunctionWriter<'_> {
             }
         }
     }
+}
+
+/// Returns the code that matches one of `characters`, noting each of
+/// `expected` where it fails.
+fn set_code(
+    characters: &CharacterSet,
+    expected: &[TokenStream],
+) -> TokenStream {
+    let pattern = pattern(characters).unwrap_or_else(|| quote! { _ });
+    let contains = if characters.is_empty() {
+        quote! { |_| false }
+    } else {
+        quote! { |c| ::core::matches!(c, #pattern) }
+    };
+    quote! { parser.set(position, #contains, &[#(#expected),*]) }
 }
 
 /// Returns the pattern that matches every character of `characters`, if any.
