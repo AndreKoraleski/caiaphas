@@ -42,6 +42,7 @@ pub(crate) fn module(
     let facts = Facts::new(matched);
     let general = general_rules(&facts);
     let functions = matching::functions(&facts, &general);
+    let written = Facts::new(grammar);
     let types = shapes.iter().enumerate().filter_map(|(position, shape)| {
         let shape = shape.as_ref()?;
         let rule = &grammar.syntax_rules[position];
@@ -55,14 +56,20 @@ pub(crate) fn module(
             &source[rule.span.range()],
         );
         Some(match shape {
-            Shape::Struct(fields) => structure(
-                grammar,
-                &names,
-                position,
-                fields,
-                parse,
-                &documentation,
-            ),
+            Shape::Struct(fields) => {
+                let character = written
+                    .single_characters(&rule.expression)
+                    .is_some()
+                    .then(character);
+                structure(
+                    grammar,
+                    &names,
+                    position,
+                    fields,
+                    quote! { #parse #character },
+                    &documentation,
+                )
+            }
             Shape::Enum(variants) => enumeration(
                 grammar,
                 &names,
@@ -120,6 +127,20 @@ fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
     }
 }
 
+/// Returns the `char` method of the type of a rule that only ever matches one
+/// character.
+fn character() -> TokenStream {
+    quote! {
+        /// Returns the one character this rule matched.
+        pub fn char(&self) -> char {
+            match self.span.as_str().chars().next() {
+                ::core::option::Option::Some(character) => character,
+                ::core::option::Option::None => ::core::unreachable!(),
+            }
+        }
+    }
+}
+
 /// Returns the type of the rule `rule`, either as is or in a box.
 fn held_type(names: &Names, RuleId(rule): RuleId, boxed: bool) -> TokenStream {
     let name = &names.types[rule];
@@ -136,7 +157,7 @@ fn structure(
     names: &Names,
     position: usize,
     fields: &[Field],
-    parse: Option<TokenStream>,
+    methods: TokenStream,
     documentation: &str,
 ) -> TokenStream {
     let name = &names.types[position];
@@ -208,7 +229,7 @@ fn structure(
         }
 
         impl #name {
-            #parse
+            #methods
 
             /// Returns the text this rule matched.
             pub fn text(&self) -> &str {

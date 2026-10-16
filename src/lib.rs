@@ -30,6 +30,7 @@
 //!   named after that rule. A field holds `T`, `Option<T>` or `Vec<T>`, as
 //!   many times as the rule can hold it, or `[T; N]` when it always holds it
 //!   `N` times. A type that could contain itself holds itself in a `Box`.
+//! - A rule that only ever matches one character also has `char()`.
 //! - Every type has `text()`, the text its rule matched, and every struct has
 //!   `span()`, which tells where. Types own what they hold, so they need no
 //!   lifetimes.

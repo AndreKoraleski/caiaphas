@@ -266,3 +266,15 @@ fn holds_a_rule_held_the_same_number_of_times_in_an_array() {
     let [target, value] = assignment::Assignment::parse("x=y").unwrap().name;
     assert_eq!((target.text(), value.text()), ("x", "y"));
 }
+
+caiaphas::grammar!(mod digits {
+    "digits = digit, {digit}; digit = ? U+0030..U+0039 ?;"
+});
+
+#[test]
+fn tells_the_character_of_a_rule_of_one_character() {
+    let digits = digits::Digits::parse("42").unwrap();
+    let characters: String =
+        digits.digit.iter().map(digits::Digit::char).collect();
+    assert_eq!(characters, "42");
+}
