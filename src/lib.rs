@@ -31,10 +31,10 @@ pub fn add(left: u64, right: u64) -> u64 {
 }
 
 mod analysis;
+mod annotation;
 mod compile;
 mod diagnostic;
 mod dictionary;
-mod expectation;
 mod ir;
 mod lexer;
 mod parser;

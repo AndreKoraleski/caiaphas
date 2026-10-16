@@ -1,8 +1,7 @@
 //! Rules of the intermediate representation.
 
 use crate::{
-    expectation::Expectation, ir::Expression, lexer::MetaIdentifier,
-    span::Span,
+    annotation::Expectation, ir::Expression, lexer::MetaIdentifier, span::Span,
 };
 
 /// Identifies a rule by its index in the rules of its grammar.

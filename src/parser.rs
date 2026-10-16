@@ -19,8 +19,8 @@ pub(crate) use syntax::Syntax;
 pub(crate) use syntax_rule::SyntaxRule;
 
 use crate::{
+    annotation::Comment,
     diagnostic::{Diagnostic, Severity},
-    expectation::Comment,
     lexer::{CommentlessSymbol, LexErrorKind, Lexer, Symbol, Token},
     span::Span,
 };

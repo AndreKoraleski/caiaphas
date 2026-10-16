@@ -1,7 +1,7 @@
 //! Syntax rules of ISO/IEC 14977 EBNF.
 
 use crate::{
-    expectation::Expectation,
+    annotation::Expectation,
     lexer::{CommentlessSymbol, MetaIdentifier, Symbol},
     parser::{
         Expected, ParseError, Parser, definitions_list::DefinitionsList,

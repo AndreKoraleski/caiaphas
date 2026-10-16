@@ -1,8 +1,10 @@
-//! Expectations mark a finding in a syntax rule as intended, so the analysis
-//! does not report it.
+//! Annotations are comments right before a syntax rule that tell caiaphas
+//! something about the rule. Being comments, they mean nothing to other EBNF
+//! tools.
 //!
-//! An expectation is a comment right before the rule, holding `expect`, then
-//! the code of the finding in kebab case, then a colon and the reason:
+//! An expectation marks a finding in the rule as intended, so the analysis
+//! does not report it. It holds `expect`, then the code of the finding in
+//! kebab case, then a colon and the reason:
 //!
 //! ```text
 //! (* expect repeated-follow-conflict: the body of an abstraction extends as
@@ -10,10 +12,9 @@
 //! application = atom, {' ', argument};
 //! ```
 //!
-//! Each comment holds one expectation, and a rule can have several. Being
-//! comments, they mean nothing to other EBNF tools. The standard reads quotes
-//! in a comment as terminal strings, so a reason cannot hold a lone `'` or
-//! `"`.
+//! Each comment holds one annotation, and a rule can have several. The
+//! standard reads quotes in a comment as terminal strings, so a reason cannot
+//! hold a lone `'` or `"`.
 
 use crate::span::Span;
 
