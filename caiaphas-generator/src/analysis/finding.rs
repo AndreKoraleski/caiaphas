@@ -531,7 +531,6 @@ impl From<Finding> for Diagnostic {
     fn from(finding: Finding) -> Self {
         Self {
             severity: finding.kind.severity(),
-            code: Some(finding.kind.code().name()),
             message: finding.to_string(),
             help: Some(finding.kind.help()),
             span: finding.span,
@@ -826,7 +825,7 @@ mod tests {
     }
 
     #[test]
-    fn turns_a_finding_into_a_diagnostic_with_its_code() {
+    fn turns_a_finding_into_a_diagnostic() {
         let finding =
             crate::analysis::tests::findings("a = ['x'] | ['y'];").remove(0);
         let labels = finding.labels.clone();
@@ -835,7 +834,6 @@ mod tests {
             Diagnostic::from(finding),
             Diagnostic {
                 severity: Severity::Warning,
-                code: Some("ambiguous-nullable-branches"),
                 message: "more than one branch can match nothing".to_owned(),
                 span: Span { start: 4, end: 17 },
                 labels,

@@ -25,8 +25,6 @@ pub(crate) struct Label {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Diagnostic {
     pub(crate) severity: Severity,
-    /// The code an expectation names the problem by, if it has one.
-    pub(crate) code: Option<&'static str>,
     pub(crate) message: String,
     pub(crate) span: Span,
     pub(crate) labels: Vec<Label>,
@@ -36,15 +34,15 @@ pub(crate) struct Diagnostic {
 impl Diagnostic {
     /// Returns the diagnostic as text, showing each line of `source` it points
     /// at, with `path` naming where the source comes from.
+    ///
+    /// The text leaves out whether it is an error or a warning, which whoever
+    /// shows it adds, as rustc does for a compile error.
     pub(crate) fn render(&self, path: &str, source: &str) -> String {
         let level = match self.severity {
             Severity::Error => Level::ERROR,
             Severity::Warning => Level::WARNING,
         };
-        let mut title = level.primary_title(&self.message);
-        if let Some(code) = self.code {
-            title = title.id(code);
-        }
+        let title = level.no_name().primary_title(&self.message);
         let snippet = Snippet::source(source)
             .path(path)
             .annotation(AnnotationKind::Primary.span(self.span.range()))
@@ -68,7 +66,6 @@ mod tests {
     fn diagnostic(start: usize, end: usize) -> Diagnostic {
         Diagnostic {
             severity: Severity::Error,
-            code: None,
             message: "something is wrong".to_owned(),
             span: Span { start, end },
             labels: Vec::new(),
@@ -83,7 +80,7 @@ mod tests {
         found.help = Some("define `b` with a syntax rule".to_owned());
         assert_eq!(
             found.render("grammar.ebnf", "a = 'x', b;\n"),
-            "error: `b` is not defined\n \
+            "`b` is not defined\n \
              --> grammar.ebnf:1:10\n  \
              |\n\
              1 | a = 'x', b;\n  \
@@ -94,11 +91,9 @@ mod tests {
     }
 
     #[test]
-    fn names_the_code_and_shows_labels() {
+    fn shows_labels_in_source_order() {
         let source = "a = 'x';\n\nb = 'y';\na = 'z';\n";
         let mut found = diagnostic(19, 27);
-        found.severity = Severity::Warning;
-        found.code = Some("some-code");
         found.labels = vec![
             Label {
                 span: Span { start: 19, end: 20 },
@@ -111,7 +106,7 @@ mod tests {
         ];
         assert_eq!(
             found.render("g.ebnf", source),
-            "warning[some-code]: something is wrong\n \
+            "something is wrong\n \
              --> g.ebnf:4:1\n  \
              |\n\
              1 | a = 'x';\n  \
@@ -129,7 +124,7 @@ mod tests {
         let source = "a = 'x'\r\n  | 'y';\r\n";
         assert_eq!(
             diagnostic(4, 16).render("g.ebnf", source),
-            "error: something is wrong\n \
+            "something is wrong\n \
              --> g.ebnf:1:5\n  \
              |\n\
              1 |   a = 'x'\n  \

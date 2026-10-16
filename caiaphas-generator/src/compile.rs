@@ -43,12 +43,10 @@ mod tests {
             .collect()
     }
 
-    fn codes(
-        diagnostics: &[Diagnostic],
-    ) -> Vec<(Severity, Option<&'static str>)> {
+    fn severities(diagnostics: &[Diagnostic]) -> Vec<Severity> {
         diagnostics
             .iter()
-            .map(|diagnostic| (diagnostic.severity, diagnostic.code))
+            .map(|diagnostic| diagnostic.severity)
             .collect()
     }
 
@@ -63,9 +61,11 @@ mod tests {
     fn returns_a_grammar_with_its_warnings() {
         let (grammar, diagnostics) = compile("a = ['xy'], 'x';");
         assert!(grammar.is_some());
+        assert_eq!(severities(&diagnostics), [Severity::Warning]);
         assert_eq!(
-            codes(&diagnostics),
-            [(Severity::Warning, Some("optional-follow-conflict"))]
+            messages(&diagnostics),
+            ["this optional sequence and what comes after it can both \
+                 start with 'x', so a parser cannot tell whether to take it"]
         );
     }
 
@@ -91,11 +91,8 @@ mod tests {
         let (grammar, diagnostics) = compile("a = a, 'x' | 'y' | 'y';");
         assert!(grammar.is_none());
         assert_eq!(
-            codes(&diagnostics),
-            [
-                (Severity::Error, Some("left-recursion")),
-                (Severity::Warning, Some("duplicate-alternative")),
-            ]
+            severities(&diagnostics),
+            [Severity::Error, Severity::Warning]
         );
     }
 }

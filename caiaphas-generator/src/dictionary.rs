@@ -228,7 +228,6 @@ impl From<DictionaryError> for Diagnostic {
         };
         Self {
             severity: Severity::Error,
-            code: None,
             message: error.to_string(),
             span: error.span,
             labels,
@@ -439,7 +438,6 @@ pub(crate) mod tests {
             let (_, errors) = grammar(source);
             let diagnostic = Diagnostic::from(errors[0].clone());
             assert_eq!(diagnostic.severity, Severity::Error, "{source:?}");
-            assert_eq!(diagnostic.code, None, "{source:?}");
             assert_eq!(diagnostic.message, errors[0].to_string());
             assert_eq!(diagnostic.span, errors[0].span, "{source:?}");
             assert_eq!(diagnostic.help.as_deref(), Some(help), "{source:?}");
