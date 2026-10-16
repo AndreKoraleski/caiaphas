@@ -5,7 +5,8 @@
 //! Unlike branches that only start the same way, duplicates are certainly
 //! ambiguous. Quotes and grouping do not count, so `'x'` and `("x")` are the
 //! same. The order of nested alternatives does, so `(b | c)` and `(c | b)` are
-//! not.
+//! not. A rule that takes the first match never takes a duplicate, so the
+//! unreachable alternative check reports it there instead.
 
 use crate::{
     analysis::{
@@ -23,27 +24,32 @@ pub(super) fn check(
     _facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
-    grammar.visit(&mut |expression| {
-        let ExpressionKind::DefinitionsList(alternatives) = &expression.kind
-        else {
-            return;
-        };
-        for (index, later) in alternatives.iter().enumerate() {
-            if let Some(earlier) = alternatives[..index]
-                .iter()
-                .find(|earlier| earlier.is_written_like(later))
-            {
-                findings.push(Finding {
-                    kind: FindingKind::DuplicateAlternative,
-                    span: later.span,
-                    labels: vec![Label {
-                        span: earlier.span,
-                        message: "written the same way as this one",
-                    }],
-                });
+    let longest_match =
+        grammar.syntax_rules.iter().filter(|rule| !rule.first_match);
+    for rule in longest_match {
+        rule.expression.visit(&mut |expression| {
+            let ExpressionKind::DefinitionsList(alternatives) =
+                &expression.kind
+            else {
+                return;
+            };
+            for (index, later) in alternatives.iter().enumerate() {
+                if let Some(earlier) = alternatives[..index]
+                    .iter()
+                    .find(|earlier| earlier.is_written_like(later))
+                {
+                    findings.push(Finding {
+                        kind: FindingKind::DuplicateAlternative,
+                        span: later.span,
+                        labels: vec![Label {
+                            span: earlier.span,
+                            message: "written the same way as this one",
+                        }],
+                    });
+                }
             }
-        }
-    });
+        });
+    }
 }
 
 #[cfg(test)]
@@ -66,6 +72,11 @@ mod tests {
             duplicates("a = 'x', b | 'y' | 'x', b; b = 'z';"),
             [(Span { start: 19, end: 25 }, Span { start: 4, end: 10 })]
         );
+    }
+
+    #[test]
+    fn leaves_a_rule_that_takes_the_first_match_to_another_check() {
+        assert_eq!(duplicates("(* first match *) a = 'x' | 'x';"), []);
     }
 
     #[test]
