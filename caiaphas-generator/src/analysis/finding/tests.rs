@@ -222,9 +222,9 @@ const CASES: &[Case] = &[
         severity: Severity::Suggestion,
         message: "a parser cannot tell from `x` which way to take here, so \
                   `s` and the rules that reach it try every way",
-        help: "write `(* greedy *)` right before `s` if it should take each \
-               way as it comes, which keeps its parser fast, or make what \
-               comes after the choice start differently",
+        help: "make what comes after the choice start differently if `s` \
+               should be fast, since taking each way as it comes would make \
+               it miss what it matches",
     },
     Case {
         source: "(* expect no-such-finding: none *) a = 'x';",

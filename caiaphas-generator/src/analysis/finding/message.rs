@@ -137,12 +137,33 @@ impl FindingKind {
                     .to_owned()
             }
             Self::NondeterministicChoice {
-                meta_identifier, ..
+                meta_identifier,
+                greedy: Some(codes),
+                ..
+            } => {
+                let annotations: Vec<String> =
+                    std::iter::once("`(* greedy *)`".to_owned())
+                        .chain(codes.iter().map(|code| {
+                            format!("`(* expect {}: reason *)`", code.name())
+                        }))
+                        .collect();
+                format!(
+                    "write {} right before `{}` if it should take each way as \
+                     it comes, which keeps its parser fast, or {}",
+                    annotations.join(" and "),
+                    meta_identifier.as_str(),
+                    start_differently("the choice")
+                )
+            }
+            Self::NondeterministicChoice {
+                meta_identifier,
+                greedy: None,
+                ..
             } => format!(
-                "write `(* greedy *)` right before `{}` if it should take \
-                 each way as it comes, which keeps its parser fast, or {}",
-                meta_identifier.as_str(),
-                start_differently("the choice")
+                "{} if `{}` should be fast, since taking each way as it comes \
+                 would make it miss what it matches",
+                start_differently("the choice"),
+                meta_identifier.as_str()
             ),
             Self::UnknownExpectation {
                 similar: Some(similar),
@@ -314,6 +335,7 @@ impl fmt::Display for FindingKind {
             Self::NondeterministicChoice {
                 meta_identifier,
                 characters,
+                ..
             } => write!(
                 f,
                 "a parser cannot tell from {} which way to take here, so `{}` \

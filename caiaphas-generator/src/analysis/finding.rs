@@ -107,6 +107,9 @@ pub(crate) enum FindingKind {
     NondeterministicChoice {
         meta_identifier: MetaIdentifier,
         characters: CharacterSet,
+        /// The codes of the findings that `(* greedy *)` would bring about in
+        /// the rule, or `None` when the rule would then miss what it matches.
+        greedy: Option<Vec<FindingCode>>,
     },
     /// An expectation names no kind of finding, though maybe a misspelling of
     /// the `similar` one.

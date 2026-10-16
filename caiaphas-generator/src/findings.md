@@ -163,10 +163,14 @@ without changing the grammar or its types.
 ## nondeterministic-choice
 
 Suggestion. A parser cannot tell from the next character which way a choice
-goes, as with `{'x'}, 'x'`, so the rule and the rules that reach it try every
-way and run slower. Write `(* greedy *)` right before the rule if it should
-take each way as it comes, or make what comes after the choice start
-differently.
+goes, as with the `else` in
+`statement = 'if', c, statement, ['else', statement] | 'x';`, so the rule and
+the rules that reach it try every way and run slower. If the rule should take
+each way as it comes, write `(* greedy *)` right before it, with an
+expectation of the follow conflict that brings, as the help says. Otherwise
+make what comes after the choice start differently. Where taking each way as
+it comes would miss what the rule matches, as in `{'x'}, 'x'`, the help leaves
+greedy out.
 
 ## unknown-expectation
 
