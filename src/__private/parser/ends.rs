@@ -138,15 +138,23 @@ impl Ends {
 
     /// Keeps only the ends `keep` holds for.
     pub fn retain(&mut self, mut keep: impl FnMut(usize) -> bool) {
-        let kept = Self::none();
-        let kept = self.iter().filter(|&end| keep(end)).fold(
-            kept,
-            |mut kept, end| {
-                kept.add(end);
-                kept
-            },
-        );
-        *self = kept;
+        match &mut self.0 {
+            Held::Few { count, ends } => {
+                let mut kept = 0;
+                for index in 0..*count {
+                    if keep(ends[index]) {
+                        ends[kept] = ends[index];
+                        kept += 1;
+                    }
+                }
+                *count = kept;
+            }
+            Held::Many { ends, seen } => {
+                ends.retain(|&end| keep(end));
+                *seen = (ends.len() > LISTED_ENDS)
+                    .then(|| ends.iter().copied().collect());
+            }
+        }
     }
 
     /// Returns the ends with the end of the most text first.
