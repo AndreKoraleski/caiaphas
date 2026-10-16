@@ -18,7 +18,7 @@ use crate::{
         matcher,
     },
     diagnostic::Label,
-    ir::{Expression, ExpressionKind, Grammar},
+    ir::{Expression, ExpressionKind, Grammar, RuleId},
 };
 
 /// Reports every alternative that can match a text an earlier alternative of
@@ -52,8 +52,13 @@ pub(super) fn check(
                         .map(|matched| (earlier, matched))
                 });
                 if let Some((earlier, matched)) = tie {
+                    let exclusion = written(grammar, later)
+                        .zip(written(grammar, earlier))
+                        .map(|(later, earlier)| {
+                            format!("{later} - {earlier}")
+                        });
                     findings.push(Finding {
-                        kind: FindingKind::TiedBranches { matched },
+                        kind: FindingKind::TiedBranches { matched, exclusion },
                         span: later.span,
                         labels: vec![Label {
                             span: earlier.span,
@@ -66,8 +71,26 @@ pub(super) fn check(
     }
 }
 
+/// Returns how to write `expression` again, when it is a rule or a terminal
+/// string.
+fn written(grammar: &Grammar, expression: &Expression) -> Option<String> {
+    match &expression.kind {
+        ExpressionKind::MetaIdentifier(RuleId(position)) => Some(
+            grammar.syntax_rules[*position]
+                .meta_identifier
+                .written()
+                .to_owned(),
+        ),
+        ExpressionKind::TerminalString(text) if text.contains('\'') => {
+            Some(format!("\"{text}\""))
+        }
+        ExpressionKind::TerminalString(text) => Some(format!("'{text}'")),
+        _ => None,
+    }
+}
+
 /// Returns what both `earlier` and `later`, written in a rule that is `greedy`
-/// or not, can match, written as it would appear in Rust, when it can be told.
+/// or not, can match, as a message tells it, when it can be told.
 fn shared(
     grammar: &Grammar,
     facts: &Facts<'_>,
@@ -83,7 +106,7 @@ fn shared(
         facts.single_characters(later),
     ) {
         let characters = earlier.intersection(&later);
-        return (!characters.is_empty()).then(|| characters.to_string());
+        return (!characters.is_empty()).then(|| characters.described());
     }
     [(earlier, later), (later, earlier)]
         .into_iter()
@@ -94,7 +117,7 @@ fn shared(
                         == Some(true)
             })
         })
-        .map(|text| format!("{text:?}"))
+        .map(|text| format!("`{}`", text.escape_debug()))
 }
 
 #[cfg(test)]
@@ -122,7 +145,7 @@ mod tests {
         assert_eq!(
             ties("a = ? U+0061..U+007A ? | ('x' | '1');"),
             [(
-                "these branches can both match 'x', so the parser takes the \
+                "these branches can both match `x`, so the parser takes the \
                  one written first"
                     .to_owned(),
                 Span { start: 25, end: 36 },
@@ -140,8 +163,22 @@ mod tests {
         assert_eq!(found.len(), 1);
         assert_eq!(
             found[0].0,
-            "these branches can both match \"if\", so the parser takes the \
+            "these branches can both match `if`, so the parser takes the \
              one written first"
+        );
+    }
+
+    #[test]
+    fn tells_how_to_exclude_what_the_branches_share_by_their_names() {
+        let source = "word = 'if' | name; name = letter, {letter}; \
+                      letter = ? U+0061..U+007A ?;";
+        let help = findings_with(source, FindingCode::TiedBranches)[0]
+            .kind
+            .help();
+        assert_eq!(
+            help,
+            "exclude what they share from one of them with `-`, such as \
+             `name - 'if'`"
         );
     }
 
@@ -149,7 +186,7 @@ mod tests {
     fn finds_a_fixed_text_written_after_what_matches_it() {
         let found = ties("a = 'x', {'x'} | ('xx' | 'y');");
         assert_eq!(found.len(), 1);
-        assert!(found[0].0.contains("\"xx\""), "{found:?}");
+        assert!(found[0].0.contains("`xx`"), "{found:?}");
     }
 
     #[test]

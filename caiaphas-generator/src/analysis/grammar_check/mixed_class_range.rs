@@ -77,8 +77,8 @@ mod tests {
         assert_eq!(
             ranges("a = ? U+0041..U+007A ?;"),
             [
-                "this range from `A` to `z` also takes '['..='`', though they \
-                 are neither letters nor digits"
+                "this range from `A` to `z` also takes `[` to `` ` ``, though \
+                 they are neither letters nor digits"
             ]
         );
     }

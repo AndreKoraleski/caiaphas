@@ -39,7 +39,12 @@ pub(crate) enum FindingKind {
     NullableRepeatedSequence,
     /// Two alternatives can match the same text, so a parser can only take the
     /// one written first.
-    TiedBranches { matched: String },
+    TiedBranches {
+        matched: String,
+        /// How to write the later branch without what the earlier matches,
+        /// when both are rules or terminal strings.
+        exclusion: Option<String>,
+    },
     /// An alternative goes on from where another ends with characters that can
     /// also come after the choice, so a parser cannot tell which to take.
     LongerBranchConflict { characters: CharacterSet },

@@ -87,7 +87,7 @@ fn finds_the_dangling_else_of_a_greedy_rule() {
         summary(source),
         [
             "['else', statement]: this optional sequence and what comes after \
-             it can both start with 'e', so a parser cannot tell whether to \
+             it can both start with `e`, so a parser cannot tell whether to \
              take it []"
         ]
     );
@@ -106,7 +106,7 @@ fn finds_whitespace_that_two_rules_can_both_read_in_a_greedy_rule() {
         summary(source),
         [
             "{' '}: this repeated sequence and what comes after it can both \
-             start with ' ', so a parser cannot tell whether to repeat it \
+             start with ` `, so a parser cannot tell whether to repeat it \
              again []"
         ]
     );
@@ -156,7 +156,7 @@ fn finds_keywords_that_identifiers_also_match() {
     assert_eq!(
         summary(source),
         [
-            "identifier: these branches can both match \"if\", so the parser \
+            "identifier: these branches can both match `if`, so the parser \
              takes the one written first [\"keyword\"]"
         ]
     );

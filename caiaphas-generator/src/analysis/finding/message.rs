@@ -35,11 +35,18 @@ impl FindingKind {
                  where `{['x']}` does not"
                     .to_owned()
             }
-            Self::TiedBranches { .. } => {
+            Self::TiedBranches {
+                exclusion: Some(exclusion),
+                ..
+            } => format!(
                 "exclude what they share from one of them with `-`, such as \
-                 `identifier - keyword`"
-                    .to_owned()
-            }
+                 `{exclusion}`"
+            ),
+            Self::TiedBranches {
+                exclusion: None, ..
+            } => "exclude what they share from one of them with `-`, such as \
+                  `identifier - keyword`"
+                .to_owned(),
             Self::LongerBranchConflict { .. } => format!(
                 "{} from how this branch goes on",
                 start_differently("the choice")
@@ -175,7 +182,7 @@ impl fmt::Display for FindingKind {
                 "this repeated sequence can match nothing, so it could repeat \
                  forever",
             ),
-            Self::TiedBranches { matched } => write!(
+            Self::TiedBranches { matched, .. } => write!(
                 f,
                 "these branches can both match {matched}, so the parser takes \
                  the one written first"
@@ -184,7 +191,7 @@ impl fmt::Display for FindingKind {
                 f.write_str(&cannot_tell(
                     "this branch, past where another ends,",
                     "the choice",
-                    characters,
+                    &characters.described(),
                     "which to take",
                 ))
             }
@@ -192,7 +199,7 @@ impl fmt::Display for FindingKind {
                 f.write_str(&cannot_tell(
                     "this optional sequence",
                     "it",
-                    characters,
+                    &characters.described(),
                     "whether to take it",
                 ))
             }
@@ -200,7 +207,7 @@ impl fmt::Display for FindingKind {
                 f.write_str(&cannot_tell(
                     "this repeated sequence",
                     "it",
-                    characters,
+                    &characters.described(),
                     "whether to repeat it again",
                 ))
             }
@@ -258,8 +265,9 @@ impl fmt::Display for FindingKind {
                 between,
             } => write!(
                 f,
-                "this range from `{first}` to `{last}` also takes {between}, \
-                 though they are neither letters nor digits"
+                "this range from `{first}` to `{last}` also takes {}, \
+                 though they are neither letters nor digits",
+                between.described()
             ),
             Self::IneffectiveAnnotation {
                 meta_identifier,
@@ -293,8 +301,9 @@ impl fmt::Display for FindingKind {
                 characters,
             } => write!(
                 f,
-                "a parser cannot tell from {characters} which way to take \
-                 here, so `{}` and the rules that reach it try every way",
+                "a parser cannot tell from {} which way to take here, so `{}` \
+                 and the rules that reach it try every way",
+                characters.described(),
                 meta_identifier.as_str()
             ),
             Self::UnknownExpectation { code, .. } => {

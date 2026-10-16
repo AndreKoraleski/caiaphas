@@ -116,7 +116,7 @@ mod tests {
             conflicts("s = ('x' | 'x', 'y'), 'y';"),
             [(
                 "this branch, past where another ends, and what comes after \
-                 the choice can both start with 'y', so a parser cannot tell \
+                 the choice can both start with `y`, so a parser cannot tell \
                  which to take"
                     .to_owned(),
                 Span { start: 11, end: 19 },

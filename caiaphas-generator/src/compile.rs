@@ -78,7 +78,7 @@ mod tests {
         assert_eq!(
             messages(&diagnostics),
             ["this optional sequence and what comes after it can both \
-                 start with 'x', so a parser cannot tell whether to take it"]
+                 start with `x`, so a parser cannot tell whether to take it"]
         );
     }
 

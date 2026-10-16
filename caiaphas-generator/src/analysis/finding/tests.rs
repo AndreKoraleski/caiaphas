@@ -54,7 +54,7 @@ const CASES: &[Case] = &[
         source: "a = ? U+0061..U+0063 ? | ? U+0062..U+0064 ?;",
         code: FindingCode::TiedBranches,
         severity: Severity::Warning,
-        message: "these branches can both match 'b'..='c', so the parser \
+        message: "these branches can both match `b` to `c`, so the parser \
                   takes the one written first",
         help: "exclude what they share from one of them with `-`, such as \
                `identifier - keyword`",
@@ -64,7 +64,7 @@ const CASES: &[Case] = &[
         code: FindingCode::LongerBranchConflict,
         severity: Severity::Warning,
         message: "this branch, past where another ends, and what comes \
-                  after the choice can both start with 'y', so a parser \
+                  after the choice can both start with `y`, so a parser \
                   cannot tell which to take",
         help: "make what comes after the choice start differently from \
                how this branch goes on, or remove `(* greedy *)` so the \
@@ -75,7 +75,7 @@ const CASES: &[Case] = &[
         code: FindingCode::OptionalFollowConflict,
         severity: Severity::Warning,
         message: "this optional sequence and what comes after it can both \
-                  start with 'x', so a parser cannot tell whether to take \
+                  start with `x`, so a parser cannot tell whether to take \
                   it",
         help: "make what comes after the sequence start differently, or \
                remove `(* greedy *)` so the parser tries every way",
@@ -85,7 +85,7 @@ const CASES: &[Case] = &[
         code: FindingCode::RepeatedFollowConflict,
         severity: Severity::Warning,
         message: "this repeated sequence and what comes after it can both \
-                  start with 'x', so a parser cannot tell whether to \
+                  start with `x`, so a parser cannot tell whether to \
                   repeat it again",
         help: "end the repetition with something it cannot start with, or \
                make what comes after it start differently, or remove `(* \
@@ -184,8 +184,8 @@ const CASES: &[Case] = &[
         source: "s = ? U+0041..U+007A ?;",
         code: FindingCode::MixedClassRange,
         severity: Severity::Warning,
-        message: "this range from `A` to `z` also takes '['..='`', though \
-                  they are neither letters nor digits",
+        message: "this range from `A` to `z` also takes `[` to `` ` ``, \
+                  though they are neither letters nor digits",
         help: "split it into a range for each kind of character, such as `? \
                U+0041..U+005A ? | ? U+0061..U+007A ?` for the letters",
     },
@@ -220,7 +220,7 @@ const CASES: &[Case] = &[
         source: "s = {'x'}, 'x';",
         code: FindingCode::NondeterministicChoice,
         severity: Severity::Suggestion,
-        message: "a parser cannot tell from 'x' which way to take here, so \
+        message: "a parser cannot tell from `x` which way to take here, so \
                   `s` and the rules that reach it try every way",
         help: "write `(* greedy *)` right before `s` if it should take each \
                way as it comes, which keeps its parser fast, or make what \

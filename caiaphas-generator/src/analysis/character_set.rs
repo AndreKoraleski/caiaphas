@@ -162,6 +162,35 @@ impl fmt::Display for CharacterSet {
     }
 }
 
+impl CharacterSet {
+    /// Returns the set as a message tells it, such as `` `a`, `c` or `x` to
+    /// `z` ``.
+    pub(crate) fn described(&self) -> String {
+        let shown = |c: char| match c {
+            '`' => "`` ` ``".to_owned(),
+            _ => format!("`{}`", c.escape_debug()),
+        };
+        let count = self.ranges.len();
+        let mut described = String::new();
+        for (index, range) in self.ranges.iter().enumerate() {
+            if index > 0 {
+                described.push_str(if index == count - 1 {
+                    " or "
+                } else {
+                    ", "
+                });
+            }
+            let (first, last) = (*range.start(), *range.end());
+            described.push_str(&shown(first));
+            if first != last {
+                described.push_str(" to ");
+                described.push_str(&shown(last));
+            }
+        }
+        described
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

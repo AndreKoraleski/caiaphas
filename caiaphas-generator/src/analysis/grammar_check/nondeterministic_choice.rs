@@ -60,7 +60,7 @@ mod tests {
         assert_eq!(
             choices("s = {'x'}, 'x';"),
             [(
-                "a parser cannot tell from 'x' which way to take here, so \
+                "a parser cannot tell from `x` which way to take here, so \
                  `s` and the rules that reach it try every way"
                     .to_owned(),
                 Span { start: 4, end: 9 },
