@@ -1,11 +1,11 @@
 //! The matcher runs expressions on texts the way a generated parser does, to
 //! tell which texts a branch matches.
 //!
-//! Each choice takes the branch that matches the most text, unless its rule
-//! takes the first match, when it takes the first branch that matches.
-//! Optional and repeated sequences take as much as they can. Recursion can
-//! make matching run long or deep, so it gives up after a fixed number of
-//! steps or levels.
+//! It follows every way through a rule, as a parser that tries every way does.
+//! In a greedy rule it takes one way as it comes instead: the branch that
+//! matches the most, or the first that matches with a first match, and as much
+//! of an optional or repeated sequence as it can. Recursion can make matching
+//! run long or deep, so it gives up after a fixed number of steps or levels.
 
 use crate::ir::{Expression, ExpressionKind, Grammar, RuleId};
 
@@ -19,11 +19,13 @@ const DEPTH: usize = 200;
 const TEXTS: usize = 64;
 
 /// Returns whether `expression`, written in a rule that takes the longest
-/// match, matches all of `text`, or `None` if matching gave up first.
+/// match and is `greedy` or not, matches all of `text`, or `None` if matching
+/// gave up first.
 pub(crate) fn matches_all(
     grammar: &Grammar,
     expression: &Expression,
     text: &str,
+    greedy: bool,
 ) -> Option<bool> {
     let mut matcher = Matcher {
         grammar,
@@ -31,9 +33,10 @@ pub(crate) fn matches_all(
         steps: STEPS,
         depth: DEPTH,
         first_match: false,
+        greedy,
     };
-    let end = matcher.end(expression, 0)?;
-    Some(end == Some(text.len()))
+    let ends = matcher.ends(expression, 0)?;
+    Some(ends.contains(&text.len()))
 }
 
 /// Returns every text `expression` can match, when it can only match a few
@@ -93,8 +96,9 @@ fn texts_within(
             let RuleId(position) = *rule_id;
             let rule = &grammar.syntax_rules[position];
             // A first match can leave out what later branches match, so the
-            // texts of its rule are not listed.
-            if rule.first_match || entered.contains(rule_id) {
+            // texts of its rule are not listed, and neither are those of a
+            // greedy rule, which can leave some out.
+            if rule.greedy || entered.contains(rule_id) {
                 return None;
             }
             entered.push(*rule_id);
@@ -125,6 +129,7 @@ fn concatenate(firsts: &[String], seconds: &[String]) -> Option<Vec<String>> {
 }
 
 /// Runs expressions on a text, counting down the steps left.
+#[derive(Clone, Copy)]
 struct Matcher<'a> {
     grammar: &'a Grammar,
     text: &'a str,
@@ -133,46 +138,63 @@ struct Matcher<'a> {
     depth: usize,
     /// Whether the choices being matched take their first branch that matches.
     first_match: bool,
+    /// Whether the rule being matched takes each way as it comes.
+    greedy: bool,
 }
 
 impl Matcher<'_> {
-    /// Returns where the match of `expression` at `position` ends, if it
-    /// matches, or `None` once there are no steps or levels left.
-    fn end(
+    /// Returns where the matches of `expression` at `position` can end, at
+    /// most one in a greedy rule, or `None` once there are no steps or levels
+    /// left.
+    fn ends(
         &mut self,
         expression: &Expression,
         position: usize,
-    ) -> Option<Option<usize>> {
+    ) -> Option<Vec<usize>> {
         self.steps = self.steps.checked_sub(1)?;
         self.depth = self.depth.checked_sub(1)?;
-        let end = self.match_expression(expression, position);
+        let ends = self.match_expression(expression, position);
         self.depth += 1;
-        end
+        ends
     }
 
     fn match_expression(
         &mut self,
         expression: &Expression,
         position: usize,
-    ) -> Option<Option<usize>> {
+    ) -> Option<Vec<usize>> {
         let rest = &self.text[position..];
         Some(match &expression.kind {
             ExpressionKind::TerminalString(string) => rest
                 .starts_with(string.as_str())
-                .then(|| position + string.len()),
+                .then(|| position + string.len())
+                .into_iter()
+                .collect(),
             ExpressionKind::SpecialSequence(range) => rest
                 .chars()
                 .next()
                 .filter(|c| range.contains(c))
-                .map(|c| position + c.len_utf8()),
-            ExpressionKind::EmptySequence => Some(position),
+                .map(|c| position + c.len_utf8())
+                .into_iter()
+                .collect(),
+            ExpressionKind::EmptySequence => vec![position],
             ExpressionKind::MetaIdentifier(RuleId(rule)) => {
                 let rule = &self.grammar.syntax_rules[*rule];
-                let around =
-                    std::mem::replace(&mut self.first_match, rule.first_match);
-                let end = self.end(&rule.expression, position);
-                self.first_match = around;
-                return end;
+                let around = (self.first_match, self.greedy);
+                (self.first_match, self.greedy) =
+                    (rule.first_match, rule.greedy);
+                let ends = self.ends(&rule.expression, position);
+                (self.first_match, self.greedy) = around;
+                let ends = ends?;
+                // A greedy rule takes the end the rule it reads prefers.
+                if !self.greedy || ends.len() < 2 {
+                    return Some(ends);
+                }
+                if rule.first_match {
+                    vec![ends[0]]
+                } else {
+                    ends.into_iter().max().into_iter().collect()
+                }
             }
             ExpressionKind::SingleDefinition(expressions) => {
                 return self.sequence(expressions.iter(), position);
@@ -185,66 +207,103 @@ impl Matcher<'_> {
                 return self.sequence(times, position);
             }
             ExpressionKind::DefinitionsList(expressions) => {
-                let mut longest = None;
+                let mut ends = Vec::new();
                 for expression in expressions {
-                    let end = self.end(expression, position)?;
-                    if self.first_match && end.is_some() {
-                        return Some(end);
+                    let found = self.ends(expression, position)?;
+                    if self.greedy && self.first_match && !found.is_empty() {
+                        return Some(found);
                     }
-                    longest = longest.max(end);
+                    add_all(&mut ends, found);
                 }
-                longest
+                if self.greedy {
+                    ends.into_iter().max().into_iter().collect()
+                } else {
+                    ends
+                }
             }
             ExpressionKind::OptionalSequence(expression) => {
-                Some(self.end(expression, position)?.unwrap_or(position))
+                let mut ends = self.ends(expression, position)?;
+                if !self.greedy || ends.is_empty() {
+                    add_all(&mut ends, [position]);
+                }
+                ends
             }
             ExpressionKind::RepeatedSequence(expression) => {
-                let mut end = position;
-                while let Some(next) = self.end(expression, end)? {
-                    if next == end {
-                        break;
-                    }
-                    end = next;
-                }
-                Some(end)
+                return self.rounds(expression, position);
             }
             ExpressionKind::SyntacticTerm {
                 syntactic_factor,
                 syntactic_exception,
             } => {
-                let Some(end) = self.end(syntactic_factor, position)? else {
-                    return Some(None);
-                };
-                // The exception only reads what the factor matched.
-                let mut within = Matcher {
-                    grammar: self.grammar,
-                    text: &self.text[..end],
-                    steps: self.steps,
-                    depth: self.depth,
-                    first_match: self.first_match,
-                };
-                let excluded =
-                    within.end(syntactic_exception, position)? == Some(end);
-                self.steps = within.steps;
-                (!excluded).then_some(end)
+                let mut ends = Vec::new();
+                for end in self.ends(syntactic_factor, position)? {
+                    // The exception only reads what the factor matched.
+                    let mut within = Matcher {
+                        text: &self.text[..end],
+                        ..*self
+                    };
+                    let excluded = within
+                        .ends(syntactic_exception, position)?
+                        .contains(&end);
+                    self.steps = within.steps;
+                    if !excluded {
+                        ends.push(end);
+                    }
+                }
+                ends
             }
         })
     }
 
-    /// Returns where `expressions` end when matched one after another.
+    /// Returns where `expressions` can end when matched one after another.
     fn sequence<'e>(
         &mut self,
         expressions: impl Iterator<Item = &'e Expression>,
         position: usize,
-    ) -> Option<Option<usize>> {
-        let mut end = position;
+    ) -> Option<Vec<usize>> {
+        let mut ends = vec![position];
         for expression in expressions {
-            match self.end(expression, end)? {
-                Some(next) => end = next,
-                None => return Some(None),
+            let mut next = Vec::new();
+            for start in ends {
+                add_all(&mut next, self.ends(expression, start)?);
+            }
+            ends = next;
+        }
+        Some(ends)
+    }
+
+    /// Returns where `expression`, repeated any number of times from
+    /// `position`, can end. A greedy rule repeats it as long as it matches.
+    fn rounds(
+        &mut self,
+        expression: &Expression,
+        position: usize,
+    ) -> Option<Vec<usize>> {
+        let mut ends = vec![position];
+        let mut index = 0;
+        while let Some(&start) = ends.get(index) {
+            index += 1;
+            let found = self.ends(expression, start)?;
+            if self.greedy {
+                match found.first() {
+                    Some(&next) if next != start => ends = vec![next],
+                    _ => return Some(vec![start]),
+                }
+                index = 0;
+            } else {
+                add_all(&mut ends, found);
             }
         }
-        Some(Some(end))
+        Some(ends)
+    }
+}
+
+/// Adds each of `found` to `ends` that is not there already.
+fn add_all(ends: &mut Vec<usize>, found: impl IntoIterator<Item = usize>) {
+    for end in found {
+        if !ends.contains(&end) {
+            ends.push(end);
+        }
     }
 }
 
@@ -256,7 +315,8 @@ mod tests {
     /// Returns whether the first rule of `source` matches all of `text`.
     fn first_rule_matches(source: &str, text: &str) -> Option<bool> {
         let grammar = build_valid(source);
-        matches_all(&grammar, &grammar.syntax_rules[0].expression, text)
+        let rule = &grammar.syntax_rules[0];
+        matches_all(&grammar, &rule.expression, text, rule.greedy)
     }
 
     /// Returns the texts the first rule of `source` can match, sorted.
@@ -283,18 +343,33 @@ mod tests {
     }
 
     #[test]
-    fn takes_the_first_branch_that_matches_where_the_rule_asks() {
+    fn follows_every_way_outside_a_greedy_rule() {
         let source = "s = k; (* first match *) k = 'i' | 'if';";
+        assert_eq!(first_rule_matches(source, "if"), Some(true));
+        assert_eq!(first_rule_matches("s = {'x'}, 'x';", "xx"), Some(true));
+        assert_eq!(first_rule_matches("s = ['x'], 'x';", "x"), Some(true));
+        assert_eq!(
+            first_rule_texts(source),
+            Some(vec!["i".to_owned(), "if".to_owned()])
+        );
+    }
+
+    #[test]
+    fn takes_the_first_branch_that_matches_in_a_greedy_rule() {
+        let source = "s = k; (* greedy *) (* first match *) k = 'i' | 'if';";
         assert_eq!(first_rule_matches(source, "i"), Some(true));
         assert_eq!(first_rule_matches(source, "if"), Some(false));
         assert_eq!(first_rule_texts(source), None);
     }
 
     #[test]
-    fn takes_as_much_as_it_can_without_giving_back() {
-        assert_eq!(first_rule_matches("s = {'x'}, 'x';", "xx"), Some(false));
-        assert_eq!(first_rule_matches("s = ['x'], 'x';", "x"), Some(false));
-        assert_eq!(first_rule_matches("s = ['x'], 'y';", "y"), Some(true));
+    fn takes_as_much_as_it_can_without_giving_back_in_a_greedy_rule() {
+        let matches = |source: &str, text| {
+            first_rule_matches(&format!("(* greedy *) {source}"), text)
+        };
+        assert_eq!(matches("s = {'x'}, 'x';", "xx"), Some(false));
+        assert_eq!(matches("s = ['x'], 'x';", "x"), Some(false));
+        assert_eq!(matches("s = ['x'], 'y';", "y"), Some(true));
     }
 
     #[test]
@@ -310,6 +385,9 @@ mod tests {
         assert_eq!(first_rule_matches(source, "in"), Some(true));
         assert_eq!(first_rule_matches(source, "if"), Some(false));
         assert_eq!(first_rule_matches(source, "iff"), Some(true));
+        let source = "s = (letter, letter) - 'if'; letter = 'i' | 'f';";
+        assert_eq!(first_rule_matches(source, "fi"), Some(true));
+        assert_eq!(first_rule_matches(source, "if"), Some(false));
     }
 
     #[test]

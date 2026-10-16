@@ -38,7 +38,7 @@ pub(super) fn check(
             };
             for (index, later) in alternatives.iter().enumerate() {
                 let tie = alternatives[..index].iter().find_map(|earlier| {
-                    shared(grammar, facts, earlier, later)
+                    shared(grammar, facts, rule.greedy, earlier, later)
                         .map(|matched| (earlier, matched))
                 });
                 if let Some((earlier, matched)) = tie {
@@ -56,11 +56,12 @@ pub(super) fn check(
     }
 }
 
-/// Returns what both `earlier` and `later` can match, written as it would
-/// appear in Rust, when it can be told.
+/// Returns what both `earlier` and `later`, written in a rule that is `greedy`
+/// or not, can match, written as it would appear in Rust, when it can be told.
 fn shared(
     grammar: &Grammar,
     facts: &Facts<'_>,
+    greedy: bool,
     earlier: &Expression,
     later: &Expression,
 ) -> Option<String> {
@@ -79,7 +80,8 @@ fn shared(
         .find_map(|(fixed, other)| {
             matcher::texts(grammar, fixed)?.into_iter().find(|text| {
                 !text.is_empty()
-                    && matcher::matches_all(grammar, other, text) == Some(true)
+                    && matcher::matches_all(grammar, other, text, greedy)
+                        == Some(true)
             })
         })
         .map(|text| format!("{text:?}"))
@@ -168,9 +170,8 @@ mod tests {
 
     #[test]
     fn matches_a_rule_that_takes_the_first_match_as_its_parser_does() {
-        assert_eq!(
-            ties("s = k | o; (* first match *) k = 'i' | 'if'; o = 'if';"),
-            []
-        );
+        let rules = "(* first match *) k = 'i' | 'if'; o = 'if';";
+        assert_eq!(ties(&format!("s = k | o; {rules}")).len(), 1);
+        assert_eq!(ties(&format!("s = k | o; (* greedy *) {rules}")), []);
     }
 }
