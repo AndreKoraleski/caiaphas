@@ -30,8 +30,8 @@ pub struct Rule {
     pub number: usize,
     /// The name of the rule as written. Errors call the rule by it.
     pub name: &'static str,
-    /// Whether the rule is left out of the tree and of errors, along with what
-    /// it matches.
+    /// Whether the rule is left out of the tree, along with what it matches,
+    /// and mostly out of errors.
     pub hidden: bool,
     /// Whether what the rule could not read goes unsaid, as for whitespace
     /// that can match nothing.
