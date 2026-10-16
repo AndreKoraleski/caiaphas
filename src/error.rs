@@ -41,6 +41,16 @@ impl Error {
     ) -> Self {
         expected.sort();
         expected.dedup();
+        // Ranges that touch read as one, so `[^"]` or `"` is any character.
+        expected.dedup_by(|next, previous| match (next, previous) {
+            (Expected::Range(first, next_last), Expected::Range(_, last))
+                if *first <= after(*last) =>
+            {
+                *last = (*last).max(*next_last);
+                true
+            }
+            _ => false,
+        });
         let (line, column) = line_and_column(input, offset);
         let found = match rejected {
             Some(end) => Some(input[offset..end].to_owned()),
@@ -114,6 +124,14 @@ impl fmt::Display for Expected {
     }
 }
 
+/// Returns the character after `c`, or `c` when it is the last.
+fn after(c: char) -> char {
+    match c {
+        '\u{D7FF}' => '\u{E000}',
+        _ => char::from_u32(u32::from(c) + 1).unwrap_or(c),
+    }
+}
+
 /// Shows text with the characters that do not print escaped, so a tab reads
 /// `\t` and the last code point `\u{10ffff}`.
 struct Shown<'a>(&'a str);
@@ -184,6 +202,44 @@ mod tests {
     }
 
     #[test]
+    fn joins_ranges_that_touch() {
+        let error = Error::new(
+            "\"",
+            1,
+            vec![
+                Expected::Range('#', char::MAX),
+                Expected::Range('"', '"'),
+                Expected::Range('\0', '!'),
+                Expected::Range('a', 'b'),
+                Expected::Range('\u{E000}', '\u{E001}'),
+                Expected::Range('\u{D000}', '\u{D7FF}'),
+            ],
+            None,
+        );
+        assert_eq!(error.expected(), [Expected::Range('\0', char::MAX)]);
+        assert!(error.to_string().starts_with("expected any character,"));
+        let error = Error::new(
+            "",
+            0,
+            vec![
+                Expected::Range('a', 'b'),
+                Expected::Range('d', 'e'),
+                Expected::Range('\u{E000}', '\u{E001}'),
+                Expected::Range('\u{D000}', '\u{D7FF}'),
+            ],
+            None,
+        );
+        assert_eq!(
+            error.expected(),
+            [
+                Expected::Range('a', 'b'),
+                Expected::Range('d', 'e'),
+                Expected::Range('\u{D000}', '\u{E001}'),
+            ]
+        );
+    }
+
+    #[test]
     fn names_ranges_and_the_end_of_the_input() {
         let error = Error::new(
             "x\ny",
@@ -248,21 +304,17 @@ mod tests {
     }
 
     #[test]
-    fn escapes_what_does_not_print_and_names_every_character() {
+    fn escapes_what_does_not_print() {
         let error = Error::new(
             "\u{301}",
             0,
-            vec![
-                Expected::Range('#', char::MAX),
-                Expected::Range('\0', char::MAX),
-                Expected::Text("\"\\'"),
-            ],
+            vec![Expected::Range('#', char::MAX), Expected::Text("\"\\'")],
             None,
         );
         assert_eq!(
             error.to_string(),
-            "expected `\"\\'`, any character or a character from `#` to \
-             `\\u{10ffff}`, found `\\u{301}` at line 1, column 1"
+            "expected `\"\\'` or a character from `#` to `\\u{10ffff}`, \
+             found `\\u{301}` at line 1, column 1"
         );
     }
 
