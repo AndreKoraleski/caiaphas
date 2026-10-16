@@ -1,0 +1,10 @@
+(* Comma-separated values, as RFC 4180 describes them, with a line break
+   after every record. *)
+table = {record, newline};
+record = field, {',', field};
+(* as Cell *)
+(* greedy *)
+(* expect repeated-follow-conflict: two quotes in a row are always one *)
+field = ? /"([^"]|"")*"/ ? | ? /[^,"\r\n]*/ ?;
+(* hide *)
+newline = ? /\r{0,1}\n/ ?;

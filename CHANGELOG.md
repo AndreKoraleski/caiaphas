@@ -47,7 +47,7 @@ adhere to [Semantic Versioning][semver].
   grammar files without building anything, and `caiaphas explain` tells what a
   finding means, or lists every code.
 - A tutorial in the docs, a page that explains every finding, and examples that
-  read arithmetic, JSON and INI files.
+  read arithmetic, JSON, INI and CSV files.
 
 [keep-a-changelog]: https://keepachangelog.com/en/1.1.0/
 [semver]: https://semver.org/spec/v2.0.0.html
