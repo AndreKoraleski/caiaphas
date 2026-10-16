@@ -279,13 +279,17 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     }
 
     /// Finishes `rule` and returns its match from `start` up to `end`, or none
-    /// when `end` is `None`.
+    /// when `end` is `None`. A rule that does not match forgets the nodes it
+    /// matched, so no caller finds them among its own.
     pub fn finish_rule(
         &mut self,
         rule: &Rule,
         start: RuleStart,
         end: Option<usize>,
     ) -> Match {
+        if end.is_none() {
+            self.matched.truncate(start.mark);
+        }
         let found = end.map(|end| {
             (end, self.node(rule, start.position..end, start.mark))
         });

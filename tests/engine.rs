@@ -421,3 +421,26 @@ fn names_the_type_of_a_conversion_as_where_the_macro_is() {
     assert_eq!(signs.operator, [Operator::Plus, Operator::Minus]);
     assert_eq!(signs.text, "xx");
 }
+
+caiaphas::grammar!(mod leftover {
+    "(* greedy *) s = head, c;
+     head = [d], 'a', {'x'}, 'x';
+     d = c, 'y';
+     c = ? U+0061..U+0062 ?;"
+});
+
+caiaphas::grammar!(mod leftover_variant {
+    "(* greedy *) e = head | k;
+     head = [d], 'q', {'x'}, 'x';
+     d = c, 'y';
+     c = 'q';
+     k = 'w';"
+});
+
+#[test]
+fn leaves_no_node_of_a_rule_that_did_not_match() {
+    let parsed = leftover::S::parse("axb").unwrap();
+    assert_eq!((parsed.c.text(), parsed.c.span().range()), ("b", 2..3));
+    let parsed = leftover_variant::E::parse("qx").unwrap();
+    assert!(matches!(parsed, leftover_variant::E::Head(_)));
+}
