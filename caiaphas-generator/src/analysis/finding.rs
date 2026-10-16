@@ -2,6 +2,7 @@
 
 mod code;
 mod message;
+mod remedy;
 
 use crate::{
     analysis::character_set::CharacterSet,
