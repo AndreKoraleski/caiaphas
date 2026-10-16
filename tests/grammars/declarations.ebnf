@@ -1,0 +1,20 @@
+(* Declarations such as `let answer: int = (42);`, colours such as `#00ff7f`
+   and markers such as `@1-9`, each from its own start rule. *)
+program = ws, {declaration, ws};
+declaration = 'let', ws, name, ws, ':', ws, type, ws,
+              ['=', ws, expression, ws], ';';
+type = 'int' | 'bool';
+expression = literal | group;
+group = '(', ws, expression, ws, ')';
+literal = number | 'true' | 'false';
+number = digit, {digit};
+name = (letter, {letter}) - keyword;
+keyword = 'let' | 'int' | 'bool' | 'true' | 'false';
+colour = '#', 6 * hex;
+marker = '@', span;
+span = digit, '-', digit;
+digit = ? U+0030..U+0039 ?;
+hex = ? U+0030..U+0039 ? | ? U+0061..U+0066 ?;
+letter = ? U+0061..U+007A ?;
+(* hide *)
+ws = {' ' | ? U+000A ?};
