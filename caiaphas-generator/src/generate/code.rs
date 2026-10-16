@@ -60,10 +60,10 @@ pub(crate) fn module(
     let types = shapes.iter().enumerate().filter_map(|(position, shape)| {
         let shape = shape.as_ref()?;
         let rule = &grammar.syntax_rules[position];
-        let start = grammar.start_syntax_rules.contains(&RuleId(position));
-        let parse =
-            start.then(|| parse(rule, RuleId(position), general[position]));
-        let from_str = start.then(|| from_str(&names.types[position]));
+        // Every type parses, so a part of a grammar can be read and tested
+        // alone.
+        let parse = parse(rule, RuleId(position), general[position]);
+        let from_str = from_str(&names.types[position]);
         let comments = rule.comments.iter().fold(
             String::new(),
             |mut comments, comment| {
@@ -96,7 +96,7 @@ pub(crate) fn module(
                 &names,
                 position,
                 variants,
-                parse.as_ref(),
+                &parse,
                 &documentation,
             ),
             Shape::Converted(_) => return None,
@@ -198,8 +198,8 @@ fn last_part(ty: &str) -> &str {
         .unwrap_or(ty)
 }
 
-/// Returns the `parse` function of the start rule `rule_id`, written `rule`.
-/// With `general`, it tries every way through the rule.
+/// Returns the `parse` function of the rule `rule_id`, written `rule`. With
+/// `general`, it tries every way through the rule.
 fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
     let name = name::spaced(rule);
     let documentation = format!(
@@ -252,7 +252,7 @@ fn character() -> TokenStream {
 }
 
 /// Returns the implementation that lets `str::parse` read the type `name` of a
-/// start rule, as its `parse` does.
+/// rule, as its `parse` does.
 fn from_str(name: &Ident) -> TokenStream {
     quote! {
         impl ::core::str::FromStr for #name {

@@ -180,7 +180,7 @@ pub(super) fn enumeration(
     names: &Names,
     position: usize,
     variants: &[Variant],
-    parse: Option<&TokenStream>,
+    parse: &TokenStream,
     documentation: &str,
 ) -> TokenStream {
     let name = &names.types[position];

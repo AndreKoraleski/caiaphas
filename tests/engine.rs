@@ -569,3 +569,12 @@ fn reads_the_patterns_of_special_sequences() {
     assert_eq!(parsed.text.as_deref(), Some(r#""say \"hi\"""#));
     assert!(Assignment::parse("9lives = 1").is_err());
 }
+
+#[test]
+fn parses_with_the_type_of_any_rule() {
+    let setting: settings::Setting = "port=80".parse().unwrap();
+    assert_eq!(setting.name, "port");
+    assert_eq!(setting.value, settings::Value::Number(80));
+    let error = settings::Setting::parse("port").unwrap_err();
+    assert_eq!(error.column(), 5);
+}
