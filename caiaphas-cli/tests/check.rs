@@ -74,3 +74,21 @@ fn tells_how_to_call_it() {
     assert!(printed(&caiaphas(&["--help"])).contains("usage:"));
     assert!(printed(&caiaphas(&["--version"])).starts_with("caiaphas "));
 }
+
+#[test]
+fn explains_a_kind_of_finding() {
+    let output = caiaphas(&["explain", "tied-branches"]);
+    assert!(output.status.success());
+    let printed = printed(&output);
+    assert!(
+        printed.starts_with("Warning. Two alternatives"),
+        "{printed}"
+    );
+}
+
+#[test]
+fn fails_at_a_code_of_no_finding() {
+    let output = caiaphas(&["explain", "no-such-code"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(caiaphas(&["explain"]).status.code(), Some(2));
+}

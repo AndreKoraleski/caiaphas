@@ -1,19 +1,24 @@
 //! The `caiaphas` command checks ISO/IEC 14977 EBNF grammars as the `grammar!`
 //! macro does, without building anything, and also prints the suggestions that
-//! would make their parsers faster.
+//! would make their parsers faster. It also explains each kind of finding.
 
 use std::{env, fs, process::ExitCode};
 
-const USAGE: &str = "usage: caiaphas check <grammar>...";
+const USAGE: &str = "\
+usage: caiaphas check <grammar>...
+       caiaphas explain <code>";
 
 const HELP: &str = "\
 caiaphas checks ISO/IEC 14977 EBNF grammars as the grammar! macro does, and
 prints every problem and every suggestion that would make a parser faster.
+caiaphas explain tells what a kind of finding means, by the code a finding
+gives, such as tied-branches.
 
 usage: caiaphas check <grammar>...
+       caiaphas explain <code>
 
-It exits with 1 when a grammar cannot be read, or has a problem that would
-stop the build, and with 2 when it is called wrongly.";
+It exits with 1 when a grammar cannot be read, has a problem that would stop
+the build, or a code names no finding, and with 2 when it is called wrongly.";
 
 fn main() -> ExitCode {
     let mut arguments = env::args().skip(1);
@@ -25,6 +30,10 @@ fn main() -> ExitCode {
             }
             check(&paths)
         }
+        Some("explain") => match (arguments.next(), arguments.next()) {
+            (Some(code), None) => explain(&code),
+            _ => misuse(),
+        },
         Some("--help" | "-h") => {
             println!("{HELP}");
             ExitCode::SUCCESS
@@ -41,6 +50,20 @@ fn main() -> ExitCode {
 fn misuse() -> ExitCode {
     eprintln!("{USAGE}");
     ExitCode::from(2)
+}
+
+/// Prints what the finding with `code` means. Fails when no finding has it.
+fn explain(code: &str) -> ExitCode {
+    match caiaphas_generator::explain(code) {
+        Some(explanation) => {
+            println!("{explanation}");
+            ExitCode::SUCCESS
+        }
+        None => {
+            eprintln!("error: `{code}` is not the code of any finding");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 /// Checks the grammar in each of `paths` and prints what it finds. Fails when
