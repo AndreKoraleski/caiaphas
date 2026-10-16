@@ -2,7 +2,13 @@
 //! macro does, without building anything, and prints the suggestions that
 //! would make their parsers faster too. It also explains each kind of finding.
 
-use std::{env, fs, process::ExitCode};
+use std::{
+    env,
+    ffi::OsStr,
+    fs,
+    path::{Path, PathBuf},
+    process::ExitCode,
+};
 
 const USAGE: &str = "\
 usage: caiaphas check <grammar>...
@@ -21,10 +27,12 @@ It exits with 1 when a grammar cannot be read, has a problem that would stop
 the build, or a code names no finding, and with 2 when it is called wrongly.";
 
 fn main() -> ExitCode {
-    let mut arguments = env::args().skip(1);
-    match arguments.next().as_deref() {
+    // A path need not be text, so the arguments are read as the system gives
+    // them.
+    let mut arguments = env::args_os().skip(1);
+    match arguments.next().as_deref().and_then(OsStr::to_str) {
         Some("check") => {
-            let paths: Vec<String> = arguments.collect();
+            let paths: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
             if paths.is_empty() {
                 return misuse();
             }
@@ -32,7 +40,7 @@ fn main() -> ExitCode {
         }
         Some("explain") => match (arguments.next(), arguments.next()) {
             (None, _) => list(),
-            (Some(code), None) => explain(&code),
+            (Some(code), None) => explain(&code.to_string_lossy()),
             _ => misuse(),
         },
         Some("--help" | "-h") => {
@@ -81,13 +89,16 @@ fn explain(code: &str) -> ExitCode {
 
 /// Checks the grammar in each of `paths` and prints what it finds. Fails when
 /// a grammar cannot be read or has a problem that would stop the build.
-fn check(paths: &[String]) -> ExitCode {
+fn check(paths: &[PathBuf]) -> ExitCode {
     let mut failed = false;
     let mut found = false;
     for path in paths {
-        match fs::read_to_string(path) {
+        match read(path) {
             Ok(source) => {
-                let report = caiaphas_generator::check(&source, path);
+                let report = caiaphas_generator::check(
+                    &source,
+                    &path.to_string_lossy(),
+                );
                 for finding in &report.findings {
                     println!("{finding}\n");
                 }
@@ -95,7 +106,7 @@ fn check(paths: &[String]) -> ExitCode {
                 failed |= report.stops_build;
             }
             Err(error) => {
-                eprintln!("error: cannot read `{path}`: {error}");
+                eprintln!("error: {error}");
                 failed = true;
             }
         }
@@ -111,4 +122,16 @@ fn check(paths: &[String]) -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+/// Returns the grammar in the file at `path`, or why it cannot be read.
+fn read(path: &Path) -> Result<String, String> {
+    if path.is_dir() {
+        return Err(format!(
+            "`{}` is a directory, not a grammar",
+            path.display()
+        ));
+    }
+    fs::read_to_string(path)
+        .map_err(|error| format!("cannot read `{}`: {error}", path.display()))
 }
