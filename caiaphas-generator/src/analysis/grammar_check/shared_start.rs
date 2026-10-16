@@ -5,7 +5,7 @@
 //!
 //! Written once before a choice of what follows it, as in
 //! `s = a, ('x' | 'y');`, the start matches the same and is read once. That
-//! makes this a suggestion, which never stops the build.
+//! makes this a suggestion.
 
 use crate::{
     analysis::{
@@ -54,9 +54,9 @@ pub(super) fn check(
     }
 }
 
-/// Returns whether `earlier` and `later` start with the same expression, and
-/// are not written the same way, which the duplicate alternative check
-/// reports.
+/// Returns whether `earlier` and `later` start with the same expression and
+/// are not written the same way. The duplicate alternative check reports those
+/// that are.
 fn shares_start(earlier: &Expression, later: &Expression) -> bool {
     let (Some(start), Some(other)) =
         (earlier.steps().first(), later.steps().first())

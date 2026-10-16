@@ -323,8 +323,8 @@ fn reaches(contained: &[Vec<RuleId>], from: RuleId, to: RuleId) -> bool {
     })[position]
 }
 
-/// Returns which rules get a type, which are the start rules and the rules
-/// their types hold.
+/// Returns which rules get a type: the start rules and the rules their types
+/// hold.
 fn reached(grammar: &Grammar, shapes: &[Shape]) -> Vec<bool> {
     let starts = grammar.start_syntax_rules.iter().copied();
     reachable(shapes.len(), starts, |RuleId(position), pending| {

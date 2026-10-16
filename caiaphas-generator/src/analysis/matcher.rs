@@ -95,9 +95,9 @@ fn texts_within(
         ExpressionKind::MetaIdentifier(rule_id) => {
             let RuleId(position) = *rule_id;
             let rule = &grammar.syntax_rules[position];
-            // A first match can leave out what later branches match, so the
-            // texts of its rule are not listed, and neither are those of a
-            // greedy rule, which can leave some out.
+            // A greedy rule can match less than its expression describes, and
+            // a rule entered again could list texts without end, so neither is
+            // listed.
             if rule.greedy || entered.contains(rule_id) {
                 return None;
             }

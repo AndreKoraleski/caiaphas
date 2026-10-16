@@ -1,11 +1,10 @@
 //! A single character rule only ever matches one character, such as `digit` in
 //! `number = digit, {digit};`. When a repetition reads it, every character it
-//! matches builds a node and a value of its own, which can be most of the work
-//! of a parser.
+//! matches builds a node and a value of its own, and that can be most of the
+//! work of a parser.
 //!
 //! A hidden rule builds neither, and the rules that read it still hold its
-//! text, so hiding it makes the parser faster. That makes this a suggestion,
-//! which never stops the build.
+//! text, so hiding it makes the parser faster. That makes this a suggestion.
 
 use crate::{
     analysis::{

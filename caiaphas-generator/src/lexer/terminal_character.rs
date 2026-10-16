@@ -83,8 +83,8 @@ impl TerminalCharacter {
 }
 
 /// Returns how to write `c` when it is not a terminal character: as a special
-/// sequence, which can hold any character, or as the plain character it looks
-/// like, when that was meant.
+/// sequence, since one can hold any character, or as the plain character it
+/// looks like, when that was meant.
 pub(crate) fn how_to_write(c: char) -> String {
     let code = u32::from(c);
     match looks_like(c) {

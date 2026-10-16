@@ -79,7 +79,7 @@ impl FunctionWriter<'_> {
 
     /// Returns the code of `expression` when it only ever matches one
     /// character and builds no node, as one set unless it is a terminal string
-    /// or special sequence, which already check one character.
+    /// or special sequence, since those already check one character.
     pub(in crate::generate) fn single(
         &self,
         expression: &Expression,

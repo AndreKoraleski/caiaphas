@@ -1,8 +1,8 @@
-//! Matching writes the function of each rule, which matches the rule against
-//! an input with the parser of the runtime.
+//! Matching writes the function that matches each rule against an input with
+//! the parser of the runtime.
 //!
 //! Each function reads `parser` and `position`, and so does the code of each
-//! expression in it, which gives where the expression's match ends, if it
+//! expression in it. That code gives where the expression's match ends, if it
 //! matches. An expression that goes on from where another ends binds
 //! `position` again, so the code of every expression fits anywhere.
 
@@ -79,7 +79,8 @@ pub(super) struct FunctionWriter<'a> {
 }
 
 impl FunctionWriter<'_> {
-    /// Returns the function of `rule`, which `remembers` its matches or not.
+    /// Returns the function of `rule`. It remembers the rule's matches when
+    /// `remembers` holds.
     fn function(
         &self,
         rule_id: RuleId,

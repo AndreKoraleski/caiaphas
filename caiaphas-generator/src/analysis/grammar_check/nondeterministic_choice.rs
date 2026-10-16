@@ -1,6 +1,6 @@
 //! A nondeterministic choice is one that a parser cannot make from what comes
 //! next, such as whether to repeat `{'x'}` in `{'x'}, 'x'`. Its rule tries
-//! every way through it, which is slower than taking one way as it comes.
+//! every way through it, and that is slower than taking one way as it comes.
 
 use crate::{
     analysis::{

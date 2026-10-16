@@ -10,8 +10,8 @@ use crate::lexer::{gap_separator, terminal_character::TerminalCharacter};
 #[derive(Debug, Clone)]
 pub(crate) struct MetaIdentifier {
     name: String,
-    /// The meta identifier as written, gaps included, which tells where its
-    /// words start.
+    /// The meta identifier as written, gaps included, to tell where its words
+    /// start.
     written: String,
 }
 

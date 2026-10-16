@@ -30,7 +30,7 @@ struct Names {
 
 /// Returns the items of the module that parses `grammar`, whose source is
 /// `source`, with a type for each rule that has a shape in `shapes`. The
-/// parser matches `matched`, which is `grammar` or the same rules rearranged.
+/// parser matches `matched`: `grammar` or the same rules rearranged.
 pub(crate) fn module(
     grammar: &Grammar,
     matched: &Grammar,

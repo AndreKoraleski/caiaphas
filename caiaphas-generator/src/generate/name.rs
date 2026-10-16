@@ -9,7 +9,7 @@ use proc_macro2::{Ident, Span};
 
 use crate::ir::Rule;
 
-/// Words Rust reserves, which an identifier can only be when raw.
+/// Words Rust reserves. An identifier can only be one when raw.
 const KEYWORDS: &[&str] = &[
     "abstract", "as", "async", "await", "become", "box", "break", "const",
     "continue", "do", "dyn", "else", "enum", "extern", "false", "final", "fn",
@@ -19,8 +19,8 @@ const KEYWORDS: &[&str] = &[
     "use", "virtual", "where", "while", "yield",
 ];
 
-/// Names an identifier cannot be even when raw, along with `span`, which the
-/// generated types keep for where each rule matched.
+/// Names an identifier cannot be even when raw. `span` is among them because
+/// the generated types keep where each rule matched in a field of that name.
 const TAKEN: &[&str] = &["crate", "self", "Self", "super", "span"];
 
 /// Returns the name of `rule` as written, with single spaces between its

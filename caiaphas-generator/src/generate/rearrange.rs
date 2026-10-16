@@ -98,8 +98,8 @@ fn choice(alternatives: Vec<Expression>, span: Span) -> Expression {
     }
 }
 
-/// Returns the alternatives of `run`, which all start with the same
-/// expression, as that start followed by a choice of what each has after it.
+/// Returns the alternatives of `run` as the expression they all start with,
+/// followed by a choice of what each has after it.
 fn factored(run: Vec<Expression>) -> Expression {
     let span = Span {
         start: run[0].span.start,
@@ -135,8 +135,8 @@ fn into_steps(expression: Expression) -> Vec<Expression> {
     }
 }
 
-/// Returns `steps` as one expression, which matches nothing at `end` when
-/// there are none.
+/// Returns `steps` as one expression. With no steps, it matches nothing at
+/// `end`.
 fn sequence(mut steps: Vec<Expression>, end: usize) -> Expression {
     match steps.len() {
         0 => Expression {
