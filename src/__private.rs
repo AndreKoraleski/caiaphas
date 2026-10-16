@@ -7,6 +7,10 @@
 //! written of those that tie. Optional and repeated sequences take as much as
 //! they can. Each rule remembers its match at every position, so trying every
 //! branch never matches a rule twice in the same place.
+//!
+//! A parse notes nothing about why an input might not match. Only when it
+//! does not match is it matched again, noting at each failure what could have
+//! been read, to say why.
 
 use std::sync::Arc;
 
@@ -64,19 +68,25 @@ pub fn parse(
     rule: usize,
     input: &str,
 ) -> Result<Tree, Error> {
-    let mut parser = Parser::new(grammar, input, true);
+    let mut parser = Parser::new(grammar, input, false);
     match parser.rule(rule, 0) {
         Some((end, node)) if end == input.len() => Ok(Tree {
             input: Arc::new(Input::new(input)),
             nodes: parser.nodes,
             root: node.expect("a start rule is never hidden"),
         }),
-        Some((end, _)) => {
-            parser.expect(end, Expected::End);
-            Err(parser.error())
-        }
-        None => Err(parser.error()),
+        _ => Err(explain(grammar, rule, input)),
     }
+}
+
+/// Matches `input` against the rule numbered `rule` again, which it does not
+/// match in full, and returns where and why it does not.
+fn explain(grammar: &'static Grammar, rule: usize, input: &str) -> Error {
+    let mut parser = Parser::new(grammar, input, true);
+    if let Some((end, _)) = parser.rule(rule, 0) {
+        parser.expect(end, Expected::End);
+    }
+    parser.error()
 }
 
 /// The rules an input matched, each with the rules it matched inside it.
@@ -196,8 +206,8 @@ struct Parser<'i> {
     furthest: usize,
     /// What could have been read at the furthest position.
     expected: Vec<Expected>,
-    /// Whether failures count towards the error, which they do not inside an
-    /// exception.
+    /// Whether failures count towards the error, which they only do when
+    /// finding out why an input does not match, and never inside an exception.
     reports: bool,
 }
 
