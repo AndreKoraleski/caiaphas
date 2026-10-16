@@ -13,6 +13,7 @@
 //! instead, as in `s = {'x'}, 'x';`.
 
 use crate::analysis::{
+    character_set::CharacterSet,
     choice_point::{ChoicePoint, ChoicePointKind},
     finding::{Finding, FindingKind},
 };
@@ -21,13 +22,25 @@ use crate::analysis::{
 /// come right after it. A sequence that can match nothing is left to the
 /// nullable branches check.
 pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
-    if matches!(
-        choice_point.kind,
-        ChoicePointKind::DefinitionsList
-            | ChoicePointKind::FirstMatchDefinitionsList
-    ) {
-        return;
-    }
+    // What the sequence is reported as when it can start like what follows it,
+    // and when it takes everything that follows it.
+    let (conflict, takes_all): (fn(CharacterSet) -> FindingKind, _) =
+        match choice_point.kind {
+            ChoicePointKind::OptionalSequence => (
+                |characters| FindingKind::OptionalFollowConflict {
+                    characters,
+                },
+                FindingKind::RequiredOptionalSequence,
+            ),
+            ChoicePointKind::RepeatedSequence => (
+                |characters| FindingKind::RepeatedFollowConflict {
+                    characters,
+                },
+                FindingKind::DeadEndRepeatedSequence,
+            ),
+            ChoicePointKind::DefinitionsList
+            | ChoicePointKind::FirstMatchDefinitionsList => return,
+        };
     let [sequence, end] = choice_point.branches.as_slice() else {
         return;
     };
@@ -43,24 +56,10 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
             .single_characters
             .as_ref()
             .is_some_and(|taken| end.lookahead.is_subset(taken));
-    let kind = match (choice_point.kind, takes_everything_after) {
-        (ChoicePointKind::OptionalSequence, false) => {
-            FindingKind::OptionalFollowConflict { characters }
-        }
-        (ChoicePointKind::OptionalSequence, true) => {
-            FindingKind::RequiredOptionalSequence
-        }
-        (ChoicePointKind::RepeatedSequence, false) => {
-            FindingKind::RepeatedFollowConflict { characters }
-        }
-        (ChoicePointKind::RepeatedSequence, true) => {
-            FindingKind::DeadEndRepeatedSequence
-        }
-        (
-            ChoicePointKind::DefinitionsList
-            | ChoicePointKind::FirstMatchDefinitionsList,
-            _,
-        ) => return,
+    let kind = if takes_everything_after {
+        takes_all
+    } else {
+        conflict(characters)
     };
     findings.push(Finding {
         kind,
