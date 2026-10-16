@@ -91,6 +91,7 @@ impl FunctionWriter<'_> {
         let number = Literal::usize_unsuffixed(position);
         let name = name::spaced(rule);
         let (hidden, inline) = (rule.hidden, rule.inline);
+        let quiet = hidden && self.facts.is_nullable(&rule.expression);
         let body = self.expression(&rule.expression);
         let recall = remembers.then(|| {
             quote! {
@@ -110,6 +111,7 @@ impl FunctionWriter<'_> {
                     number: #number,
                     name: #name,
                     hidden: #hidden,
+                    quiet: #quiet,
                     inline: #inline,
                     remembers: #remembers,
                 };

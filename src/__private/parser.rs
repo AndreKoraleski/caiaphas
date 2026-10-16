@@ -274,10 +274,15 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         {
             return false;
         }
-        self.expected.truncate(start.noted_before);
+        // A hidden rule leaves what it could not read for the rule around it
+        // to tell, unless it is quiet.
+        if rule.quiet {
+            self.expected.truncate(start.noted_before);
+        }
         if rule.hidden {
             return false;
         }
+        self.expected.truncate(start.noted_before);
         self.expected.push(Expected::Rule(rule.name));
         true
     }

@@ -52,11 +52,13 @@ impl ExactWriter<'_> {
         let number = Literal::usize_unsuffixed(position);
         let name = name::spaced(rule);
         let (hidden, inline) = (rule.hidden, rule.inline);
+        let quiet = hidden && self.writer.facts.is_nullable(&rule.expression);
         let constant = quote! {
             const RULE: __caiaphas::Rule = __caiaphas::Rule {
                 number: #number,
                 name: #name,
                 hidden: #hidden,
+                quiet: #quiet,
                 inline: #inline,
                 remembers: true,
             };

@@ -109,9 +109,10 @@ impl FunctionWriter<'_> {
     /// expected where it fails, when it only ever matches one character and
     /// builds no node.
     ///
-    /// A hidden rule notes nothing where it fails to start, so it adds nothing
-    /// to note. A syntactic term is left out, since the characters its
-    /// exception takes out fail without noting anything.
+    /// A hidden rule notes the characters it would have read, as one that only
+    /// matches one character never matches nothing. A syntactic term is left
+    /// out, since the characters its exception takes out fail without noting
+    /// anything.
     pub(in crate::generate) fn characters(
         &self,
         expression: &Expression,
@@ -137,8 +138,7 @@ impl FunctionWriter<'_> {
                 if !rule.hidden {
                     return None;
                 }
-                self.characters(&rule.expression)?;
-                Vec::new()
+                self.characters(&rule.expression)?.1
             }
             _ => return None,
         };

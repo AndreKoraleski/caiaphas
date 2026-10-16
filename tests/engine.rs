@@ -39,7 +39,8 @@ fn reports_an_input_that_goes_on_past_the_rule_without_hidden_rules() {
     let error = list::Numbers::parse("1)").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "expected `,` or the end of the input, found `)` at line 1, column 2"
+        "expected `,`, a character from `0` to `9` or the end of the input, \
+         found `)` at line 1, column 2"
     );
 }
 
@@ -109,7 +110,8 @@ fn leaves_what_the_rest_of_the_input_needs() {
     assert_eq!(name.text(), "af");
     assert_eq!(
         parse("if").unwrap_err().to_string(),
-        "expected `fy`, found the end of the input at line 1, column 3"
+        "expected `fy` or a character from `a` to `z`, found the end of the \
+         input at line 1, column 3"
     );
 }
 
@@ -249,7 +251,8 @@ fn takes_each_way_as_it_comes_in_a_greedy_rule() {
     assert!(matches!(parse("iffy"), Ok(greedy::Word::Keyword(_))));
     assert_eq!(
         parse("affy").unwrap_err().to_string(),
-        "expected `fy`, found the end of the input at line 1, column 5"
+        "expected `fy` or a character from `a` to `z`, found the end of the \
+         input at line 1, column 5"
     );
     let sentence = greedy::Sentence::parse("iff;").unwrap();
     assert!(matches!(sentence.pair.word, greedy::Word::Keyword(_)));
@@ -305,4 +308,16 @@ fn parses_a_start_rule_from_a_str() {
     let parsed: list::Numbers = "1,2".parse().unwrap();
     assert_eq!(parsed.list.item.len(), 2);
     assert!("1,".parse::<list::Numbers>().is_err());
+}
+
+caiaphas::grammar!(mod closed {
+    "group = '(', 'x', close; (* hide *) close = ')', ';';"
+});
+
+#[test]
+fn reports_what_a_hidden_rule_expected_unless_it_can_match_nothing() {
+    assert_eq!(
+        closed::Group::parse("(x").unwrap_err().to_string(),
+        "expected `)`, found the end of the input at line 1, column 3"
+    );
 }
