@@ -1,0 +1,11 @@
+error: this repeated sequence takes every character that can come after it, so nothing after it can ever match
+        --> mod word:1:21
+         |
+       1 | (* greedy *) word = {'x'}, 'x';
+         |                     ^^^^^
+         |
+         = help: move what comes after the repetition before it, so `{'x'}, 'x'` becomes `'x', {'x'}`, or make what comes after it start with a character it cannot take, or remove `(* greedy *)` so the parser tries every way; if this is intended, write `(* expect dead-end-repeated-sequence: reason *)` right before the rule, and the grammar stays as it is
+ --> tests/ui/unexpected_warning.rs:1:31
+  |
+1 | caiaphas::grammar!(mod word { "(* greedy *) word = {'x'}, 'x';" });
+  |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

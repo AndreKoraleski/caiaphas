@@ -1,0 +1,13 @@
+error: `digit` only ever matches one character, and a repetition reads it, so every character it matches builds a value of its own
+        --> mod number:1:26
+         |
+       1 | number = digit, {digit}; digit = ? U+0030..U+0039 ?;
+         |                 -------  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+         |                 |
+         |                 this repetition reads it
+         |
+         = help: hide it with `(* hide *)` unless a type needs `digit`, since the rules that read it keep its text; if this is intended, write `(* expect single-character-rule: reason *)` right before the rule, and the grammar stays as it is
+ --> tests/ui/suggest.rs:2:5
+  |
+2 |     "number = digit, {digit}; digit = ? U+0030..U+0039 ?;"
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

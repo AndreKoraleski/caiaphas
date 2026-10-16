@@ -1,0 +1,23 @@
+error: `item` is not defined
+        --> mod pair:1:8
+         |
+       1 | pair = item, '=', item;
+         |        ^^^^
+         |
+         = help: define `item` with a syntax rule, or correct its spelling
+ --> tests/ui/undefined_rule.rs:1:31
+  |
+1 | caiaphas::grammar!(mod pair { "pair = item, '=', item;" });
+  |                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `item` is not defined
+        --> mod pair:1:19
+         |
+       1 | pair = item, '=', item;
+         |                   ^^^^
+         |
+         = help: define `item` with a syntax rule, or correct its spelling
+ --> tests/ui/undefined_rule.rs:1:31
+  |
+1 | caiaphas::grammar!(mod pair { "pair = item, '=', item;" });
+  |                               ^^^^^^^^^^^^^^^^^^^^^^^^^
