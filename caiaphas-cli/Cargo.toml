@@ -1,0 +1,22 @@
+[package]
+name = "caiaphas-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = """
+The caiaphas command, which checks ISO/IEC 14977 EBNF grammars and suggests \
+how to make their parsers faster"""
+license.workspace = true
+repository.workspace = true
+keywords = ["ebnf", "grammar", "parser-generator", "iso-14977", "cli"]
+categories = ["command-line-utilities", "parsing"]
+
+[[bin]]
+name = "caiaphas"
+path = "src/main.rs"
+
+[dependencies]
+caiaphas-generator.workspace = true
+
+[lints]
+workspace = true

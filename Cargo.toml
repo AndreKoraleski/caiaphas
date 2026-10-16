@@ -1,7 +1,7 @@
 [workspace]
-members = ["caiaphas-generator", "caiaphas-macros"]
+members = ["caiaphas-cli", "caiaphas-generator", "caiaphas-macros"]
 # Plain `cargo test` and `cargo clippy` cover every crate, not only this one.
-default-members = [".", "caiaphas-generator", "caiaphas-macros"]
+default-members = [".", "caiaphas-cli", "caiaphas-generator", "caiaphas-macros"]
 
 [workspace.package]
 version = "0.1.0"
