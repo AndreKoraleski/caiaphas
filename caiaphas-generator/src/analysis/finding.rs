@@ -125,24 +125,32 @@ impl FindingKind {
         self.code().severity()
     }
 
-    /// Returns how to fix the grammar, and how to mark the finding as intended
-    /// when it can be.
+    /// Returns how to fix the grammar.
     pub(crate) fn help(&self) -> String {
-        let code = self.code();
         let mut remedy = self.remedy();
-        if code.is_greedy_only() {
+        if self.code().is_greedy_only() {
             remedy.push_str(
                 ", or remove `(* greedy *)` so the parser tries every way",
             );
         }
-        match code.intended_behaviour() {
-            Some(behaviour) => format!(
-                "{remedy}; if this is intended, write `(* expect {}: reason \
-                 *)` right before the rule, and {behaviour}",
-                code.name()
-            ),
-            None => remedy,
+        remedy
+    }
+
+    /// Returns how to mark the finding as intended, when it can be.
+    pub(crate) fn note(&self) -> Option<String> {
+        let code = self.code();
+        if !code.is_expectable() {
+            return None;
         }
+        let expect = format!(
+            "if this is intended, write `(* expect {}: reason *)` right \
+             before the rule",
+            code.name()
+        );
+        Some(match code.intended_behaviour() {
+            Some(behaviour) => format!("{expect}, and {behaviour}"),
+            None => expect,
+        })
     }
 }
 
@@ -150,8 +158,10 @@ impl From<Finding> for Diagnostic {
     fn from(finding: Finding) -> Self {
         Self {
             severity: finding.kind.severity(),
+            code: Some(finding.kind.code().name()),
             message: finding.kind.to_string(),
             help: Some(finding.kind.help()),
+            note: finding.kind.note(),
             span: finding.span,
             labels: finding.labels,
         }

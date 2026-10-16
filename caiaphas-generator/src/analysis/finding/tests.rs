@@ -57,10 +57,7 @@ const CASES: &[Case] = &[
         message: "these branches can both match 'b'..='c', so the parser \
                   takes the one written first",
         help: "exclude what they share from one of them with `-`, such as \
-               `identifier - keyword`; if this is intended, write `(* \
-               expect tied-branches: reason *)` right before the rule, \
-               and the parser takes the branch that matches the most, and \
-               the first written of those that tie",
+               `identifier - keyword`",
     },
     Case {
         source: "(* greedy *) s = ('x' | 'x', 'y'), 'y';",
@@ -71,10 +68,7 @@ const CASES: &[Case] = &[
                   cannot tell which to take",
         help: "make what comes after the choice start differently from \
                how this branch goes on, or remove `(* greedy *)` so the \
-               parser tries every way; if this is intended, write `(* \
-               expect longer-branch-conflict: reason *)` right before the \
-               rule, and the parser takes the longer branch whenever it \
-               matches",
+               parser tries every way",
     },
     Case {
         source: "(* greedy *) a = ['xy'], 'x';",
@@ -84,11 +78,7 @@ const CASES: &[Case] = &[
                   start with 'x', so a parser cannot tell whether to take \
                   it",
         help: "make what comes after the sequence start differently, or \
-               remove `(* greedy *)` so the parser tries every way; if \
-               this is intended, write `(* expect \
-               optional-follow-conflict: reason *)` right before the \
-               rule, and the parser takes the sequence whenever it \
-               matches, as usual for a dangling else",
+               remove `(* greedy *)` so the parser tries every way",
     },
     Case {
         source: "(* greedy *) a = {'xy'}, 'x';",
@@ -99,11 +89,7 @@ const CASES: &[Case] = &[
                   repeat it again",
         help: "end the repetition with something it cannot start with, or \
                make what comes after it start differently, or remove `(* \
-               greedy *)` so the parser tries every way; if this is \
-               intended, write `(* expect repeated-follow-conflict: \
-               reason *)` right before the rule, and the parser repeats \
-               the sequence as long as it matches, so it extends as far \
-               as it can",
+               greedy *)` so the parser tries every way",
     },
     Case {
         source: "(* greedy *) a = ['x'], 'x';",
@@ -114,9 +100,7 @@ const CASES: &[Case] = &[
         help: "remove the `[...]` if the sequence is always needed, or \
                make what comes after it start with a character it cannot \
                take, or remove `(* greedy *)` so the parser tries every \
-               way; if this is intended, write `(* expect \
-               required-optional-sequence: reason *)` right before the \
-               rule, and the grammar stays as it is",
+               way",
     },
     Case {
         source: "(* greedy *) a = {'x'}, 'x';",
@@ -127,10 +111,7 @@ const CASES: &[Case] = &[
         help: "move what comes after the repetition before it, so `{'x'}, \
                'x'` becomes `'x', {'x'}`, or make what comes after it \
                start with a character it cannot take, or remove `(* \
-               greedy *)` so the parser tries every way; if this is \
-               intended, write `(* expect dead-end-repeated-sequence: \
-               reason *)` right before the rule, and the grammar stays as \
-               it is",
+               greedy *)` so the parser tries every way",
     },
     Case {
         source: "a = ['x'] | ['y'];",
@@ -138,11 +119,7 @@ const CASES: &[Case] = &[
         severity: Severity::Warning,
         message: "more than one branch can match nothing",
         help: "make all but one of these branches read something, such as \
-               by removing `[...]` around one of them; if this is \
-               intended, write `(* expect ambiguous-nullable-branches: \
-               reason *)` right before the rule, and the parser takes the \
-               branch that matches the most, and the first written of \
-               those that tie",
+               by removing `[...]` around one of them",
     },
     Case {
         source: "s = 'x'; a = 'y', [b]; b = 'z', a;",
@@ -150,10 +127,7 @@ const CASES: &[Case] = &[
         severity: Severity::Warning,
         message: "`a` cannot be reached from any start rule, so no parser \
                   uses it",
-        help: "remove `a`, or reference it from a rule a parser uses; if \
-               this is intended, write `(* expect unreachable-rule: \
-               reason *)` right before the rule, and the grammar stays as \
-               it is",
+        help: "remove `a`, or reference it from a rule a parser uses",
     },
     Case {
         source: "(* first match *) a = 'x' | 'x';",
@@ -162,9 +136,7 @@ const CASES: &[Case] = &[
         message: "an earlier alternative matches wherever this one would, \
                   so the parser never takes this one",
         help: "move it before the alternative that matches first, or \
-               remove it; if this is intended, write `(* expect \
-               unreachable-alternative: reason *)` right before the rule, \
-               and the grammar stays as it is",
+               remove it",
     },
     Case {
         source: "a = 'x' | 'x';",
@@ -172,10 +144,7 @@ const CASES: &[Case] = &[
         severity: Severity::Warning,
         message: "this alternative is written the same way as an earlier \
                   one, so both always match the same input",
-        help: "remove this alternative; if this is intended, write `(* \
-               expect duplicate-alternative: reason *)` right before the \
-               rule, and the parser takes the branch that matches the \
-               most, and the first written of those that tie",
+        help: "remove this alternative",
     },
     Case {
         source: "a = 'x' - 'y';",
@@ -183,10 +152,7 @@ const CASES: &[Case] = &[
         severity: Severity::Warning,
         message: "this exception can never apply, since nothing before \
                   the `-` matches the same input",
-        help: "remove the exception, or write the one that was meant; if \
-               this is intended, write `(* expect ineffective-exception: \
-               reason *)` right before the rule, and the grammar stays as \
-               it is",
+        help: "remove the exception, or write the one that was meant",
     },
     Case {
         source: "s = a, 'x'; a = ;",
@@ -194,9 +160,7 @@ const CASES: &[Case] = &[
         severity: Severity::Warning,
         message: "`a` can only match nothing, so it never reads any input",
         help: "give `a` something to read, or remove it and every \
-               reference to it; if this is intended, write `(* expect \
-               empty-rule: reason *)` right before the rule, and the \
-               grammar stays as it is",
+               reference to it",
     },
     Case {
         source: "a = 'x' - ? U+0061..U+007A ?;",
@@ -205,9 +169,7 @@ const CASES: &[Case] = &[
         message: "this term can never match, since the exception matches \
                   everything before the `-` does",
         help: "remove this term, or narrow the exception so something is \
-               left; if this is intended, write `(* expect \
-               exhaustive-exception: reason *)` right before the rule, \
-               and the grammar stays as it is",
+               left",
     },
     Case {
         source: "s = digit, Digit; digit = '0'; Digit = '1';",
@@ -216,9 +178,7 @@ const CASES: &[Case] = &[
         message: "`Digit` differs from `digit` only in case, which is \
                   easy to mistake",
         help: "rename `Digit` or `digit`, or merge them if they mean the \
-               same; if this is intended, write `(* expect \
-               case-only-names: reason *)` right before the rule, and the \
-               grammar stays as it is",
+               same",
     },
     Case {
         source: "s = ? U+0041..U+007A ?;",
@@ -227,9 +187,7 @@ const CASES: &[Case] = &[
         message: "this range from `A` to `z` also takes '['..='`', though \
                   they are neither letters nor digits",
         help: "split it into a range for each kind of character, such as `? \
-               U+0041..U+005A ? | ? U+0061..U+007A ?` for the letters; if \
-               this is intended, write `(* expect mixed-class-range: reason \
-               *)` right before the rule, and the grammar stays as it is",
+               U+0041..U+005A ? | ? U+0061..U+007A ?` for the letters",
     },
     Case {
         source: "(* greedy *) s = {'x'}, 'y';",
@@ -237,9 +195,7 @@ const CASES: &[Case] = &[
         severity: Severity::Warning,
         message: "`(* greedy *)` changes nothing in `s`, since a parser can \
                   tell each way through it from the next character",
-        help: "remove the `(* greedy *)`; if this is intended, write `(* \
-               expect ineffective-annotation: reason *)` right before the \
-               rule, and the grammar stays as it is",
+        help: "remove the `(* greedy *)`",
     },
     Case {
         source: "number = digit, {digit}; digit = ? U+0030..U+0039 ?;",
@@ -249,9 +205,7 @@ const CASES: &[Case] = &[
                   reads it, so every character it matches builds a value of \
                   its own",
         help: "hide it with `(* hide *)` unless a type needs `digit`, since \
-               the rules that read it keep its text; if this is intended, \
-               write `(* expect single-character-rule: reason *)` right \
-               before the rule, and the grammar stays as it is",
+               the rules that read it keep its text",
     },
     Case {
         source: "s = a, 'x' | a, 'y'; a = 'z';",
@@ -260,9 +214,7 @@ const CASES: &[Case] = &[
         message: "this alternative starts the same way as an earlier one, so \
                   a parser reads that start twice",
         help: "write the shared start once, before a choice of what follows \
-               it, so `a, x | a, y` becomes `a, (x | y)`; if this is \
-               intended, write `(* expect shared-start: reason *)` right \
-               before the rule, and the grammar stays as it is",
+               it, so `a, x | a, y` becomes `a, (x | y)`",
     },
     Case {
         source: "s = {'x'}, 'x';",
@@ -272,10 +224,7 @@ const CASES: &[Case] = &[
                   `s` and the rules that reach it try every way",
         help: "write `(* greedy *)` right before `s` if it should take each \
                way as it comes, which keeps its parser fast, or make what \
-               comes after the choice start differently; if this is \
-               intended, write `(* expect nondeterministic-choice: reason \
-               *)` right before the rule, and the parser still tries every \
-               way",
+               comes after the choice start differently",
     },
     Case {
         source: "(* expect no-such-finding: none *) a = 'x';",
@@ -346,10 +295,39 @@ fn turns_a_finding_into_a_diagnostic() {
         Diagnostic::from(finding.clone()),
         Diagnostic {
             severity: finding.kind.severity(),
+            code: Some("ambiguous-nullable-branches"),
             message: finding.kind.to_string(),
             span: finding.span,
             labels: finding.labels,
             help: Some(finding.kind.help()),
+            note: finding.kind.note(),
         }
     );
+}
+
+#[test]
+fn tells_how_to_expect_a_finding_that_can_be() {
+    let note = |source| {
+        crate::analysis::tests::findings(source)
+            .remove(0)
+            .kind
+            .note()
+    };
+    assert_eq!(
+        note("a = 'x' | 'x';").as_deref(),
+        Some(
+            "if this is intended, write `(* expect duplicate-alternative: \
+             reason *)` right before the rule, and the parser takes the \
+             branch that matches the most, and the first written of those \
+             that tie"
+        )
+    );
+    assert_eq!(
+        note("a = 'x' - ? U+0061..U+007A ?;").as_deref(),
+        Some(
+            "if this is intended, write `(* expect exhaustive-exception: \
+             reason *)` right before the rule"
+        )
+    );
+    assert_eq!(note("a = a, 'x' | 'y';"), None);
 }

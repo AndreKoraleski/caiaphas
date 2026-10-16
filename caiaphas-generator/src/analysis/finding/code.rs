@@ -118,11 +118,12 @@ impl FindingCode {
     /// Returns whether an expectation can mark a finding with this code as
     /// intended. Only warnings about the grammar itself can be.
     pub(crate) fn is_expectable(self) -> bool {
-        self.intended_behaviour().is_some()
+        self.severity() != Severity::Error
+            && self != Self::UnfulfilledExpectation
     }
 
-    /// Returns what happens when an expectation marks a finding with this code
-    /// as intended, if one can.
+    /// Returns what the parser does when an expectation marks a finding with
+    /// this code as intended, if that needs saying.
     pub(super) fn intended_behaviour(self) -> Option<&'static str> {
         match self {
             Self::TiedBranches
@@ -142,6 +143,9 @@ impl FindingCode {
                 "the parser repeats the sequence as long as it matches, so it \
                  extends as far as it can",
             ),
+            Self::NondeterministicChoice => {
+                Some("the parser still tries every way")
+            }
             Self::RequiredOptionalSequence
             | Self::DeadEndRepeatedSequence
             | Self::UnreachableRule
@@ -153,11 +157,8 @@ impl FindingCode {
             | Self::MixedClassRange
             | Self::IneffectiveAnnotation
             | Self::SingleCharacterRule
-            | Self::SharedStart => Some("the grammar stays as it is"),
-            Self::NondeterministicChoice => {
-                Some("the parser still tries every way")
-            }
-            Self::LeftRecursion
+            | Self::SharedStart
+            | Self::LeftRecursion
             | Self::IndirectLeftRecursion
             | Self::UnproductiveRule
             | Self::NullableRepeatedSequence

@@ -28,17 +28,20 @@ pub(crate) struct Label {
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Diagnostic {
     pub(crate) severity: Severity,
+    /// The code of the finding, for a diagnostic from the analysis.
+    pub(crate) code: Option<&'static str>,
     pub(crate) message: String,
     pub(crate) span: Span,
     pub(crate) labels: Vec<Label>,
     pub(crate) help: Option<String>,
+    pub(crate) note: Option<String>,
 }
 
 impl Diagnostic {
     /// Returns the diagnostic as text, showing each line of `source` it points
     /// at, with `path` naming where the source comes from.
     ///
-    /// The text starts with how serious the diagnostic is when `named`.
+    /// The text of an error starts with how serious it is only when `named`.
     /// Otherwise whoever shows it adds that, as rustc does for a compile
     /// error.
     pub(crate) fn render(
@@ -52,8 +55,21 @@ impl Diagnostic {
             Severity::Warning => Level::WARNING,
             Severity::Suggestion => Level::INFO.with_name("suggestion"),
         };
-        let level = if named { level } else { level.no_name() };
-        let title = level.primary_title(&self.message);
+        let title = if named || self.severity != Severity::Error {
+            let title = level.primary_title(&self.message);
+            match self.code {
+                Some(code) => title.id(code),
+                None => title,
+            }
+        } else {
+            // A title without a name leaves out its code, so it goes in the
+            // message instead.
+            let message = match self.code {
+                Some(code) => format!("[{code}] {}", self.message),
+                None => self.message.clone(),
+            };
+            level.no_name().primary_title(message)
+        };
         let snippet = Snippet::source(source)
             .path(path)
             .annotation(AnnotationKind::Primary.span(self.span.range()))
@@ -66,6 +82,9 @@ impl Diagnostic {
         if let Some(help) = &self.help {
             group = group.element(Level::HELP.message(help));
         }
+        if let Some(note) = &self.note {
+            group = group.element(Level::NOTE.message(note));
+        }
         Renderer::plain().render(&[group])
     }
 }
@@ -77,10 +96,12 @@ mod tests {
     fn diagnostic(start: usize, end: usize) -> Diagnostic {
         Diagnostic {
             severity: Severity::Error,
+            code: None,
             message: "something is wrong".to_owned(),
             span: Span { start, end },
             labels: Vec::new(),
             help: None,
+            note: None,
         }
     }
 
@@ -115,6 +136,29 @@ mod tests {
             found
                 .render("g.ebnf", source, true)
                 .starts_with("suggestion: something is wrong")
+        );
+    }
+
+    #[test]
+    fn starts_with_the_code_of_a_finding() {
+        let source = "a = 'x';\n";
+        let mut found = diagnostic(4, 7);
+        found.code = Some("left-recursion");
+        assert!(
+            found
+                .render("g.ebnf", source, true)
+                .starts_with("error[left-recursion]: something is wrong")
+        );
+        let unnamed = found.render("g.ebnf", source, false);
+        assert!(
+            unnamed.starts_with("[left-recursion] something is wrong"),
+            "{unnamed}"
+        );
+        found.severity = Severity::Warning;
+        assert!(
+            found
+                .render("g.ebnf", source, false)
+                .starts_with("warning[left-recursion]: something is wrong")
         );
     }
 

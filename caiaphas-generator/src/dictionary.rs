@@ -310,10 +310,12 @@ impl From<DictionaryError> for Diagnostic {
         };
         Self {
             severity: Severity::Error,
+            code: None,
             message: error.to_string(),
             span: error.span,
             labels,
             help: Some(error.help()),
+            note: None,
         }
     }
 }

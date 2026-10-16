@@ -129,6 +129,7 @@ fn clashes(grammar: &Grammar, shapes: &[Option<Shape>]) -> Vec<Diagnostic> {
             }
             Entry::Occupied(entry) => errors.push(Diagnostic {
                 severity: Severity::Error,
+                code: None,
                 message: format!(
                     "the types of `{}` and `{}` would both be named `{name}`",
                     entry.get().meta_identifier.as_str(),
@@ -140,6 +141,7 @@ fn clashes(grammar: &Grammar, shapes: &[Option<Shape>]) -> Vec<Diagnostic> {
                     message: "this rule's type has the same name",
                 }],
                 help: Some("rename one of the rules".to_owned()),
+                note: None,
             }),
         }
     }
@@ -231,7 +233,9 @@ mod tests {
         let module = generate(source, "g.ebnf", Options::default()).unwrap();
         assert_eq!(module.suggestions.len(), 1);
         assert!(
-            module.suggestions[0].starts_with("`digit` only ever matches"),
+            module.suggestions[0].starts_with(
+                "suggestion[single-character-rule]: `digit` only ever"
+            ),
             "{:?}",
             module.suggestions
         );
@@ -246,7 +250,8 @@ mod tests {
         assert!(!report.stops_build);
         assert_eq!(report.findings.len(), 1);
         assert!(
-            report.findings[0].starts_with("suggestion: `digit`"),
+            report.findings[0]
+                .starts_with("suggestion[single-character-rule]: `digit`"),
             "{:?}",
             report.findings
         );

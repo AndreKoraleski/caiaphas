@@ -34,7 +34,10 @@ fn prints_suggestions_without_failing() {
     let output = caiaphas(&["check", path.to_str().unwrap()]);
     assert!(output.status.success());
     let printed = printed(&output);
-    assert!(printed.starts_with("suggestion: `digit`"), "{printed}");
+    assert!(
+        printed.starts_with("suggestion[single-character-rule]: `digit`"),
+        "{printed}"
+    );
 }
 
 #[test]

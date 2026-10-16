@@ -130,10 +130,12 @@ impl From<ParseError> for Diagnostic {
         };
         Self {
             severity: Severity::Error,
+            code: None,
             message,
             span: error.span,
             labels: Vec::new(),
             help,
+            note: None,
         }
     }
 }
@@ -150,11 +152,13 @@ mod tests {
             Diagnostic::from(errors[0]),
             Diagnostic {
                 severity: Severity::Error,
+                code: None,
                 message: "expected `;` or `.`, found the end of the grammar"
                     .to_owned(),
                 span: Span { start: 7, end: 7 },
                 labels: Vec::new(),
                 help: None,
+                note: None,
             }
         );
     }
