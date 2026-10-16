@@ -50,7 +50,7 @@ struct Remembered {
     noted: bool,
 }
 
-/// Where a rule started to match, which finishing it needs.
+/// Where a rule started to match. Finishing the rule needs it.
 #[derive(Debug, Clone, Copy)]
 pub struct RuleStart {
     position: usize,
@@ -126,7 +126,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     }
 
     /// Returns where the character at `position` ends when `contains` holds
-    /// for it. Otherwise notes each of `expected`, which the set is made of.
+    /// for it. Otherwise notes each part of the set in `expected`.
     pub fn set(
         &mut self,
         position: usize,
@@ -164,7 +164,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     }
 
     /// Returns where the characters from `position` on that `contains` holds
-    /// for end, and notes each of `expected`, which the set is made of, there.
+    /// for end, and notes each part of the set in `expected` there.
     pub fn span(
         &mut self,
         position: usize,
@@ -232,22 +232,22 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         self.matched.truncate(mark);
     }
 
-    /// Forgets the nodes matched from `mark` to `start`, which a branch
-    /// matched before a longer one.
+    /// Forgets the nodes from `mark` to `start` of a branch that a longer one
+    /// replaced.
     pub fn discard(&mut self, mark: usize, start: usize) {
         self.matched.drain(mark..start);
     }
 
-    /// Adds the node of `found`, which a rule matched, to the nodes matched so
-    /// far, and returns where the match ends.
+    /// Adds the node of the rule's match `found` to the nodes matched so far,
+    /// and returns where the match ends.
     pub fn matched(&mut self, found: Match) -> Option<usize> {
         let (end, node) = found?;
         self.add_node(node);
         Some(end)
     }
 
-    /// Adds `node`, which a rule built, to the nodes matched so far. A hidden
-    /// rule has none.
+    /// Adds the node a rule built to the nodes matched so far. A hidden rule
+    /// builds none.
     pub fn add_node(&mut self, node: Option<usize>) {
         self.matched.extend(node);
     }
@@ -278,8 +278,8 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         }
     }
 
-    /// Finishes `rule`, which matched from `start` up to `end`, or not at all,
-    /// and returns its match.
+    /// Finishes `rule` and returns its match from `start` up to `end`, or none
+    /// when `end` is `None`.
     pub fn finish_rule(
         &mut self,
         rule: &Rule,

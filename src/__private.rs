@@ -1,27 +1,15 @@
-//! What generated parsers are made of. Generated code matches each rule of its
-//! grammar with a [`Parser`], and turns the tree the parser builds into its
-//! own types. Nothing here is meant to be used directly, so it can change in
-//! any release.
+//! What generated parsers are made of. Nothing here is meant to be used
+//! directly, so it can change in any release.
 //!
-//! The function of most rules takes one way through each choice as it comes:
-//! the branch that matches the most text and the first written of those that
-//! tie, or the first that matches with a first match, and as much of an
-//! optional or repeated sequence as it can. Outside greedy rules, the analysis
-//! makes sure that never misses a match. A rule that a parser can try more
-//! than once at the same place remembers its match there.
+//! Generated code matches each rule with a [`Parser`] and turns the tree it
+//! builds into the grammar's types. Most rules take each way as it comes. A
+//! rule where that could miss a match gets two functions instead: one lists
+//! where its matches can end, and the other builds the match that the rest of
+//! the input goes on from.
 //!
-//! Every other rule gets two functions that try every way. One tells where the
-//! rule's matches at a position can end, in the order the rule prefers them,
-//! and remembers them. The other builds the node of the match up to the end
-//! the rule around it picks, the first it prefers that the rest of the input
-//! can go on from.
-//!
-//! A parse notes nothing about why an input might not match, and skips the
-//! branches that cannot start with the next character. Only when the input
-//! does not match is it matched again, trying every branch and noting at each
-//! failure what could have been read, to say why. The function of each rule is
-//! generic over which of the two it does, so the first leaves out the work of
-//! the second entirely.
+//! A first parse notes nothing about failures. Only an input that does not
+//! match is parsed again, noting what could have come at each failure, to say
+//! why. The function of each rule is generic over which of the two it does.
 
 mod parser;
 mod tree;
@@ -55,13 +43,13 @@ pub struct Rule {
     pub remembers: bool,
 }
 
-/// The function of a rule, which matches the rule at a position.
+/// The function that matches a rule at a position.
 pub type RuleFunction<const REPORTS: bool> =
     fn(&mut Parser<'_, REPORTS>, usize) -> Match;
 
 /// Returns the tree of `input` matched in full by the rule whose function is
-/// `rule`, or where and why it does not match, which the same function found
-/// with `explain` tells.
+/// `rule`. When `input` does not match, `explain` matches it again to say
+/// where and why.
 pub fn parse(
     input: &str,
     rule: RuleFunction<false>,
@@ -93,8 +81,8 @@ pub type BuildFunction =
     fn(&mut Parser<'_, false>, usize, usize) -> Option<usize>;
 
 /// Returns the tree of `input` matched in full by the rule whose functions are
-/// `ends` and `build`, or where and why it does not match. `explain` tells
-/// that as `ends` does.
+/// `ends` and `build`. When `input` does not match, `explain` matches it again
+/// as `ends` does to say where and why.
 pub fn parse_by_ends(
     input: &str,
     ends: EndsFunction<false>,
