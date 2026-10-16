@@ -1,4 +1,5 @@
-Every finding the analysis can report.
+Every finding caiaphas can report about a grammar, by its code. A finding
+shows its code in its title, as in `warning[tied-branches]`.
 
 An error stops the build. A warning stops it too, unless an expectation right
 before its rule marks it as intended, with the code and a reason:
@@ -8,8 +9,9 @@ before its rule marks it as intended, with the code and a reason:
 word = keyword | name;
 ```
 
-A suggestion isn't intended to stop the build by default. The module docs list
-them, `caiaphas check` prints them, and `grammar!(..., suggest)` stops at them.
+A suggestion does not stop the build unless `grammar!(..., suggest)` asks it
+to, and an expectation can mark one as intended too. The docs of the generated
+module list the suggestions, and `caiaphas check` prints them.
 
 ## left-recursion
 
