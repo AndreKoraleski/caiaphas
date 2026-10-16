@@ -11,7 +11,7 @@ use crate::{
     analysis::{
         facts::Facts,
         finding::{Finding, FindingKind},
-        grammar_check::longer_branch_conflict::{rest_after, sequence},
+        grammar_check::longer_branch_conflict::rest_after,
     },
     diagnostic::Label,
     ir::{Expression, ExpressionKind, Grammar},
@@ -59,7 +59,7 @@ pub(super) fn check(
 /// reports.
 fn shares_start(earlier: &Expression, later: &Expression) -> bool {
     let (Some(start), Some(other)) =
-        (sequence(earlier).first(), sequence(later).first())
+        (earlier.steps().first(), later.steps().first())
     else {
         return false;
     };

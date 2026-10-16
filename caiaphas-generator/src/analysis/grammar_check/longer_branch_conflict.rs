@@ -74,22 +74,13 @@ pub(super) fn rest_after<'e>(
     shorter: &Expression,
     longer: &'e Expression,
 ) -> Option<&'e [Expression]> {
-    let (shorter, longer) = (sequence(shorter), sequence(longer));
+    let (shorter, longer) = (shorter.steps(), longer.steps());
     let starts_alike = shorter
         .iter()
         .zip(longer)
         .all(|(shorter, longer)| shorter.is_written_like(longer));
     (starts_alike && longer.len() > shorter.len())
         .then(|| &longer[shorter.len()..])
-}
-
-/// Returns the expressions of the single definition `expression` is, or the
-/// expression alone.
-pub(super) fn sequence(expression: &Expression) -> &[Expression] {
-    match &expression.kind {
-        ExpressionKind::SingleDefinition(expressions) => expressions,
-        _ => std::slice::from_ref(expression),
-    }
 }
 
 #[cfg(test)]
