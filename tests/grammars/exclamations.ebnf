@@ -1,0 +1,5 @@
+(* Words other than if, each with an optional exclamation mark, or two
+   question marks. *)
+exclamation = (letter, {letter}) - 'if', ['!'] | 2 * '?';
+(* hide *)
+letter = ? U+0061..U+007A ?;

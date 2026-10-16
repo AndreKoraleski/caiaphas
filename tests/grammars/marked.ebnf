@@ -1,0 +1,4 @@
+(* An `a`, an optional `b` and an `x`, with a mark before the `x`. *)
+marked = 'a', ['b'], mark, 'x';
+(* expect empty-rule: it only marks a place *)
+mark = ;

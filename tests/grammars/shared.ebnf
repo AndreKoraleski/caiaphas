@@ -1,0 +1,5 @@
+(* Two rules that both start with `r`, so `r` remembers its matches. *)
+shared = '(', (a, 'x' | b);
+a = r, 'y';
+b = r, 'z';
+r = 'q';

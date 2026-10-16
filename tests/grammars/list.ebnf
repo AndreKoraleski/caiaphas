@@ -1,0 +1,6 @@
+(* Lists of numbers and of lists in brackets, such as `12,(3,4)`. *)
+numbers = list;
+list = item, {',', item};
+item = digit, {digit} | '(', list, ')';
+(* hide *)
+digit = ? U+0030..U+0039 ?;

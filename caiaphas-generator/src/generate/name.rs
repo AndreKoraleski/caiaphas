@@ -7,6 +7,8 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::{Ident, Span};
 
+use crate::ir::Rule;
+
 /// Words Rust reserves, which an identifier can only be when raw.
 const KEYWORDS: &[&str] = &[
     "abstract", "as", "async", "await", "become", "box", "break", "const",
@@ -20,6 +22,12 @@ const KEYWORDS: &[&str] = &[
 /// Names an identifier cannot be even when raw, along with `span`, which the
 /// generated types keep for where each rule matched.
 const TAKEN: &[&str] = &["crate", "self", "Self", "super", "span"];
+
+/// Returns the name of `rule` as written, with single spaces between its
+/// words.
+pub(crate) fn spaced(rule: &Rule) -> String {
+    rule.meta_identifier.words().collect::<Vec<_>>().join(" ")
+}
 
 /// Returns the name of a type or variant, such as `SyntaxRule` for
 /// `syntax rule`.

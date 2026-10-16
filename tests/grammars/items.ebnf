@@ -1,0 +1,5 @@
+(* Items split by `;`, where an item is `ab` before it is an `a` with any
+   `b`s after it. *)
+items = item, {';', item};
+(* first match *)
+item = 'ab' | 'a', {'b'};

@@ -1,0 +1,5 @@
+(* An `x` or `y` the type leaves out, then one it keeps. *)
+pair = skipped, letter;
+(* hide *)
+skipped = letter;
+letter = 'x' | 'y';

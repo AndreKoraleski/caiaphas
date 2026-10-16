@@ -2,6 +2,7 @@
 //! types of its rules.
 
 mod code;
+mod matching;
 mod name;
 mod shape;
 
@@ -102,19 +103,18 @@ mod tests {
         )
         .unwrap()
         .to_string();
-        assert!(items.contains("StartsWith (& [('x' , 'x')]"), "{items}");
-        assert!(items.contains("StartsWith (& [('u' , 'v')]"), "{items}");
-        assert_eq!(items.matches("StartsWith").count(), 2, "{items}");
+        assert!(items.contains("Some ('x'))"), "{items}");
+        assert!(items.contains("Some ('u' ..= 'v'))"), "{items}");
+        assert_eq!(items.matches("matches !").count(), 2, "{items}");
     }
 
     #[test]
     fn takes_the_first_match_where_a_rule_asks_for_it() {
         let items = |source| generate(source, "g.ebnf").unwrap().to_string();
         let longest = items("s = a | b; a = 'x'; b = 'y';");
-        assert!(longest.contains("Expression :: Choice"), "{longest}");
+        assert!(longest.contains("longest"), "{longest}");
         let first = items("(* first match *) s = a | b; a = 'x'; b = 'y';");
-        assert!(first.contains("Expression :: First"), "{first}");
-        assert!(!first.contains("Expression :: Choice"), "{first}");
+        assert!(!first.contains("longest"), "{first}");
     }
 
     #[test]

@@ -1,0 +1,7 @@
+(* Words, where a keyword is never a name. *)
+(* expect tied-branches: a keyword wins over a name with the same text *)
+word = keyword | name;
+keyword = 'if';
+name = letter, {letter};
+(* hide *)
+letter = ? U+0061..U+007A ?;

@@ -1,5 +1,5 @@
-//! Code writes the items of a grammar's module: the tables its parser reads,
-//! the type of each rule, and how each type is built from a match.
+//! Code writes the items of a grammar's module: the function that matches each
+//! rule, the type of each rule, and how each type is built from a match.
 //!
 //! Generated code names everything outside the module by its full path, so
 //! that a rule named `String` or `Debug` cannot change what it means.
@@ -8,12 +8,12 @@ use proc_macro2::{Ident, Literal, TokenStream};
 use quote::quote;
 
 use crate::{
-    analysis::{Facts, revisited_rules},
+    analysis::Facts,
     generate::{
-        name,
+        matching, name,
         shape::{Count, Field, Shape, Variant},
     },
-    ir::{Expression, ExpressionKind, Grammar, Rule, RuleId},
+    ir::{Grammar, Rule, RuleId},
 };
 
 /// The type and field names of every rule.
@@ -37,13 +37,7 @@ pub(crate) fn module(
         types: written_names.clone().map(name::type_name).collect(),
         fields: written_names.map(name::field_name).collect(),
     };
-    let facts = Facts::new(grammar);
-    let revisited = revisited_rules(&facts);
-    let rules = grammar
-        .syntax_rules
-        .iter()
-        .zip(revisited)
-        .map(|(rule, remembers)| rule_table(rule, remembers, &facts));
+    let functions = matching::functions(&Facts::new(grammar));
     let types = shapes.iter().enumerate().filter_map(|(position, shape)| {
         let shape = shape.as_ref()?;
         let rule = &grammar.syntax_rules[position];
@@ -53,7 +47,7 @@ pub(crate) fn module(
             .then(|| parse(rule, position));
         let documentation = format!(
             " The type of the `{}` rule:\n\n```text\n{}\n```",
-            written(rule),
+            name::spaced(rule),
             &source[rule.span.range()],
         );
         Some(match shape {
@@ -78,135 +72,9 @@ pub(crate) fn module(
     quote! {
         use ::caiaphas::__private as __caiaphas;
 
-        static __GRAMMAR: __caiaphas::Grammar =
-            __caiaphas::Grammar { rules: &[#(#rules),*] };
+        #functions
 
         #(#types)*
-    }
-}
-
-/// Returns the name of `rule` as written, with single spaces between its
-/// words.
-fn written(rule: &Rule) -> String {
-    rule.meta_identifier.words().collect::<Vec<_>>().join(" ")
-}
-
-/// Returns the table of `rule`, with `facts` about its grammar, and whether it
-/// `remembers` its matches.
-fn rule_table(rule: &Rule, remembers: bool, facts: &Facts<'_>) -> TokenStream {
-    let name = written(rule);
-    let tables = Tables {
-        facts,
-        first_match: rule.first_match,
-    };
-    let expression = tables.expression(&rule.expression);
-    let hidden = rule.hidden;
-    quote! {
-        __caiaphas::Rule {
-            name: #name,
-            expression: #expression,
-            hidden: #hidden,
-            remembers: #remembers,
-        }
-    }
-}
-
-/// Writes the tables of the expressions of one rule.
-struct Tables<'a> {
-    facts: &'a Facts<'a>,
-    /// Whether the rule's choices take their first alternative that matches.
-    first_match: bool,
-}
-
-impl Tables<'_> {
-    /// Returns the table of `expression`.
-    fn expression(&self, expression: &Expression) -> TokenStream {
-        let table_of = |expression| self.expression(expression);
-        match &expression.kind {
-            ExpressionKind::SingleDefinition(expressions) => {
-                let expressions = expressions.iter().map(table_of);
-                quote! {
-                    __caiaphas::Expression::Sequence(&[#(#expressions),*])
-                }
-            }
-            ExpressionKind::DefinitionsList(expressions) => {
-                let branches =
-                    expressions.iter().map(|branch| self.branch(branch));
-                let choice = if self.first_match {
-                    quote! { First }
-                } else {
-                    quote! { Choice }
-                };
-                quote! { __caiaphas::Expression::#choice(&[#(#branches),*]) }
-            }
-            ExpressionKind::OptionalSequence(expression) => {
-                let branch = self.branch(expression);
-                quote! { __caiaphas::Expression::Optional(&#branch) }
-            }
-            ExpressionKind::RepeatedSequence(expression) => {
-                let branch = self.branch(expression);
-                quote! { __caiaphas::Expression::Repeated(&#branch) }
-            }
-            ExpressionKind::SyntacticFactor {
-                integer,
-                syntactic_primary,
-            } => {
-                let integer = Literal::u32_unsuffixed(*integer);
-                let expression = table_of(syntactic_primary);
-                quote! {
-                    __caiaphas::Expression::Times(#integer, &#expression)
-                }
-            }
-            ExpressionKind::SyntacticTerm {
-                syntactic_factor,
-                syntactic_exception,
-            } => {
-                let factor = table_of(syntactic_factor);
-                let exception = table_of(syntactic_exception);
-                quote! {
-                    __caiaphas::Expression::Except(&#factor, &#exception)
-                }
-            }
-            ExpressionKind::MetaIdentifier(RuleId(position)) => {
-                let position = Literal::usize_unsuffixed(*position);
-                quote! { __caiaphas::Expression::Rule(#position) }
-            }
-            ExpressionKind::TerminalString(text) => {
-                quote! { __caiaphas::Expression::Text(#text) }
-            }
-            ExpressionKind::SpecialSequence(range) => {
-                let (first, last) = (range.start(), range.end());
-                quote! { __caiaphas::Expression::Range(#first, #last) }
-            }
-            ExpressionKind::EmptySequence => {
-                quote! { __caiaphas::Expression::Empty }
-            }
-        }
-    }
-
-    /// Returns the table of `expression` as a branch a parser can take or not,
-    /// with the characters it can start with, so a parser can skip it when the
-    /// next character is none of them.
-    ///
-    /// A branch that can match nothing can start anywhere, and a terminal
-    /// string or special sequence already fails on its first character, so
-    /// those are left as they are.
-    fn branch(&self, expression: &Expression) -> TokenStream {
-        let table = self.expression(expression);
-        let checks_itself = matches!(
-            expression.kind,
-            ExpressionKind::TerminalString(_)
-                | ExpressionKind::SpecialSequence(_)
-        );
-        if checks_itself || self.facts.is_nullable(expression) {
-            return table;
-        }
-        let first = self.facts.first(expression);
-        let ranges = first.ranges().iter().map(|range| {
-            let (first, last) = (range.start(), range.end());
-            quote! { (#first, #last) }
-        });
-        quote! { __caiaphas::Expression::StartsWith(&[#(#ranges),*], &#table) }
     }
 }
 
@@ -215,17 +83,18 @@ fn parse(rule: &Rule, position: usize) -> TokenStream {
     let documentation = format!(
         " Returns the `{}` that all of `input` matches, or where `input` \
          stops matching it.",
-        written(rule)
+        name::spaced(rule)
     );
-    let position = Literal::usize_unsuffixed(position);
+    let function = matching::function_name(RuleId(position));
     quote! {
         #[doc = #documentation]
         pub fn parse(
             input: &str,
         ) -> ::core::result::Result<Self, ::caiaphas::Error> {
-            __caiaphas::parse(&__GRAMMAR, #position, input).map(|tree| {
-                <Self as __caiaphas::FromNode>::from_node(tree.root())
-            })
+            __caiaphas::parse(input, #function::<false>, #function::<true>)
+                .map(|tree| {
+                    <Self as __caiaphas::FromNode>::from_node(tree.root())
+                })
         }
     }
 }
@@ -250,7 +119,7 @@ fn structure(
     documentation: &str,
 ) -> TokenStream {
     let name = &names.types[position];
-    let this = written(&grammar.syntax_rules[position]);
+    let this = name::spaced(&grammar.syntax_rules[position]);
     let field_names: Vec<&Ident> = fields
         .iter()
         .map(|field| &names.fields[field.rule.0])
@@ -260,7 +129,7 @@ fn structure(
     let mut builds = Vec::new();
     for field in fields {
         let RuleId(held) = field.rule;
-        let held_name = written(&grammar.syntax_rules[held]);
+        let held_name = name::spaced(&grammar.syntax_rules[held]);
         let inner = held_type(names, field.rule, field.boxed);
         let index = Literal::usize_unsuffixed(held);
         let (ty, documentation, build) = match field.count {
@@ -352,7 +221,7 @@ fn enumeration(
                 let variant = &names.types[held];
                 let documentation = format!(
                     " Matched `{}`.",
-                    written(&grammar.syntax_rules[held])
+                    name::spaced(&grammar.syntax_rules[held])
                 );
                 let ty = held_type(names, *rule, *boxed);
                 let index = Literal::usize_unsuffixed(held);
