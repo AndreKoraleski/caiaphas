@@ -8,7 +8,7 @@ use crate::lexer::{gap_separator, terminal_character::TerminalCharacter};
 ///
 /// It is one or more decimal digits. Gaps may come between them but are not
 /// part of the number, so `1 2` is 12.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Integer(u32);
 
 impl Integer {

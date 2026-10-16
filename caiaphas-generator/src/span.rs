@@ -7,7 +7,7 @@ use std::ops::Range;
 ///
 /// `start` is the first byte, and `end` the byte after the last one, so an
 /// empty span has `start == end`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Span {
     pub(crate) start: usize,
     pub(crate) end: usize,

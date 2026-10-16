@@ -23,11 +23,10 @@ use crate::span::Span;
 ///
 /// After an error it skips what could not be read and goes on, so one pass
 /// finds every error that does not hide the ones after it.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct Lexer<'a> {
     source: &'a str,
     position: usize,
-    /// Where each comment read so far is.
     comments: Vec<Span>,
 }
 
@@ -51,16 +50,18 @@ impl<'a> Lexer<'a> {
     fn skip_gaps_and_comments(&mut self) -> Result<(), LexError> {
         loop {
             self.position += gap_separator::length(self.rest());
-            if !self.rest().starts_with("(*") {
-                return Ok(());
-            }
             match bracketed_textual_comment::length(self.rest()) {
                 Ok(length) => {
                     let span = self.advance(length);
                     self.comments.push(span);
                 }
+                Err(
+                    ParseBracketedTextualCommentError::NoStartCommentSymbol,
+                ) => {
+                    return Ok(());
+                }
                 Err(error) => {
-                    let length = unchecked_comment_length(self.rest());
+                    let length = comment_recovery_length(self.rest());
                     return Err(self.skip(
                         LexErrorKind::BracketedTextualComment(error),
                         length,
@@ -79,7 +80,7 @@ impl<'a> Lexer<'a> {
                 Ok(Token { symbol, span })
             }
             Err(error) => {
-                let length = recovery_length(error, self.rest());
+                let length = symbol_recovery_length(error, self.rest());
                 Err(self.skip(LexErrorKind::CommentlessSymbol(error), length))
             }
         }
@@ -127,19 +128,22 @@ impl Iterator for Lexer<'_> {
 /// where the next token most likely starts.
 ///
 /// Skips at least one character, so the lexer always moves.
-fn recovery_length(error: ParseCommentlessSymbolError, input: &str) -> usize {
+fn symbol_recovery_length(
+    error: ParseCommentlessSymbolError,
+    input: &str,
+) -> usize {
     let first = input.chars().next().map_or(0, char::len_utf8);
-    let length = match error {
+    match error {
         // Only the value of the integer is wrong, so every digit is skipped.
         ParseCommentlessSymbolError::Integer(_) => {
             gap_separator::remove(input, |c| c.is_ascii_digit()).1
         }
-        // A terminal string cannot go past the end of its line.
+        // A terminal string starts with its quote, and cannot go past the end
+        // of its line.
         ParseCommentlessSymbolError::TerminalString(_) => {
             let line = input.find('\n').map_or(input, |end| &input[..end]);
-            line[first..]
-                .find(&input[..first])
-                .map_or(line.len(), |end| first + end + first)
+            let quote = &line[..1];
+            line[1..].find(quote).map_or(line.len(), |end| end + 2)
         }
         ParseCommentlessSymbolError::SpecialSequence(_) => input[first..]
             .find('?')
@@ -148,19 +152,21 @@ fn recovery_length(error: ParseCommentlessSymbolError, input: &str) -> usize {
         ParseCommentlessSymbolError::EndOfInput
         | ParseCommentlessSymbolError::InvalidCharacter(_)
         | ParseCommentlessSymbolError::NotCommentless(_) => first,
-    };
-    length.max(first)
+    }
 }
 
 /// Returns how long the comment at the start of `input` is, counting only `(*`
 /// and `*)`, or the length of `input` if it does not end.
 ///
 /// Used to move past a comment that cannot be read as the standard says.
-fn unchecked_comment_length(input: &str) -> usize {
+fn comment_recovery_length(input: &str) -> usize {
     let mut depth = 0;
     let mut length = 0;
-    while let Some(c) = input[length..].chars().next() {
+    loop {
         let after = &input[length..];
+        let Some(c) = after.chars().next() else {
+            break;
+        };
         if after.starts_with("(*") {
             depth += 1;
             length += 2;
@@ -193,16 +199,6 @@ pub(crate) enum LexErrorKind {
     BracketedTextualComment(ParseBracketedTextualCommentError),
 }
 
-impl LexErrorKind {
-    /// Returns the error that caused this one, if any.
-    pub(crate) fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::CommentlessSymbol(error) => error.source(),
-            Self::BracketedTextualComment(error) => error.source(),
-        }
-    }
-}
-
 impl fmt::Display for LexErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -212,15 +208,12 @@ impl fmt::Display for LexErrorKind {
     }
 }
 
-impl fmt::Display for LexError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.kind.fmt(f)
-    }
-}
-
-impl Error for LexError {
+impl Error for LexErrorKind {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.kind.source()
+        match self {
+            Self::CommentlessSymbol(error) => error.source(),
+            Self::BracketedTextualComment(error) => error.source(),
+        }
     }
 }
 
@@ -510,9 +503,12 @@ mod tests {
 
     #[test]
     fn error_displays_the_message_of_what_failed() {
-        assert_eq!(error("*)").to_string(), "`*)` without a matching `(*`");
         assert_eq!(
-            error("(* a").to_string(),
+            error("*)").kind.to_string(),
+            "`*)` without a matching `(*`"
+        );
+        assert_eq!(
+            error("(* a").kind.to_string(),
             "EBNF comment has no closing `*)`"
         );
     }
@@ -521,7 +517,7 @@ mod tests {
     fn error_gives_the_source_of_what_failed() {
         let error = error("(* don't *)");
         assert_eq!(
-            error.source().map(ToString::to_string),
+            error.kind.source().map(ToString::to_string),
             Some(ParseTerminalStringError::NoClosingQuote.to_string())
         );
     }

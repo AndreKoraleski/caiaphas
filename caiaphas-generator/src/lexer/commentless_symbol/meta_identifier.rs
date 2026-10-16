@@ -1,7 +1,5 @@
 //! Meta identifiers of ISO/IEC 14977 EBNF.
 
-use std::hash::{Hash, Hasher};
-
 use crate::lexer::{gap_separator, terminal_character::TerminalCharacter};
 
 /// A meta identifier names a rule.
@@ -50,12 +48,6 @@ impl PartialEq for MetaIdentifier {
 }
 
 impl Eq for MetaIdentifier {}
-
-impl Hash for MetaIdentifier {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-    }
-}
 
 fn is_letter(c: char) -> bool {
     matches!(
