@@ -37,6 +37,9 @@ pub(crate) enum FindingKind {
     /// Two alternatives can match the same text, so a parser can only take the
     /// one written first.
     TiedBranches { matched: String },
+    /// An alternative goes on from where another ends with characters that can
+    /// also come after the choice, so a parser cannot tell which to take.
+    LongerBranchConflict { characters: CharacterSet },
     /// An optional sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to take it.
     OptionalFollowConflict { characters: CharacterSet },
@@ -87,6 +90,7 @@ pub(crate) enum FindingCode {
     UnproductiveRule,
     NullableRepeatedSequence,
     TiedBranches,
+    LongerBranchConflict,
     OptionalFollowConflict,
     RepeatedFollowConflict,
     RequiredOptionalSequence,
@@ -105,12 +109,13 @@ pub(crate) enum FindingCode {
 
 impl FindingCode {
     /// Every code, so a name can be looked up.
-    pub(crate) const ALL: [Self; 19] = [
+    pub(crate) const ALL: [Self; 20] = [
         Self::LeftRecursion,
         Self::IndirectLeftRecursion,
         Self::UnproductiveRule,
         Self::NullableRepeatedSequence,
         Self::TiedBranches,
+        Self::LongerBranchConflict,
         Self::OptionalFollowConflict,
         Self::RepeatedFollowConflict,
         Self::RequiredOptionalSequence,
@@ -134,6 +139,7 @@ impl FindingCode {
             Self::UnproductiveRule => "unproductive-rule",
             Self::NullableRepeatedSequence => "nullable-repeated-sequence",
             Self::TiedBranches => "tied-branches",
+            Self::LongerBranchConflict => "longer-branch-conflict",
             Self::OptionalFollowConflict => "optional-follow-conflict",
             Self::RepeatedFollowConflict => "repeated-follow-conflict",
             Self::RequiredOptionalSequence => "required-optional-sequence",
@@ -165,6 +171,7 @@ impl FindingCode {
             | Self::UnknownExpectation
             | Self::UnexpectableFinding => Severity::Error,
             Self::TiedBranches
+            | Self::LongerBranchConflict
             | Self::OptionalFollowConflict
             | Self::RepeatedFollowConflict
             | Self::RequiredOptionalSequence
@@ -196,6 +203,9 @@ impl FindingCode {
                 "the parser takes the branch that matches the most, and the \
                  first written of those that tie",
             ),
+            Self::LongerBranchConflict => {
+                Some("the parser takes the longer branch whenever it matches")
+            }
             Self::OptionalFollowConflict => Some(
                 "the parser takes the sequence whenever it matches, as usual \
                  for a dangling else",
@@ -234,6 +244,9 @@ impl FindingKind {
                 FindingCode::NullableRepeatedSequence
             }
             Self::TiedBranches { .. } => FindingCode::TiedBranches,
+            Self::LongerBranchConflict { .. } => {
+                FindingCode::LongerBranchConflict
+            }
             Self::OptionalFollowConflict { .. } => {
                 FindingCode::OptionalFollowConflict
             }
@@ -316,6 +329,11 @@ impl FindingKind {
             Self::TiedBranches { .. } => {
                 "exclude what they share from one of them with `-`, such as \
                  `identifier - keyword`"
+                    .to_owned()
+            }
+            Self::LongerBranchConflict { .. } => {
+                "make what comes after the choice start differently from how \
+                 this branch goes on"
                     .to_owned()
             }
             Self::OptionalFollowConflict { .. } => {
@@ -422,6 +440,12 @@ impl fmt::Display for Finding {
                 f,
                 "these branches can both match {matched}, so the parser takes \
                  the one written first"
+            ),
+            FindingKind::LongerBranchConflict { characters } => write!(
+                f,
+                "this branch goes on from where another ends with \
+                 {characters}, which can also come after the choice, so a \
+                 parser cannot tell which to take"
             ),
             FindingKind::OptionalFollowConflict { characters } => write!(
                 f,
@@ -579,6 +603,19 @@ mod tests {
                    expect tied-branches: reason *)` right before the rule, \
                    and the parser takes the branch that matches the most, and \
                    the first written of those that tie",
+        },
+        Case {
+            source: "s = ('x' | 'x', 'y'), 'y';",
+            code: FindingCode::LongerBranchConflict,
+            severity: Severity::Warning,
+            message: "this branch goes on from where another ends with 'y', \
+                      which can also come after the choice, so a parser \
+                      cannot tell which to take",
+            help: "make what comes after the choice start differently from \
+                   how this branch goes on; if this is intended, write `(* \
+                   expect longer-branch-conflict: reason *)` right before the \
+                   rule, and the parser takes the longer branch whenever it \
+                   matches",
         },
         Case {
             source: "a = ['xy'], 'x';",

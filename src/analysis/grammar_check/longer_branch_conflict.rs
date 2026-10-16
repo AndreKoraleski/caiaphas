@@ -1,0 +1,132 @@
+//! A longer branch conflict is an alternative that goes on from where another
+//! alternative of the same choice ends, with characters that can also come
+//! after the choice, such as `'x', 'y'` in `s = ('x' | 'x', 'y'), 'y';`.
+//!
+//! A parser takes the alternative that matches the most, so it takes the
+//! longer one whenever it can, even when what comes after the choice needed
+//! the shorter one. It is the follow conflict of an optional sequence, since
+//! `a | a, b` matches like `a, [b]`.
+
+use crate::{
+    analysis::{
+        character_set::CharacterSet,
+        facts::Facts,
+        finding::{Finding, FindingKind},
+    },
+    diagnostic::Label,
+    ir::{Expression, ExpressionKind, Grammar},
+};
+
+/// Reports every alternative that goes on from where another alternative of
+/// the same definitions list ends, with characters that can come after the
+/// list.
+pub(super) fn check(
+    _grammar: &Grammar,
+    facts: &Facts<'_>,
+    findings: &mut Vec<Finding>,
+) {
+    facts.walk(&mut |expression, after| {
+        let ExpressionKind::DefinitionsList(alternatives) = &expression.kind
+        else {
+            return;
+        };
+        for longer in alternatives {
+            let conflict = alternatives.iter().find_map(|shorter| {
+                let rest = rest_after(shorter, longer)?;
+                let characters = rest
+                    .iter()
+                    .rev()
+                    .fold(CharacterSet::default(), |after, expression| {
+                        facts.first_before(expression, &after)
+                    })
+                    .intersection(&after.characters);
+                (!characters.is_empty()).then_some((shorter, characters))
+            });
+            if let Some((shorter, characters)) = conflict {
+                findings.push(Finding {
+                    kind: FindingKind::LongerBranchConflict { characters },
+                    span: longer.span,
+                    labels: vec![Label {
+                        span: shorter.span,
+                        message: "this branch ends where the longer one goes \
+                                  on",
+                    }],
+                });
+            }
+        }
+    });
+}
+
+/// Returns what `longer` goes on with after `shorter`, when `longer` starts
+/// with every expression of `shorter` and has more.
+fn rest_after<'e>(
+    shorter: &Expression,
+    longer: &'e Expression,
+) -> Option<&'e [Expression]> {
+    let (shorter, longer) = (sequence(shorter), sequence(longer));
+    let starts_alike = shorter
+        .iter()
+        .zip(longer)
+        .all(|(shorter, longer)| shorter.is_written_like(longer));
+    (starts_alike && longer.len() > shorter.len())
+        .then(|| &longer[shorter.len()..])
+}
+
+/// Returns the expressions of the single definition `expression` is, or the
+/// expression alone.
+fn sequence(expression: &Expression) -> &[Expression] {
+    match &expression.kind {
+        ExpressionKind::SingleDefinition(expressions) => expressions,
+        _ => std::slice::from_ref(expression),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        analysis::{finding::FindingCode, tests::findings_with},
+        span::Span,
+    };
+
+    fn conflicts(source: &str) -> Vec<(String, Span, Span)> {
+        findings_with(source, FindingCode::LongerBranchConflict)
+            .into_iter()
+            .map(|finding| {
+                (finding.to_string(), finding.span, finding.labels[0].span)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn finds_a_branch_that_goes_on_like_what_follows_the_choice() {
+        assert_eq!(
+            conflicts("s = ('x' | 'x', 'y'), 'y';"),
+            [(
+                "this branch goes on from where another ends with 'y', which \
+                 can also come after the choice, so a parser cannot tell \
+                 which to take"
+                    .to_owned(),
+                Span { start: 11, end: 19 },
+                Span { start: 5, end: 8 },
+            )]
+        );
+    }
+
+    #[test]
+    fn finds_what_follows_through_other_rules() {
+        let found = conflicts("s = a, 'y'; a = b | b, 'y'; b = 'x';");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].1, Span { start: 20, end: 26 });
+    }
+
+    #[test]
+    fn accepts_a_branch_that_goes_on_differently() {
+        assert_eq!(conflicts("s = ('x' | 'x', 'y'), 'z';"), []);
+        assert_eq!(conflicts("s = 'x' | 'x', 'y';"), []);
+    }
+
+    #[test]
+    fn accepts_branches_that_only_start_alike() {
+        assert_eq!(conflicts("s = ('x', 'y' | 'x', 'z'), 'z';"), []);
+    }
+}
