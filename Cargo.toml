@@ -46,7 +46,14 @@ repository.workspace = true
 keywords = ["ebnf", "grammar", "parser", "parser-generator", "iso-14977"]
 categories = ["parsing", "text-processing"]
 # Only what users need, so CI and editor settings stay out of the package.
-include = ["/src", "/tests", "/README.md", "/CHANGELOG.md", "/LICENSE-*"]
+include = [
+    "/src",
+    "/tests",
+    "/examples",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE-*",
+]
 # Only for a dedicated website, never `repository`.
 # homepage = ""
 # Left unset, as crates.io links to docs.rs.
