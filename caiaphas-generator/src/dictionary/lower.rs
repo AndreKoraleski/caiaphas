@@ -151,6 +151,9 @@ impl Lowering<'_, '_> {
                             kind:
                                 DictionaryErrorKind::UndefinedMetaIdentifier {
                                     meta_identifier: meta_identifier.clone(),
+                                    similar: self
+                                        .index
+                                        .similar(meta_identifier),
                                 },
                             span: syntactic_primary.span,
                         });
@@ -285,6 +288,29 @@ mod tests {
 
     #[test]
     fn rejects_undefined_meta_identifiers() {
+        let (_, errors) =
+            grammar("s = item; items = 'x'; Digit = 'y'; t = digit;");
+        let similar: Vec<Option<String>> = errors
+            .iter()
+            .map(|error| match &error.kind {
+                DictionaryErrorKind::UndefinedMetaIdentifier {
+                    similar,
+                    ..
+                } => {
+                    similar.as_ref().map(|similar| similar.as_str().to_owned())
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            similar,
+            [Some("items".to_owned()), Some("Digit".to_owned())]
+        );
+        let (_, errors) = grammar("s = number; name = 'x';");
+        assert!(matches!(
+            &errors[0].kind,
+            DictionaryErrorKind::UndefinedMetaIdentifier { similar: None, .. }
+        ));
         let (grammar, errors) = grammar("a = 'x', b;");
         assert_eq!(render(&grammar, "a"), "seq('x', empty)");
         assert_eq!(errors.len(), 1);
@@ -293,6 +319,7 @@ mod tests {
             DictionaryError {
                 kind: DictionaryErrorKind::UndefinedMetaIdentifier {
                     meta_identifier,
+                    ..
                 },
                 span: Span { start: 9, end: 10 },
             } if meta_identifier.as_str() == "b"
