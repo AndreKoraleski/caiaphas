@@ -3,16 +3,15 @@
 use crate::{
     dictionary::{DictionaryError, DictionaryErrorKind},
     ir::{Rule, RuleId},
-    parser::Syntax,
 };
 
-/// Returns every rule that no other rule references, and reports a grammar
-/// without one and every start rule that is hidden, converted or inline.
-/// `rules` are the rules of `syntax`.
+/// Returns every rule that no other rule references, and reports every start
+/// rule that is hidden, converted or inline.
 ///
-/// A rule that only references itself is still a start rule.
+/// A rule that only references itself is still a start rule. When every rule
+/// is referenced by another, as when the top rule of a grammar is used inside
+/// itself, the first rule written is the start rule.
 pub(super) fn start_rules(
-    syntax: &Syntax,
     rules: &[Rule],
     errors: &mut Vec<DictionaryError>,
 ) -> Vec<RuleId> {
@@ -25,19 +24,12 @@ pub(super) fn start_rules(
                 }
             });
     }
-    let start_rules: Vec<RuleId> = (0..rules.len())
+    let mut start_rules: Vec<RuleId> = (0..rules.len())
         .filter(|&position| !referenced[position])
         .map(RuleId)
         .collect();
-    if start_rules.is_empty() {
-        if let (Some(first), Some(last)) =
-            (syntax.syntax_rules.first(), syntax.syntax_rules.last())
-        {
-            errors.push(DictionaryError {
-                kind: DictionaryErrorKind::NoStartSyntaxRule,
-                span: first.span.to(last.span),
-            });
-        }
+    if start_rules.is_empty() && !rules.is_empty() {
+        start_rules.push(RuleId(0));
     }
     for &RuleId(position) in &start_rules {
         let rule = &rules[position];
@@ -71,13 +63,7 @@ pub(super) fn start_rules(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        dictionary::{
-            DictionaryErrorKind,
-            tests::{grammar, start_names},
-        },
-        span::Span,
-    };
+    use crate::dictionary::tests::{grammar, start_names};
 
     fn starts(source: &str) -> Vec<String> {
         let (grammar, errors) = grammar(source);
@@ -109,18 +95,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_grammar_where_every_rule_is_referenced() {
-        let source = "e = t; t = f; f = '(', e, ')' | 'x';";
-        let (grammar, errors) = grammar(source);
-        assert_eq!(grammar.start_syntax_rules, []);
-        assert_eq!(errors.len(), 1);
-        assert_eq!(errors[0].kind, DictionaryErrorKind::NoStartSyntaxRule);
-        assert_eq!(
-            errors[0].span,
-            Span {
-                start: 0,
-                end: source.len(),
-            }
-        );
+    fn starts_from_the_first_rule_where_every_rule_is_referenced() {
+        assert_eq!(starts("e = t; t = f; f = '(', e, ')' | 'x';"), ["e"]);
     }
 }

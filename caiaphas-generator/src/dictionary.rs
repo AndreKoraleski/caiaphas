@@ -33,7 +33,7 @@ pub(crate) fn build(syntax: &Syntax) -> (Grammar, Vec<DictionaryError>) {
     let index = Index::new(syntax, &mut errors);
     let syntax_rules = lower::lower(&index, &mut errors);
     let start_syntax_rules =
-        start_rules::start_rules(syntax, &syntax_rules, &mut errors);
+        start_rules::start_rules(&syntax_rules, &mut errors);
     syntactic_exception::check(&syntax_rules, &mut errors);
     inline_rules::check(&syntax_rules, &mut errors);
     errors.sort_by_key(|error| error.span.start);
@@ -147,8 +147,6 @@ pub(crate) enum DictionaryErrorKind {
         /// characters is written in a regular expression.
         class: bool,
     },
-    /// Every syntax rule is referenced by another, so none can start a parser.
-    NoStartSyntaxRule,
     /// A syntactic exception uses a meta identifier whose rule is recursive or
     /// references a recursive rule.
     RecursiveSyntacticException { meta_identifier: MetaIdentifier },
@@ -180,10 +178,6 @@ impl fmt::Display for DictionaryError {
             } => {
                 write!(f, "`{}` is not defined", meta_identifier.as_str())
             }
-            DictionaryErrorKind::NoStartSyntaxRule => f.write_str(
-                "every syntax rule is referenced by another, so none starts \
-                 the grammar",
-            ),
             DictionaryErrorKind::RecursiveSyntacticException {
                 meta_identifier,
             } => write!(
@@ -277,11 +271,6 @@ impl DictionaryError {
                     "define `{}` with a syntax rule, or correct its spelling",
                     meta_identifier.as_str()
                 )
-            }
-            DictionaryErrorKind::NoStartSyntaxRule => {
-                "add a rule that no other rule references to start the \
-                 grammar, such as `grammar = expression;`"
-                    .to_owned()
             }
             DictionaryErrorKind::RecursiveSyntacticException {
                 meta_identifier,
@@ -453,7 +442,6 @@ pub(crate) mod tests {
                 DictionaryErrorKind::UndefinedMetaIdentifier { .. } => {
                     "undefined"
                 }
-                DictionaryErrorKind::NoStartSyntaxRule => "no start",
                 DictionaryErrorKind::RecursiveSyntacticException {
                     ..
                 } => "recursive",
@@ -497,13 +485,6 @@ pub(crate) mod tests {
                 "a = b;",
                 "`b` is not defined",
                 "define `b` with a syntax rule, or correct its spelling",
-            ),
-            (
-                "a = b; b = a;",
-                "every syntax rule is referenced by another, so none starts \
-                 the grammar",
-                "add a rule that no other rule references to start the \
-                 grammar, such as `grammar = expression;`",
             ),
             (
                 "s = 'x' - b; b = 'y', [b];",
