@@ -86,7 +86,7 @@ mod tests {
         assert_eq!(
             codes(
                 "(* expect optional-follow-conflict: wanted *) \
-                 a = ['xy'], 'x' | 'x';"
+                 a = ['xy'], 'x' | 'x', ['z'];"
             ),
             ["tied-branches"]
         );
@@ -143,7 +143,7 @@ mod tests {
             codes(
                 "(* expect optional-follow-conflict: wanted *) \
                  (* expect tied-branches: also wanted *) \
-                 a = ['xy'], 'x' | 'x';"
+                 a = ['xy'], 'x' | 'x', ['z'];"
             ),
             Vec::<&str>::new()
         );

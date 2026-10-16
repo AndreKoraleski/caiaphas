@@ -14,6 +14,7 @@ use crate::{
     analysis::{
         facts::Facts,
         finding::{Finding, FindingKind},
+        grammar_check::unreachable_alternative,
         matcher,
     },
     diagnostic::Label,
@@ -37,6 +38,15 @@ pub(super) fn check(
                 return;
             };
             for (index, later) in alternatives.iter().enumerate() {
+                // An alternative that an earlier one takes every match of is
+                // left to the unreachable alternative check.
+                if alternatives[..index].iter().any(|earlier| {
+                    unreachable_alternative::covers(
+                        grammar, facts, rule, earlier, later,
+                    )
+                }) {
+                    continue;
+                }
                 let tie = alternatives[..index].iter().find_map(|earlier| {
                     shared(grammar, facts, rule.greedy, earlier, later)
                         .map(|matched| (earlier, matched))
@@ -110,12 +120,12 @@ mod tests {
     #[test]
     fn finds_alternatives_that_match_the_same_character() {
         assert_eq!(
-            ties("a = ? U+0061..U+007A ? | 'x';"),
+            ties("a = ? U+0061..U+007A ? | ('x' | '1');"),
             [(
                 "these branches can both match 'x', so the parser takes the \
                  one written first"
                     .to_owned(),
-                Span { start: 25, end: 28 },
+                Span { start: 25, end: 36 },
                 Span { start: 4, end: 22 },
             )]
         );
@@ -137,7 +147,7 @@ mod tests {
 
     #[test]
     fn finds_a_fixed_text_written_after_what_matches_it() {
-        let found = ties("a = 'x', {'x'} | 'xx';");
+        let found = ties("a = 'x', {'x'} | ('xx' | 'y');");
         assert_eq!(found.len(), 1);
         assert!(found[0].0.contains("\"xx\""), "{found:?}");
     }
@@ -170,7 +180,7 @@ mod tests {
 
     #[test]
     fn matches_a_rule_that_takes_the_first_match_as_its_parser_does() {
-        let rules = "(* first match *) k = 'i' | 'if'; o = 'if';";
+        let rules = "(* first match *) k = 'i' | 'if'; o = 'if' | 'of';";
         assert_eq!(ties(&format!("s = k | o; {rules}")).len(), 1);
         assert_eq!(ties(&format!("s = k | o; (* greedy *) {rules}")), []);
     }

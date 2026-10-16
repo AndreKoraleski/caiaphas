@@ -160,8 +160,7 @@ const CASES: &[Case] = &[
         code: FindingCode::UnreachableAlternative,
         severity: Severity::Warning,
         message: "an earlier alternative matches wherever this one would, \
-                  so a parser that takes the first match never takes this \
-                  one",
+                  so the parser never takes this one",
         help: "move it before the alternative that matches first, or \
                remove it; if this is intended, write `(* expect \
                unreachable-alternative: reason *)` right before the rule, \

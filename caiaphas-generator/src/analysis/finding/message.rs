@@ -213,8 +213,8 @@ impl fmt::Display for FindingKind {
                 meta_identifier.as_str()
             ),
             Self::UnreachableAlternative => f.write_str(
-                "an earlier alternative matches wherever this one would, so a \
-                 parser that takes the first match never takes this one",
+                "an earlier alternative matches wherever this one would, so \
+                 the parser never takes this one",
             ),
             Self::DuplicateAlternative => f.write_str(
                 "this alternative is written the same way as an earlier one, \

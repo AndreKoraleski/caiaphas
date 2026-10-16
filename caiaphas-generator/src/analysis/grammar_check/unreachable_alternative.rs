@@ -1,13 +1,15 @@
 //! An unreachable alternative comes after one that takes every match it could
-//! have, in a rule that takes the first match, such as the second `'x'` in
-//! `(* first match *) a = 'x' | 'x';`.
+//! have, such as `'if'` in `word = name | 'if';`, so its variant is never
+//! built.
 //!
-//! An earlier alternative does when it matches every text the later one does:
-//! when both are written the same way, when it matches every single character
-//! the later one does, or every one of the few fixed texts. A greedy rule
-//! takes the earlier one wherever it matches at all, so there it also does
-//! when it always matches, when the later one starts with all of it, or when
-//! it is one fixed text that every text of the later one starts with.
+//! An earlier alternative does when it matches every text the later one does,
+//! since the first written of alternatives that tie wins: when it matches
+//! every single character the later one does, or each of its few fixed texts,
+//! and in a rule that takes the first match, when both are written the same
+//! way. A greedy rule that takes the first match takes the earlier one
+//! wherever it matches at all, so there it also does when it always matches,
+//! when the later one starts with all of it, or when it is one fixed text that
+//! every text of the later one starts with.
 
 use crate::{
     analysis::{
@@ -17,19 +19,17 @@ use crate::{
         matcher,
     },
     diagnostic::Label,
-    ir::{Expression, ExpressionKind, Grammar},
+    ir::{Expression, ExpressionKind, Grammar, Rule},
 };
 
-/// Reports every alternative of a rule that takes the first match that comes
-/// after one that matches wherever it would.
+/// Reports every alternative that comes after one that takes every match it
+/// could have.
 pub(super) fn check(
     grammar: &Grammar,
     facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
-    let first_match =
-        grammar.syntax_rules.iter().filter(|rule| rule.first_match);
-    for rule in first_match {
+    for rule in &grammar.syntax_rules {
         rule.expression.visit(&mut |expression| {
             let ExpressionKind::DefinitionsList(alternatives) =
                 &expression.kind
@@ -38,7 +38,7 @@ pub(super) fn check(
             };
             for (index, later) in alternatives.iter().enumerate() {
                 let earlier = alternatives[..index].iter().find(|earlier| {
-                    covers(grammar, facts, rule.greedy, earlier, later)
+                    covers(grammar, facts, rule, earlier, later)
                 });
                 if let Some(earlier) = earlier {
                     findings.push(Finding {
@@ -55,12 +55,11 @@ pub(super) fn check(
     }
 }
 
-/// Returns whether `earlier` takes every match `later` could have, in a rule
-/// that is `greedy` or not.
-fn covers(
+/// Returns whether `earlier` takes every match `later` could have, in `rule`.
+pub(super) fn covers(
     grammar: &Grammar,
     facts: &Facts<'_>,
-    greedy: bool,
+    rule: &Rule,
     earlier: &Expression,
     later: &Expression,
 ) -> bool {
@@ -68,31 +67,36 @@ fn covers(
         facts.single_characters(earlier),
         facts.single_characters(later),
     );
-    let every_text = earlier.is_written_like(later)
-        || matches!(
-            single_characters,
-            (Some(earlier), Some(later)) if later.is_subset(&earlier)
-        )
-        || has_every_text(grammar, earlier, later);
+    // Alternatives written the same way are left to the duplicate alternative
+    // check, outside a rule that takes the first match.
+    if earlier.is_written_like(later) {
+        return rule.first_match;
+    }
+    let every_text = matches!(
+        single_characters,
+        (Some(earlier), Some(later)) if later.is_subset(&earlier)
+    ) || has_every_text(grammar, rule.greedy, earlier, later);
     every_text
-        || greedy
+        || rule.first_match
+            && rule.greedy
             && (facts.always_matches(earlier)
                 || rest_after(earlier, later).is_some()
                 || starts_every_text(grammar, earlier, later))
 }
 
-/// Returns whether `earlier` matches every one of the few fixed texts `later`
-/// can match.
+/// Returns whether `earlier`, written in a rule that is `greedy` or not,
+/// matches all of each of the few fixed texts `later` can match.
 fn has_every_text(
     grammar: &Grammar,
+    greedy: bool,
     earlier: &Expression,
     later: &Expression,
 ) -> bool {
-    let Some(earlier) = matcher::texts(grammar, earlier) else {
-        return false;
-    };
-    matcher::texts(grammar, later)
-        .is_some_and(|texts| texts.iter().all(|text| earlier.contains(text)))
+    matcher::texts(grammar, later).is_some_and(|texts| {
+        texts.iter().all(|text| {
+            matcher::matches_all(grammar, earlier, text, greedy) == Some(true)
+        })
+    })
 }
 
 /// Returns whether `earlier` only ever matches one fixed text that every text
@@ -208,7 +212,19 @@ mod tests {
     }
 
     #[test]
-    fn leaves_rules_that_take_the_longest_match_alone() {
+    fn finds_a_word_that_an_earlier_name_matches_in_any_rule() {
+        let source = "word = name | 'if'; name = letter, {letter}; \
+                      letter = ? U+0061..U+007A ?;";
+        assert_eq!(unreachable(source), [(span(14, 18), span(7, 11))]);
+        assert_eq!(
+            unreachable("a = 'x', {'x'} | 'xx';"),
+            [(span(17, 21), span(4, 14))]
+        );
+    }
+
+    #[test]
+    fn leaves_alternatives_that_match_more_or_are_written_alike() {
         assert_eq!(unreachable("a = ['y'] | 'x' | 'xy';"), []);
+        assert_eq!(unreachable("a = 'x' | 'x';"), []);
     }
 }
