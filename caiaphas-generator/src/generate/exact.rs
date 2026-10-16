@@ -15,7 +15,6 @@ use crate::{
     generate::{
         code,
         matching::{self, FunctionWriter, pattern},
-        name,
     },
     ir::{Expression, ExpressionKind, Rule, RuleId},
 };
@@ -49,21 +48,7 @@ impl ExactWriter<'_> {
         rule: &Rule,
     ) -> TokenStream {
         let (ends, build) = (ends_name(rule_id), build_name(rule_id));
-        let RuleId(position) = rule_id;
-        let number = Literal::usize_unsuffixed(position);
-        let name = name::spaced(rule);
-        let (hidden, inline) = (rule.hidden, rule.inline);
-        let quiet = hidden && self.writer.facts.is_nullable(&rule.expression);
-        let constant = quote! {
-            const RULE: __caiaphas::Rule = __caiaphas::Rule {
-                number: #number,
-                name: #name,
-                hidden: #hidden,
-                quiet: #quiet,
-                inline: #inline,
-                remembers: true,
-            };
-        };
+        let constant = self.writer.rule_constant(rule_id, rule, true);
         let body = self.ends(&rule.expression);
         // A rule whose type its text converts to keeps only the ends whose
         // text the type reads.
@@ -92,7 +77,7 @@ impl ExactWriter<'_> {
                 parser.finish_ends(&RULE, start, ends)
             }
         };
-        if hidden {
+        if rule.hidden {
             return ends_function;
         }
         let building = self.build(&rule.expression);

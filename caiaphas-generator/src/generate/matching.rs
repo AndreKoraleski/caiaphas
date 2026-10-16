@@ -79,6 +79,31 @@ pub(super) struct FunctionWriter<'a> {
 }
 
 impl FunctionWriter<'_> {
+    /// Returns the constant that tells the parser about `rule`, numbered
+    /// `rule_id`, when its function `remembers` its matches or not.
+    pub(super) fn rule_constant(
+        &self,
+        rule_id: RuleId,
+        rule: &Rule,
+        remembers: bool,
+    ) -> TokenStream {
+        let RuleId(position) = rule_id;
+        let number = Literal::usize_unsuffixed(position);
+        let name = name::spaced(rule);
+        let (hidden, inline) = (rule.hidden, rule.inline);
+        let quiet = hidden && self.facts.is_nullable(&rule.expression);
+        quote! {
+            const RULE: __caiaphas::Rule = __caiaphas::Rule {
+                number: #number,
+                name: #name,
+                hidden: #hidden,
+                quiet: #quiet,
+                inline: #inline,
+                remembers: #remembers,
+            };
+        }
+    }
+
     /// Returns the function of `rule`. It remembers the rule's matches when
     /// `remembers` holds.
     fn function(
@@ -88,11 +113,7 @@ impl FunctionWriter<'_> {
         remembers: bool,
     ) -> TokenStream {
         let function = function_name(rule_id);
-        let RuleId(position) = rule_id;
-        let number = Literal::usize_unsuffixed(position);
-        let name = name::spaced(rule);
-        let (hidden, inline) = (rule.hidden, rule.inline);
-        let quiet = hidden && self.facts.is_nullable(&rule.expression);
+        let constant = self.rule_constant(rule_id, rule, remembers);
         let body = self.expression(&rule.expression);
         // A rule whose type its text converts to fails where the type does not
         // read the text.
@@ -117,14 +138,7 @@ impl FunctionWriter<'_> {
                 parser: &mut __caiaphas::Parser<'_, REPORTS>,
                 position: usize,
             ) -> __caiaphas::Match {
-                const RULE: __caiaphas::Rule = __caiaphas::Rule {
-                    number: #number,
-                    name: #name,
-                    hidden: #hidden,
-                    quiet: #quiet,
-                    inline: #inline,
-                    remembers: #remembers,
-                };
+                #constant
                 #recall
                 let start = parser.start_rule(position);
                 let end = #body;
