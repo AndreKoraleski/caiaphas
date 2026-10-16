@@ -552,3 +552,20 @@ fn takes_the_first_match_of_a_rule_wherever_it_is() {
     assert_eq!(f("gabb"), "a");
     assert_eq!(f("sabb"), "a");
 }
+
+caiaphas::grammar!(mod patterns {
+    r#"assignment = name, ? / *= */ ?, (number | text);
+       (* as String *) name = ? /[a-z_][a-z0-9_]*/ ?;
+       (* as u32 *) number = ? /\d+/ ?;
+       (* as String *) text = ? /"([^"\\]|\\.)*"/ ?;"#
+});
+
+#[test]
+fn reads_the_patterns_of_special_sequences() {
+    use patterns::Assignment;
+    let parsed = Assignment::parse("max_size = 42").unwrap();
+    assert_eq!(parsed.name, "max_size");
+    let parsed = Assignment::parse(r#"greeting="say \"hi\"""#).unwrap();
+    assert_eq!(parsed.text.as_deref(), Some(r#""say \"hi\"""#));
+    assert!(Assignment::parse("9lives = 1").is_err());
+}

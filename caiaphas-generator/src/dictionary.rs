@@ -3,6 +3,7 @@
 
 mod inline_rules;
 mod lower;
+mod pattern;
 mod start_rules;
 mod syntactic_exception;
 

@@ -164,7 +164,11 @@ impl Lowering<'_, '_> {
                 ExpressionKind::TerminalString(string.as_str().to_owned())
             }
             SyntacticPrimaryKind::SpecialSequence(sequence) => {
-                ExpressionKind::SpecialSequence(sequence.range().clone())
+                super::pattern::expression(
+                    sequence.pattern(),
+                    syntactic_primary.span,
+                )
+                .kind
             }
             SyntacticPrimaryKind::EmptySequence => {
                 ExpressionKind::EmptySequence

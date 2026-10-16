@@ -11,7 +11,7 @@ use std::{error::Error, fmt};
 use bracketed_textual_comment::ParseBracketedTextualCommentError;
 pub(crate) use commentless_symbol::ParseCommentlessSymbolError;
 pub(crate) use commentless_symbol::{
-    CommentlessSymbol, Integer, MetaIdentifier, SpecialSequence,
+    CommentlessSymbol, Integer, MetaIdentifier, Pattern, SpecialSequence,
     TerminalString,
 };
 pub(crate) use terminal_character::Symbol;

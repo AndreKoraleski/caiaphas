@@ -3,43 +3,56 @@
 //! The standard leaves the meaning of a special sequence to each
 //! implementation.
 //!
-//! Here it holds one code point, such as `? U+00E9 ?`, or an inclusive range
-//! of them, such as `? U+0041..U+005A ?`.
+//! Here it holds one code point, such as `? U+00E9 ?`, an inclusive range of
+//! them, such as `? U+0041..U+005A ?`, or a [`Pattern`] between two `/`, such
+//! as `? /[a-z]+/ ?`. Anything else, such as a description in words, is not
+//! read.
+
+mod pattern;
 
 use std::{error::Error, fmt, ops::RangeInclusive};
+
+pub(crate) use pattern::Pattern;
 
 use crate::lexer::{
     gap_separator,
     terminal_character::{Symbol, TerminalCharacter},
 };
 
-/// A special sequence stands for any one character in its range.
-///
-/// A single code point is a range from that code point to itself.
+/// A special sequence stands for what its pattern matches.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SpecialSequence(RangeInclusive<char>);
+pub(crate) struct SpecialSequence(Pattern);
 
 impl SpecialSequence {
     /// Returns the special sequence at the start of `input`, and how long it
     /// is, `?` included.
     ///
     /// Gaps between the `?` are removed before the code points are read, so
-    /// `? U+0041 .. U+005A ?` is the same as `?U+0041..U+005A?`.
+    /// `? U+0041 .. U+005A ?` is the same as `?U+0041..U+005A?`. In a pattern,
+    /// only the gaps around the `/` are.
     pub(crate) fn read(
         input: &str,
     ) -> Result<(Self, usize), ParseSpecialSequenceError> {
         let length = length(input)?;
+        let raw = input[1..length - 1].trim_matches(gap_separator::is_gap);
+        if let Some(text) = raw
+            .strip_prefix('/')
+            .and_then(|rest| rest.strip_suffix('/'))
+        {
+            let pattern = pattern::parse(text)
+                .map_err(ParseSpecialSequenceError::InvalidPattern)?;
+            return Ok((Self(pattern), length));
+        }
         // Between the `?`, every character that is not part of a gap is a
         // graphic ASCII character.
-        let content: String = input[1..length - 1]
-            .chars()
-            .filter(char::is_ascii_graphic)
-            .collect();
-        Ok((Self(parse_range(&content)?), length))
+        let content: String =
+            raw.chars().filter(char::is_ascii_graphic).collect();
+        let range = parse_range(&content)?;
+        Ok((Self(Pattern::Characters(vec![range])), length))
     }
 
-    /// Returns the characters it stands for.
-    pub(crate) fn range(&self) -> &RangeInclusive<char> {
+    /// Returns what it matches.
+    pub(crate) fn pattern(&self) -> &Pattern {
         &self.0
     }
 }
@@ -113,6 +126,8 @@ pub(crate) enum ParseSpecialSequenceError {
     NotAScalarValue(u32),
     /// A range starts after it ends.
     ReversedRange(char, char),
+    /// What is between the `/` is not a pattern, for this reason.
+    InvalidPattern(&'static str),
 }
 
 impl fmt::Display for ParseSpecialSequenceError {
@@ -129,9 +144,12 @@ impl fmt::Display for ParseSpecialSequenceError {
                 "{c:?} is not a valid character in a special sequence"
             ),
             Self::Unsupported => f.write_str(
-                "special sequence must hold a code point such as \
-                 U+00E9 or a range such as U+0041..U+005A",
+                "special sequence must hold a code point such as U+00E9, a \
+                 range such as U+0041..U+005A or a pattern such as /[a-z]+/",
             ),
+            Self::InvalidPattern(reason) => {
+                write!(f, "invalid pattern in a special sequence: {reason}")
+            }
             Self::NotAScalarValue(value) => {
                 write!(f, "U+{value:04X} is not a Unicode scalar value")
             }
@@ -154,8 +172,12 @@ mod tests {
     fn read(
         input: &str,
     ) -> Result<(RangeInclusive<char>, usize), ParseSpecialSequenceError> {
-        SpecialSequence::read(input)
-            .map(|(sequence, length)| (sequence.range().clone(), length))
+        SpecialSequence::read(input).map(|(sequence, length)| {
+            let Pattern::Characters(ranges) = sequence.pattern() else {
+                panic!("a code point or range is one set of characters");
+            };
+            (ranges[0].clone(), length)
+        })
     }
 
     #[test]
@@ -299,6 +321,23 @@ mod tests {
     }
 
     #[test]
+    fn reads_a_pattern_between_slashes() {
+        let (sequence, length) = SpecialSequence::read("? /[ab]+/ ?").unwrap();
+        assert_eq!(length, 11);
+        assert!(matches!(sequence.pattern(), Pattern::Repeat { .. }));
+        assert_eq!(
+            SpecialSequence::read("?/[a/"),
+            Err(ParseSpecialSequenceError::NoClosingSymbol)
+        );
+        assert_eq!(
+            SpecialSequence::read("?/[a/?"),
+            Err(ParseSpecialSequenceError::InvalidPattern(
+                "a class needs a `]`"
+            ))
+        );
+    }
+
+    #[test]
     fn rejects_reversed_ranges() {
         assert_eq!(
             read("?U+005A..U+0041?"),
@@ -323,8 +362,8 @@ mod tests {
             ),
             (
                 ParseSpecialSequenceError::Unsupported,
-                "special sequence must hold a code point such as U+00E9 \
-                 or a range such as U+0041..U+005A",
+                "special sequence must hold a code point such as U+00E9, a \
+                 range such as U+0041..U+005A or a pattern such as /[a-z]+/",
             ),
             (
                 ParseSpecialSequenceError::NotAScalarValue(0xD800),

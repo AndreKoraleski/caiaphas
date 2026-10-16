@@ -11,7 +11,7 @@ pub(crate) use integer::Integer;
 use integer::ParseIntegerError;
 pub(crate) use meta_identifier::MetaIdentifier;
 use special_sequence::ParseSpecialSequenceError;
-pub(crate) use special_sequence::SpecialSequence;
+pub(crate) use special_sequence::{Pattern, SpecialSequence};
 use terminal_string::ParseTerminalStringError;
 pub(crate) use terminal_string::TerminalString;
 
@@ -244,11 +244,14 @@ mod tests {
     fn reads_special_sequences_with_their_gaps() {
         let (symbol, length) = read("? U+0041 .. U+005A ? | x").unwrap();
         assert_eq!(length, 20);
-        assert!(matches!(
-            symbol,
-            CommentlessSymbol::SpecialSequence(sequence)
-                if *sequence.range() == ('A'..='Z')
-        ));
+        let CommentlessSymbol::SpecialSequence(sequence) = symbol else {
+            panic!("a special sequence");
+        };
+        let Pattern::Characters(ranges) = sequence.pattern() else {
+            panic!("a range");
+        };
+        assert_eq!(ranges.first(), Some(&('A'..='Z')));
+        assert_eq!(ranges.len(), 1);
     }
 
     #[test]

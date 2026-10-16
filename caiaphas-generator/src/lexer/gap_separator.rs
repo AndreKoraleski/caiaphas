@@ -21,6 +21,11 @@ pub(crate) fn length(input: &str) -> usize {
     }
 }
 
+/// Returns whether `c` can be part of a gap.
+pub(crate) fn is_gap(c: char) -> bool {
+    matches!(c, ' ' | '\t' | '\x0B' | '\x0C' | '\r' | '\n')
+}
+
 /// Returns the characters at the start of `input` that `accept` takes, with
 /// the gaps between them removed, and how long they are, those gaps included.
 ///

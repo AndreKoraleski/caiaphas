@@ -287,14 +287,7 @@ pub(crate) mod tests {
                 return;
             }
             SyntacticPrimaryKind::SpecialSequence(sequence) => {
-                let range = sequence.range();
-                write!(
-                    text,
-                    "? U+{:04X}..U+{:04X} ?",
-                    u32::from(*range.start()),
-                    u32::from(*range.end())
-                )
-                .unwrap();
+                write!(text, "? {:?} ?", sequence.pattern()).unwrap();
                 return;
             }
             SyntacticPrimaryKind::EmptySequence => return,
@@ -355,7 +348,7 @@ pub(crate) mod tests {
     fn parses_special_sequences_and_terminal_strings() {
         assert_eq!(
             render(&parse_valid("a = ? U+0041 ?, \"b\";")),
-            "a = ? U+0041..U+0041 ?, 'b';"
+            "a = ? Characters(['A'..='A']) ?, 'b';"
         );
     }
 
