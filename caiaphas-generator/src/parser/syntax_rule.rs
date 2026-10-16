@@ -17,8 +17,8 @@ pub(crate) struct SyntaxRule {
     pub(crate) definitions_list: DefinitionsList,
     /// The findings the comments right before the rule mark as intended.
     pub(crate) expectations: Vec<Expectation>,
-    /// Whether a hide right before the rule leaves it out of the generated
-    /// types.
+    /// Whether a `(* hide *)` right before the rule leaves it out of the
+    /// generated types.
     pub(crate) hidden: bool,
     /// Whether a `(* first match *)` comes right before the rule.
     pub(crate) first_match: bool,

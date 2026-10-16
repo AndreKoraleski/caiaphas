@@ -120,8 +120,7 @@ impl ExactWriter<'_> {
     }
 
     /// Returns the code that adds the nodes of `steps`, matched one after
-    /// another from `position` to `end`. Each step takes the first end it
-    /// prefers that the steps after it can go on from to `end`.
+    /// another from `position` to `end`.
     fn build_steps(&self, steps: &[Expression]) -> TokenStream {
         let Some(last) =
             steps.iter().rposition(|step| self.builds_nodes(step))

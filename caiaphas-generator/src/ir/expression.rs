@@ -46,8 +46,8 @@ pub(crate) enum ExpressionKind {
 }
 
 impl Expression {
-    /// Returns the expressions the expression matches one after another, which
-    /// is the expression alone unless it is a single definition.
+    /// Returns the expressions this one matches one after another: the steps
+    /// of a single definition, or the expression alone.
     pub(crate) fn steps(&self) -> &[Self] {
         match &self.kind {
             ExpressionKind::SingleDefinition(steps) => steps,

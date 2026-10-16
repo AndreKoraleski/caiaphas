@@ -30,8 +30,7 @@ pub(crate) enum Shape {
 pub(crate) struct Field {
     pub(crate) rule: RuleId,
     pub(crate) count: Count,
-    /// Whether the field holds its type in a box, since that type could
-    /// contain this one.
+    /// Whether the field holds its type in a box.
     pub(crate) boxed: bool,
 }
 
@@ -52,8 +51,7 @@ const MANY: u8 = 16;
 /// A variant of an enum, for one alternative of its rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Variant {
-    /// Holds the type of another rule, in a box when that type could contain
-    /// this one.
+    /// Holds the type of another rule, in a box when `boxed` holds.
     Rule { rule: RuleId, boxed: bool },
     /// Stands for a terminal string that is a word.
     Word(String),

@@ -13,7 +13,8 @@ use crate::{
     ir::{Grammar, RuleId},
 };
 
-/// Returns the type of the rule `rule`, either as is or in a box.
+/// Returns the type a field or variant holds for the rule `rule`: its
+/// conversion, or its own type as is or in a box.
 fn held_type(names: &Names, RuleId(rule): RuleId, boxed: bool) -> TokenStream {
     if let Some(value) = &names.values[rule] {
         return value.clone();

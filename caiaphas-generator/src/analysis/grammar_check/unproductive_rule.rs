@@ -1,5 +1,5 @@
-//! An unproductive rule can never finish matching, such as `a = 'x', a;`,
-//! which needs another `a` after every `x`.
+//! An unproductive rule can never finish matching, such as `a = 'x', a;`. It
+//! needs another `a` after every `x`.
 //!
 //! Grammar theory calls these non-generating or unproductive symbols. Every
 //! rule that needs one in every alternative is unproductive too, but only the

@@ -35,7 +35,7 @@ pub(crate) struct Rule {
     pub(crate) expression: Expression,
     /// The findings the rule marks as intended.
     pub(crate) expectations: Vec<Expectation>,
-    /// Whether a hide leaves the rule out of the generated types.
+    /// Whether a `(* hide *)` leaves the rule out of the generated types.
     pub(crate) hidden: bool,
     /// Whether a `(* first match *)` right before the rule makes it take the
     /// first match.

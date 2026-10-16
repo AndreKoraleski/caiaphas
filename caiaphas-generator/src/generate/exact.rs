@@ -33,7 +33,8 @@ pub(crate) fn build_name(RuleId(position): RuleId) -> Ident {
 
 /// Writes the functions of one rule that tries every way through it.
 pub(super) struct ExactWriter<'a> {
-    /// Writes the code of what only ever matches one character.
+    /// Writes the code of what only ever matches one character, and holds the
+    /// facts and first match of the rule.
     pub(super) writer: FunctionWriter<'a>,
     /// Which rules try every way through them.
     pub(super) general: &'a [bool],

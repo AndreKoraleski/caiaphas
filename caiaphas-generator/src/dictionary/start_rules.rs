@@ -7,8 +7,8 @@ use crate::{
 };
 
 /// Returns every rule that no other rule references, and reports a grammar
-/// without one and a start rule that is hidden. `rules` are the rules of
-/// `syntax`.
+/// without one and every start rule that is hidden or converted. `rules` are
+/// the rules of `syntax`.
 ///
 /// A rule that only references itself is still a start rule.
 pub(super) fn start_rules(

@@ -23,8 +23,9 @@ use crate::{
 /// where those that `general` marks try every way through them.
 ///
 /// Every other rule that one of those reads remembers its matches, since it is
-/// read once to tell where it ends and again to build its node. One of those
-/// that a greedy rule reads also gets a function that takes one way.
+/// read once to tell where it ends and again to build its node. A rule that
+/// tries every way also gets a function that takes one way when a greedy rule
+/// reads it.
 pub(crate) fn functions(facts: &Facts<'_>, general: &[bool]) -> TokenStream {
     let grammar: &Grammar = facts.grammar();
     let mut remembers = revisited_rules(facts);
@@ -354,9 +355,9 @@ impl FunctionWriter<'_> {
         })
     }
 
-    /// Returns the code of `expression` as a branch a parser can take or not,
-    /// which a parse that only matches skips when the next character is none
-    /// of those the branch can start with.
+    /// Returns the code of `expression` as a branch a parser can take or not.
+    /// A parse that only matches skips it when the next character is none of
+    /// those the branch can start with.
     ///
     /// A branch that can match nothing can start anywhere, and a terminal
     /// string or special sequence already fails on its first character, so

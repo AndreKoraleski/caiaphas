@@ -148,14 +148,14 @@ pub(crate) enum DictionaryErrorKind {
     /// A syntactic exception uses a meta identifier whose rule is recursive or
     /// references a recursive rule.
     RecursiveSyntacticException { meta_identifier: MetaIdentifier },
-    /// A hide comes right before a start rule, whose parser has to return its
-    /// type.
+    /// A `(* hide *)` comes right before a start rule. Its parser has to
+    /// return its type.
     HiddenStartSyntaxRule { meta_identifier: MetaIdentifier },
-    /// A conversion comes right before a start rule, whose parser has to be a
+    /// An `(* as T *)` comes right before a start rule. Its parser has to be a
     /// method of its own type.
     ConvertedStartSyntaxRule { meta_identifier: MetaIdentifier },
-    /// An inline comes right before a start rule, whose parser has to return
-    /// its type.
+    /// An `(* inline *)` comes right before a start rule. Its parser has to
+    /// return its type.
     InlineStartSyntaxRule { meta_identifier: MetaIdentifier },
     /// An inline rule holds itself through inline rules alone.
     RecursiveInlineSyntaxRule { meta_identifier: MetaIdentifier },

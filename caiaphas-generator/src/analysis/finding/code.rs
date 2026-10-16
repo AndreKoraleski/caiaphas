@@ -116,7 +116,7 @@ impl FindingCode {
     }
 
     /// Returns whether an expectation can mark a finding with this code as
-    /// intended. Only warnings about the grammar itself can be.
+    /// intended. Errors and findings about expectations cannot be.
     pub(crate) fn is_expectable(self) -> bool {
         self.severity() != Severity::Error
             && self != Self::UnfulfilledExpectation

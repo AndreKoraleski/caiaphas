@@ -18,7 +18,7 @@ use crate::{
     ir::{Grammar, Rule, RuleId},
 };
 
-/// The type and field names of every rule.
+/// What writing the type of every rule needs to know.
 struct Names {
     types: Vec<Ident>,
     fields: Vec<Ident>,
@@ -30,9 +30,10 @@ struct Names {
     textual: Vec<bool>,
 }
 
-/// Returns the items of the module that parses `grammar`, whose source is
-/// `source`, with a type for each rule that has a shape in `shapes`. The
-/// parser matches `matched`: `grammar` or the same rules rearranged.
+/// Returns the items of the module that parses `grammar`, with a type for each
+/// rule that has a shape in `shapes`. The parser matches `matched`: `grammar`
+/// or the same rules rearranged. Each type's docs quote its rule from
+/// `source`.
 pub(crate) fn module(
     grammar: &Grammar,
     matched: &Grammar,
