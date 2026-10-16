@@ -14,7 +14,7 @@ use rustc_hash::FxHashMap;
 
 use crate::{
     error::{Error, Expected},
-    span::Span,
+    span::{Input, Span},
 };
 
 /// The rules of a grammar, indexed by the numbers that refer to them.
@@ -67,7 +67,7 @@ pub fn parse(
     let mut parser = Parser::new(grammar, input, true);
     match parser.rule(rule, 0) {
         Some((end, node)) if end == input.len() => Ok(Tree {
-            input: Arc::from(input),
+            input: Arc::new(Input::new(input)),
             nodes: parser.nodes,
             root: node.expect("a start rule is never hidden"),
         }),
@@ -82,7 +82,7 @@ pub fn parse(
 /// The rules an input matched, each with the rules it matched inside it.
 #[derive(Debug)]
 pub struct Tree {
-    input: Arc<str>,
+    input: Arc<Input>,
     nodes: Vec<NodeData>,
     root: usize,
 }
@@ -128,7 +128,7 @@ impl<'t> Node<'t> {
 
     pub fn text(&self) -> &'t str {
         let data = self.data();
-        &self.tree.input[data.start..data.end]
+        &self.tree.input.as_str()[data.start..data.end]
     }
 
     /// Returns the nodes of the rules matched inside this one, in order.
