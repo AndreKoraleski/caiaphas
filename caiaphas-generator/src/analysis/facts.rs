@@ -134,6 +134,12 @@ impl<'a> Facts<'a> {
         );
     }
 
+    /// Returns what can come right after the rule `rule_id`.
+    pub(crate) fn follow(&self, rule_id: RuleId) -> &Follow {
+        let RuleId(position) = rule_id;
+        &self.follow_rules()[position]
+    }
+
     /// Returns the grammar the facts are about.
     pub(crate) fn grammar(&self) -> &'a Grammar {
         self.grammar

@@ -66,10 +66,13 @@ pub(crate) fn choice_points(facts: &Facts<'_>) -> Vec<ChoicePoint> {
     choice_points
 }
 
-/// Returns which rules of the grammar `facts` answers about a parser can try
-/// more than once at the same place. Those are the rules that the branches of
-/// a choice point reach when two of them can start with the same character,
-/// and only they have to remember their matches.
+/// Returns which rules a parser can try more than once at the same place, in
+/// the grammar `facts` answers about. Only those have to remember their
+/// matches.
+///
+/// They are the rules inside a choice point whose branches can start alike,
+/// each rule that can match nothing and then be tried again right away, as
+/// `b` can in `a = b, b;`, and every rule those reach.
 pub(crate) fn revisited_rules(facts: &Facts<'_>) -> Vec<bool> {
     let mut starts = Vec::new();
     visit_choice_points(facts, &mut |expression, choice_point| {
@@ -79,6 +82,16 @@ pub(crate) fn revisited_rules(facts: &Facts<'_>) -> Vec<bool> {
             });
         }
     });
+    for (position, rule) in facts.grammar().syntax_rules.iter().enumerate() {
+        let rule_id = RuleId(position);
+        if facts.is_nullable(&rule.expression) {
+            let first = facts.first(&rule.expression);
+            let after = &facts.follow(rule_id).characters;
+            if first.is_empty() || !first.intersection(after).is_empty() {
+                starts.push(rule_id);
+            }
+        }
+    }
     facts.grammar().reached_from(starts)
 }
 
@@ -201,6 +214,23 @@ mod tests {
     fn finds_rules_a_sequence_and_what_follows_it_both_reach() {
         assert_eq!(revisited("s = [a, 'x'], a, 'y'; a = 'z';"), [false, true]);
         assert_eq!(revisited("s = [a, 'x'], 'y'; a = 'z';"), [false, false]);
+        assert_eq!(revisited("s = {a, 'x'}, a, 'y'; a = 'z';"), [false, true]);
+    }
+
+    #[test]
+    fn finds_rules_two_alternatives_of_a_first_match_reach() {
+        assert_eq!(
+            revisited("(* first match *) s = a, 'x' | a, 'y'; a = 'z';"),
+            [false, true]
+        );
+    }
+
+    #[test]
+    fn finds_rules_tried_again_where_they_matched_nothing() {
+        assert_eq!(
+            revisited("s = a, 'q'; a = b, b; b = c, c; c = 'x' | ;"),
+            [false, false, true, true]
+        );
     }
 
     #[test]
