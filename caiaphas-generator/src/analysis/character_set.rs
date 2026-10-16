@@ -74,8 +74,8 @@ impl CharacterSet {
 
     /// Returns whether every character of this set is in `other`.
     ///
-    /// The ranges of `other` never touch, so each range of this set has to
-    /// fit inside one of them.
+    /// The ranges of `other` never touch, so each range of this set has to fit
+    /// inside one of them.
     pub(crate) fn is_subset(&self, other: &Self) -> bool {
         let mut position = 0;
         self.ranges.iter().all(|range| {
@@ -97,11 +97,15 @@ impl CharacterSet {
         let mut ranges = Vec::new();
         for range in &self.ranges {
             let mut start = Some(*range.start());
-            for cut in &other.ranges {
+            let cuts = other
+                .ranges
+                .iter()
+                .take_while(|cut| cut.start() <= range.end());
+            for cut in cuts {
                 let Some(from) = start else {
                     break;
                 };
-                if cut.end() < &from || cut.start() > range.end() {
+                if cut.end() < &from {
                     continue;
                 }
                 if let Some(before) =

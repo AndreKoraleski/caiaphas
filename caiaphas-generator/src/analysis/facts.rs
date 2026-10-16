@@ -20,8 +20,7 @@ pub(crate) struct Facts<'a> {
     first: OnceCell<Vec<CharacterSet>>,
     /// What can come right after each rule.
     follow: OnceCell<Vec<Follow>>,
-    /// The characters each rule matches, when it only ever matches one
-    /// character.
+    /// The single characters of each rule.
     single_characters: OnceCell<Vec<Option<CharacterSet>>>,
 }
 
@@ -55,6 +54,10 @@ impl<'a> Facts<'a> {
     }
 
     /// Returns the characters `expression` can start with.
+    ///
+    /// A syntactic term starts with what its factor starts with, and leaves
+    /// out what its exception matches only when both only ever match one
+    /// character.
     pub(crate) fn first(&self, expression: &Expression) -> CharacterSet {
         first(
             expression,
@@ -157,8 +160,8 @@ impl<'a> Facts<'a> {
                 syntactic_exception,
             } => {
                 self.walk_expression(syntactic_factor, after, visit);
-                // The exception only reads what its factor matched, so it ends
-                // where that does, as if the input ended there.
+                // The exception only reads what its factor matched, so the
+                // input it reads could end right after it.
                 let exception_after = Follow {
                     characters: after.characters.clone(),
                     end_of_input: true,
@@ -265,9 +268,12 @@ impl<'a> Facts<'a> {
     fn single_character_rules(&self) -> &[Option<CharacterSet>] {
         self.single_characters.get_or_init(|| {
             let rules = &self.grammar.syntax_rules;
-            let mut states = vec![Characters::Unvisited; rules.len()];
+            let mut states =
+                vec![SingleCharacterSearch::Unvisited; rules.len()];
             (0..rules.len())
-                .map(|position| rule_characters(rules, &mut states, position))
+                .map(|position| {
+                    rule_single_characters(rules, &mut states, position)
+                })
                 .collect()
         })
     }
@@ -313,8 +319,7 @@ impl<'a> Facts<'a> {
 pub(crate) struct Follow {
     pub(crate) characters: CharacterSet,
     /// Whether the input can end right after it, since a parser reads the
-    /// whole input from a start rule. The end of what an exception reads
-    /// counts too, since the exception only reads what its factor matched.
+    /// whole input from a start rule.
     pub(crate) end_of_input: bool,
 }
 
@@ -407,15 +412,9 @@ fn first(
             ..
         } => first(expression),
         ExpressionKind::SyntacticTerm {
-            syntactic_factor,
-            syntactic_exception,
-        } => match (
-            single_characters(syntactic_factor, characters),
-            single_characters(syntactic_exception, characters),
-        ) {
-            (Some(factor), Some(exception)) => factor.difference(&exception),
-            _ => first(syntactic_factor),
-        },
+            syntactic_factor, ..
+        } => single_characters(expression, characters)
+            .unwrap_or_else(|| first(syntactic_factor)),
         ExpressionKind::MetaIdentifier(RuleId(position)) => {
             rules[*position].clone()
         }
@@ -430,40 +429,41 @@ fn first(
     }
 }
 
-/// What is known so far about the characters a rule matches.
+/// What is known so far about the single characters of a rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Characters {
+enum SingleCharacterSearch {
     Unvisited,
     /// Being worked out, so reaching it again means recursion.
     Visiting,
     Known(Option<CharacterSet>),
 }
 
-/// Returns the characters the rule at `position` matches when it only ever
-/// matches one character, working out the rules it references first.
+/// Returns the single characters of the rule at `position`, working out those
+/// of the rules it references first.
 ///
-/// A recursive rule gets no answer.
-fn rule_characters(
+/// A recursive rule gets no answer, and neither does any rule that references
+/// one.
+fn rule_single_characters(
     rules: &[Rule],
-    states: &mut [Characters],
+    states: &mut [SingleCharacterSearch],
     position: usize,
 ) -> Option<CharacterSet> {
     match &states[position] {
-        Characters::Known(characters) => return characters.clone(),
-        Characters::Visiting => return None,
-        Characters::Unvisited => {}
+        SingleCharacterSearch::Known(characters) => return characters.clone(),
+        SingleCharacterSearch::Visiting => return None,
+        SingleCharacterSearch::Unvisited => {}
     }
-    states[position] = Characters::Visiting;
+    states[position] = SingleCharacterSearch::Visiting;
     let characters = single_characters_with(
         &rules[position].expression,
-        &mut |RuleId(target)| rule_characters(rules, states, target),
+        &mut |RuleId(target)| rule_single_characters(rules, states, target),
     );
-    states[position] = Characters::Known(characters.clone());
+    states[position] = SingleCharacterSearch::Known(characters.clone());
     characters
 }
 
-/// Returns the characters `expression` matches when it only ever matches one
-/// character, given the same for each rule in `characters`.
+/// Returns the single characters of `expression`, given those of each rule in
+/// `characters`.
 fn single_characters(
     expression: &Expression,
     characters: &[Option<CharacterSet>],

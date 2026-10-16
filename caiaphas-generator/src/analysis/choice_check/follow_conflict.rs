@@ -4,31 +4,33 @@
 //! could belong to either `if`.
 //!
 //! LL(1) parsing calls this a FIRST/FOLLOW conflict. A parser that sees one of
-//! those characters cannot tell whether to take the sequence, or whether to
-//! repeat it again, so it has to pick one, usually the sequence.
+//! those characters cannot tell from it alone whether to take the sequence, or
+//! whether to repeat it again, so it takes the sequence whenever it matches.
 //!
-//! When the sequence only ever matches one character, every character that can
-//! come after it is one of those, and the input cannot end there, a parser
-//! that picks the sequence takes them all. Skipping an optional sequence then
-//! never leads to a match, and nothing after a repeated sequence ever matches,
-//! as in `s = {'x'}, 'x';`. That is reported instead of the conflict.
+//! When the sequence only ever matches one character, it can take every
+//! character that can come after it, and the input cannot end there, the
+//! finding is a required optional sequence or a dead-end repeated sequence
+//! instead, as in `s = {'x'}, 'x';`.
 
 use crate::analysis::{
-    choice_point::{ChoiceKind, ChoicePoint},
+    choice_point::{ChoicePoint, ChoicePointKind},
     finding::{Finding, FindingKind},
 };
 
 /// Reports every optional or repeated sequence that can start with what can
-/// come right after it. A sequence that can match nothing is left to the empty
-/// branches check.
+/// come right after it. A sequence that can match nothing is left to the
+/// nullable branches check.
 pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
+    if choice_point.kind == ChoicePointKind::DefinitionsList {
+        return;
+    }
     let [sequence, end] = choice_point.branches.as_slice() else {
         return;
     };
     if sequence.nullable {
         return;
     }
-    let characters = sequence.first.intersection(&end.first);
+    let characters = sequence.lookahead.intersection(&end.lookahead);
     if characters.is_empty() {
         return;
     }
@@ -36,21 +38,21 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
         && sequence
             .single_characters
             .as_ref()
-            .is_some_and(|taken| end.first.is_subset(taken));
+            .is_some_and(|taken| end.lookahead.is_subset(taken));
     let kind = match (choice_point.kind, takes_everything_after) {
-        (ChoiceKind::OptionalSequence, false) => {
+        (ChoicePointKind::OptionalSequence, false) => {
             FindingKind::OptionalFollowConflict { characters }
         }
-        (ChoiceKind::OptionalSequence, true) => {
+        (ChoicePointKind::OptionalSequence, true) => {
             FindingKind::RequiredOptionalSequence
         }
-        (ChoiceKind::RepeatedSequence, false) => {
+        (ChoicePointKind::RepeatedSequence, false) => {
             FindingKind::RepeatedFollowConflict { characters }
         }
-        (ChoiceKind::RepeatedSequence, true) => {
+        (ChoicePointKind::RepeatedSequence, true) => {
             FindingKind::DeadEndRepeatedSequence
         }
-        (ChoiceKind::DefinitionsList, _) => return,
+        (ChoicePointKind::DefinitionsList, _) => return,
     };
     findings.push(Finding {
         kind,

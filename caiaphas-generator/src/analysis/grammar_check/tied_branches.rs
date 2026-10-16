@@ -90,7 +90,11 @@ mod tests {
         findings_with(source, FindingCode::TiedBranches)
             .into_iter()
             .map(|finding| {
-                (finding.to_string(), finding.span, finding.labels[0].span)
+                (
+                    finding.kind.to_string(),
+                    finding.span,
+                    finding.labels[0].span,
+                )
             })
             .collect()
     }

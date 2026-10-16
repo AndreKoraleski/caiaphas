@@ -22,15 +22,15 @@ pub(super) fn check(
     facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
-    let first: Vec<Vec<(RuleId, Span)>> = grammar
+    let first_meta_identifiers: Vec<Vec<(RuleId, Span)>> = grammar
         .syntax_rules
         .iter()
         .map(|rule| facts.first_meta_identifiers(&rule.expression))
         .collect();
     for (position, rule) in grammar.syntax_rules.iter().enumerate() {
-        for &(target, span) in &first[position] {
+        for &(target, span) in &first_meta_identifiers[position] {
             if target != RuleId(position)
-                && reaches(&first, target, RuleId(position))
+                && reaches(&first_meta_identifiers, target, RuleId(position))
             {
                 let RuleId(through) = target;
                 findings.push(Finding {
@@ -52,9 +52,13 @@ pub(super) fn check(
 }
 
 /// Returns whether `to` can be read before any character, starting from `from`
-/// and following what each rule can read first.
-fn reaches(first: &[Vec<(RuleId, Span)>], from: RuleId, to: RuleId) -> bool {
-    let mut visited = vec![false; first.len()];
+/// and following the meta identifiers each rule can read first.
+fn reaches(
+    first_meta_identifiers: &[Vec<(RuleId, Span)>],
+    from: RuleId,
+    to: RuleId,
+) -> bool {
+    let mut visited = vec![false; first_meta_identifiers.len()];
     let mut pending = vec![from];
     while let Some(RuleId(position)) = pending.pop() {
         if RuleId(position) == to {
@@ -62,7 +66,11 @@ fn reaches(first: &[Vec<(RuleId, Span)>], from: RuleId, to: RuleId) -> bool {
         }
         if !visited[position] {
             visited[position] = true;
-            pending.extend(first[position].iter().map(|&(target, _)| target));
+            pending.extend(
+                first_meta_identifiers[position]
+                    .iter()
+                    .map(|&(target, _)| target),
+            );
         }
     }
     false

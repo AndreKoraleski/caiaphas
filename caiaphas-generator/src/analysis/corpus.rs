@@ -15,7 +15,7 @@ fn summary(source: &str) -> Vec<String> {
                 .iter()
                 .map(|label| text(label.span))
                 .collect();
-            format!("{}: {finding} {labels:?}", text(finding.span))
+            format!("{}: {} {labels:?}", text(finding.span), finding.kind)
         })
         .collect()
 }

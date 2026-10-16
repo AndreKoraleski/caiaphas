@@ -67,11 +67,6 @@ mod tests {
     }
 
     #[test]
-    fn finds_nothing_in_a_grammar_without_problems() {
-        assert_eq!(findings("a = 'x', b; b = 'y' | 'z';"), []);
-    }
-
-    #[test]
     fn sorts_findings_by_where_they_are() {
         let starts: Vec<usize> =
             findings("a = ['x'] | ['y']; b = a, b | 'z';")

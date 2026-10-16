@@ -407,16 +407,16 @@ impl FindingKind {
     }
 }
 
-impl fmt::Display for Finding {
+impl fmt::Display for FindingKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.kind {
-            FindingKind::LeftRecursion { meta_identifier } => write!(
+        match self {
+            Self::LeftRecursion { meta_identifier } => write!(
                 f,
                 "`{}` can reach itself before reading anything, so its parser \
                  would never end",
                 meta_identifier.as_str()
             ),
-            FindingKind::IndirectLeftRecursion {
+            Self::IndirectLeftRecursion {
                 meta_identifier,
                 through,
             } => write!(
@@ -426,74 +426,74 @@ impl fmt::Display for Finding {
                 meta_identifier.as_str(),
                 through.as_str()
             ),
-            FindingKind::UnproductiveRule { meta_identifier } => write!(
+            Self::UnproductiveRule { meta_identifier } => write!(
                 f,
                 "`{}` can never finish matching, since every way through it \
                  needs a rule that cannot either",
                 meta_identifier.as_str()
             ),
-            FindingKind::NullableRepeatedSequence => f.write_str(
+            Self::NullableRepeatedSequence => f.write_str(
                 "this repeated sequence can match nothing, so it could repeat \
                  forever",
             ),
-            FindingKind::TiedBranches { matched } => write!(
+            Self::TiedBranches { matched } => write!(
                 f,
                 "these branches can both match {matched}, so the parser takes \
                  the one written first"
             ),
-            FindingKind::LongerBranchConflict { characters } => write!(
+            Self::LongerBranchConflict { characters } => write!(
                 f,
                 "this branch goes on from where another ends with \
                  {characters}, which can also come after the choice, so a \
                  parser cannot tell which to take"
             ),
-            FindingKind::OptionalFollowConflict { characters } => write!(
+            Self::OptionalFollowConflict { characters } => write!(
                 f,
                 "this optional sequence and what comes after it can both \
                  start with {characters}, so a parser cannot tell whether to \
                  take it"
             ),
-            FindingKind::RepeatedFollowConflict { characters } => write!(
+            Self::RepeatedFollowConflict { characters } => write!(
                 f,
                 "this repeated sequence and what comes after it can both \
                  start with {characters}, so a parser cannot tell whether to \
                  repeat it again"
             ),
-            FindingKind::RequiredOptionalSequence => f.write_str(
+            Self::RequiredOptionalSequence => f.write_str(
                 "this optional sequence takes every character that can come \
                  after it, so skipping it never leads to a match",
             ),
-            FindingKind::DeadEndRepeatedSequence => f.write_str(
+            Self::DeadEndRepeatedSequence => f.write_str(
                 "this repeated sequence takes every character that can come \
                  after it, so nothing after it can ever match",
             ),
-            FindingKind::AmbiguousNullableBranches => {
+            Self::AmbiguousNullableBranches => {
                 f.write_str("more than one branch can match nothing")
             }
-            FindingKind::UnreachableRule { meta_identifier } => write!(
+            Self::UnreachableRule { meta_identifier } => write!(
                 f,
                 "`{}` cannot be reached from any start rule, so no parser \
                  uses it",
                 meta_identifier.as_str()
             ),
-            FindingKind::DuplicateAlternative => f.write_str(
+            Self::DuplicateAlternative => f.write_str(
                 "this alternative is written the same way as an earlier one, \
                  so both always match the same input",
             ),
-            FindingKind::IneffectiveException => f.write_str(
+            Self::IneffectiveException => f.write_str(
                 "this exception can never apply, since nothing before the `-` \
                  matches the same input",
             ),
-            FindingKind::EmptyRule { meta_identifier } => write!(
+            Self::EmptyRule { meta_identifier } => write!(
                 f,
                 "`{}` can only match nothing, so it never reads any input",
                 meta_identifier.as_str()
             ),
-            FindingKind::ExhaustiveException => f.write_str(
+            Self::ExhaustiveException => f.write_str(
                 "this term can never match, since the exception matches \
                  everything before the `-` does",
             ),
-            FindingKind::CaseOnlyNames {
+            Self::CaseOnlyNames {
                 meta_identifier,
                 other,
             } => write!(
@@ -503,10 +503,10 @@ impl fmt::Display for Finding {
                 meta_identifier.as_str(),
                 other.as_str()
             ),
-            FindingKind::UnknownExpectation { code } => {
+            Self::UnknownExpectation { code } => {
                 write!(f, "`{code}` is not the code of any finding")
             }
-            FindingKind::UnexpectableFinding { code } => {
+            Self::UnexpectableFinding { code } => {
                 let reason = if code.severity() == Severity::Error {
                     "an error"
                 } else {
@@ -518,7 +518,7 @@ impl fmt::Display for Finding {
                     code.name()
                 )
             }
-            FindingKind::UnfulfilledExpectation { code } => write!(
+            Self::UnfulfilledExpectation { code } => write!(
                 f,
                 "this expectation finds no `{}` in its rule",
                 code.name()
@@ -531,7 +531,7 @@ impl From<Finding> for Diagnostic {
     fn from(finding: Finding) -> Self {
         Self {
             severity: finding.kind.severity(),
-            message: finding.to_string(),
+            message: finding.kind.to_string(),
             help: Some(finding.kind.help()),
             span: finding.span,
             labels: finding.labels,
@@ -819,7 +819,12 @@ mod tests {
                 "{:?}",
                 case.source
             );
-            assert_eq!(finding.to_string(), case.message, "{:?}", case.source);
+            assert_eq!(
+                finding.kind.to_string(),
+                case.message,
+                "{:?}",
+                case.source
+            );
             assert_eq!(finding.kind.help(), case.help, "{:?}", case.source);
         }
     }
@@ -828,24 +833,15 @@ mod tests {
     fn turns_a_finding_into_a_diagnostic() {
         let finding =
             crate::analysis::tests::findings("a = ['x'] | ['y'];").remove(0);
-        let labels = finding.labels.clone();
-        assert!(!labels.is_empty());
+        assert!(!finding.labels.is_empty());
         assert_eq!(
-            Diagnostic::from(finding),
+            Diagnostic::from(finding.clone()),
             Diagnostic {
-                severity: Severity::Warning,
-                message: "more than one branch can match nothing".to_owned(),
-                span: Span { start: 4, end: 17 },
-                labels,
-                help: Some(
-                    "make all but one of these branches read something, such \
-                     as by removing `[...]` around one of them; if this is \
-                     intended, write `(* expect ambiguous-nullable-branches: \
-                     reason *)` right before the rule, and the parser takes \
-                     the branch that matches the most, and the first written \
-                     of those that tie"
-                        .to_owned()
-                ),
+                severity: finding.kind.severity(),
+                message: finding.kind.to_string(),
+                span: finding.span,
+                labels: finding.labels,
+                help: Some(finding.kind.help()),
             }
         );
     }

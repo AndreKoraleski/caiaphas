@@ -1,5 +1,4 @@
-//! Choice checks read one choice point at a time, where a parser has to pick
-//! one of its branches, and compare the branches.
+//! Choice checks read one choice point at a time and compare its branches.
 
 mod follow_conflict;
 mod nullable_branches;

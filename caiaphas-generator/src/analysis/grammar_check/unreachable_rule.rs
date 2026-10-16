@@ -3,8 +3,8 @@
 //!
 //! Grammar theory calls these unreachable symbols. Together with unproductive
 //! rules they make up the useless symbols of a grammar. Since start rules are
-//! the rules nothing references, an unreachable rule is always in a group of
-//! rules that only reference each other.
+//! the rules no other rule references, an unreachable rule is always in a
+//! group of rules that nothing outside the group references.
 
 use crate::{
     analysis::{

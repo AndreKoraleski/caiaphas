@@ -3,7 +3,7 @@
 
 use crate::{
     analysis::{
-        choice_point::{ChoiceKind, ChoicePoint},
+        choice_point::{ChoicePoint, ChoicePointKind},
         finding::{Finding, FindingKind},
     },
     diagnostic::Label,
@@ -29,13 +29,13 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
         return;
     }
     let (kind, labels) = match choice_point.kind {
-        ChoiceKind::DefinitionsList => {
+        ChoicePointKind::DefinitionsList => {
             (FindingKind::AmbiguousNullableBranches, nullable)
         }
-        ChoiceKind::OptionalSequence => {
+        ChoicePointKind::OptionalSequence => {
             (FindingKind::AmbiguousNullableBranches, Vec::new())
         }
-        ChoiceKind::RepeatedSequence => {
+        ChoicePointKind::RepeatedSequence => {
             (FindingKind::NullableRepeatedSequence, Vec::new())
         }
     };

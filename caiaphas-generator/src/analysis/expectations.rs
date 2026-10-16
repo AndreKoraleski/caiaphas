@@ -160,15 +160,9 @@ mod tests {
 
     #[test]
     fn reports_an_unknown_code() {
-        let found = findings("(* expect no-such-finding: none *) a = 'x';");
         assert_eq!(
-            found
-                .iter()
-                .map(|finding| &finding.kind)
-                .collect::<Vec<_>>(),
-            [&FindingKind::UnknownExpectation {
-                code: "no-such-finding".to_owned()
-            }]
+            codes("(* expect no-such-finding: none *) a = 'x';"),
+            ["unknown-expectation"]
         );
     }
 
@@ -210,7 +204,7 @@ mod tests {
         let source = "(* expect unfulfilled-expectation: none *) a = 'x';";
         assert_eq!(codes(source), ["unexpectable-finding"]);
         assert_eq!(
-            findings(source)[0].to_string(),
+            findings(source)[0].kind.to_string(),
             "`unfulfilled-expectation` is about expectations, so it cannot be \
              expected"
         );
