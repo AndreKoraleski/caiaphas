@@ -7,8 +7,8 @@ use crate::{
 };
 
 /// Returns every rule that no other rule references, and reports a grammar
-/// without one and every start rule that is hidden or converted. `rules` are
-/// the rules of `syntax`.
+/// without one and every start rule that is hidden, converted or inline.
+/// `rules` are the rules of `syntax`.
 ///
 /// A rule that only references itself is still a start rule.
 pub(super) fn start_rules(
@@ -52,6 +52,14 @@ pub(super) fn start_rules(
         if rule.hidden {
             errors.push(DictionaryError {
                 kind: DictionaryErrorKind::HiddenStartSyntaxRule {
+                    meta_identifier: rule.meta_identifier.clone(),
+                },
+                span: rule.span,
+            });
+        }
+        if rule.inline {
+            errors.push(DictionaryError {
+                kind: DictionaryErrorKind::InlineStartSyntaxRule {
                     meta_identifier: rule.meta_identifier.clone(),
                 },
                 span: rule.span,

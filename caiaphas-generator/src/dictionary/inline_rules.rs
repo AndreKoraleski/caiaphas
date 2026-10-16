@@ -1,6 +1,5 @@
 //! Inline rules give the rules that hold them what they hold, with no type of
-//! their own. A parser cannot start from one, since its `parse` returns its
-//! type, and one cannot hold itself through inline rules alone, or what it
+//! their own. One cannot hold itself through inline rules alone, or what it
 //! gives would never end.
 
 use crate::{
@@ -8,24 +7,8 @@ use crate::{
     ir::{Rule, RuleId, reachable},
 };
 
-/// Reports every start rule that is inline, and every inline rule that holds
-/// itself through inline rules alone.
-pub(super) fn check(
-    rules: &[Rule],
-    start_rules: &[RuleId],
-    errors: &mut Vec<DictionaryError>,
-) {
-    for &RuleId(position) in start_rules {
-        let rule = &rules[position];
-        if rule.inline {
-            errors.push(DictionaryError {
-                kind: DictionaryErrorKind::InlineStartSyntaxRule {
-                    meta_identifier: rule.meta_identifier.clone(),
-                },
-                span: rule.span,
-            });
-        }
-    }
+/// Reports every inline rule that holds itself through inline rules alone.
+pub(super) fn check(rules: &[Rule], errors: &mut Vec<DictionaryError>) {
     let held = |RuleId(position): RuleId, pending: &mut Vec<RuleId>| {
         rules[position].expression.visit_meta_identifiers(
             &mut |RuleId(read), _| {

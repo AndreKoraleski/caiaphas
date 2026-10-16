@@ -34,7 +34,7 @@ pub(crate) fn build(syntax: &Syntax) -> (Grammar, Vec<DictionaryError>) {
     let start_syntax_rules =
         start_rules::start_rules(syntax, &syntax_rules, &mut errors);
     syntactic_exception::check(&syntax_rules, &mut errors);
-    inline_rules::check(&syntax_rules, &start_syntax_rules, &mut errors);
+    inline_rules::check(&syntax_rules, &mut errors);
     errors.sort_by_key(|error| error.span.start);
     (
         Grammar {
