@@ -364,19 +364,33 @@ impl FunctionWriter<'_> {
     /// those are left as they are.
     fn branch(&self, expression: &Expression) -> TokenStream {
         let code = self.expression(expression);
-        let checks_itself = matches!(
-            expression.kind,
-            ExpressionKind::TerminalString(_)
-                | ExpressionKind::SpecialSequence(_)
-        );
+        let none = quote! { ::core::option::Option::None };
+        self.guarded(expression, code, &none, false)
+    }
+
+    /// Returns `code`, the code of the branch `expression`, behind a check of
+    /// the next character, so a parse that only matches gives `none` where the
+    /// branch cannot start. A branch that `checks_itself` on its first
+    /// character is left as it is.
+    pub(super) fn guarded(
+        &self,
+        expression: &Expression,
+        code: TokenStream,
+        none: &TokenStream,
+        checks_itself: bool,
+    ) -> TokenStream {
+        let checks_itself = checks_itself
+            || matches!(
+                expression.kind,
+                ExpressionKind::TerminalString(_)
+                    | ExpressionKind::SpecialSequence(_)
+            );
         if checks_itself || self.facts.is_nullable(expression) {
             return code;
         }
         let Some(pattern) = pattern(&self.facts.first(expression)) else {
             // A branch that cannot start with any character never matches.
-            return quote! {
-                if REPORTS { #code } else { ::core::option::Option::None }
-            };
+            return quote! { if REPORTS { #code } else { #none } };
         };
         quote! {
             if REPORTS
@@ -387,7 +401,7 @@ impl FunctionWriter<'_> {
             {
                 #code
             } else {
-                ::core::option::Option::None
+                #none
             }
         }
     }

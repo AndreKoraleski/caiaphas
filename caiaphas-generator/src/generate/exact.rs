@@ -14,7 +14,7 @@ use quote::{format_ident, quote};
 use crate::{
     generate::{
         code,
-        matching::{self, FunctionWriter, pattern},
+        matching::{self, FunctionWriter},
     },
     ir::{Expression, ExpressionKind, Rule, RuleId},
 };
@@ -271,30 +271,8 @@ impl ExactWriter<'_> {
     /// none of those it can start with, as in matching.
     fn branch(&self, expression: &Expression) -> TokenStream {
         let code = self.ends(expression);
-        let facts = self.writer.facts;
-        let checks_itself = matches!(
-            expression.kind,
-            ExpressionKind::TerminalString(_)
-                | ExpressionKind::SpecialSequence(_)
-        ) || self.writer.single(expression).is_some();
-        if checks_itself || facts.is_nullable(expression) {
-            return code;
-        }
         let none = quote! { __caiaphas::Ends::none() };
-        let Some(pattern) = pattern(&facts.first(expression)) else {
-            return quote! { if REPORTS { #code } else { #none } };
-        };
-        quote! {
-            if REPORTS
-                || ::core::matches!(
-                    parser.character(position),
-                    ::core::option::Option::Some(#pattern)
-                )
-            {
-                #code
-            } else {
-                #none
-            }
-        }
+        let single = self.writer.single(expression).is_some();
+        self.writer.guarded(expression, code, &none, single)
     }
 }
