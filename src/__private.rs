@@ -530,6 +530,38 @@ mod tests {
         );
     }
 
+    /// `s = 'a', ['b'], mark, 'x'; mark = ;`
+    static MARKED: Grammar = Grammar {
+        rules: &[
+            Rule {
+                name: "s",
+                expression: Expression::Sequence(&[
+                    Expression::Text("a"),
+                    Expression::Optional(&Expression::Text("b")),
+                    Expression::Rule(1),
+                    Expression::Text("x"),
+                ]),
+                hidden: false,
+                remembers: false,
+            },
+            Rule {
+                name: "mark",
+                expression: Expression::Empty,
+                hidden: false,
+                remembers: false,
+            },
+        ],
+    };
+
+    #[test]
+    fn leaves_out_a_rule_that_tried_to_read_nothing() {
+        let error = parse(&MARKED, 0, "ay").unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "expected `b` or `x`, found `y` at line 1, column 2"
+        );
+    }
+
     /// `s = 'b' | 'c';`, where the table wrongly says the first branch can
     /// only start with `a`.
     static WRONG: Grammar = Grammar {
