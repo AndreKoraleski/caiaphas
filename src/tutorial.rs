@@ -115,36 +115,42 @@
 //! assert_eq!((error.line(), error.column()), (1, 5));
 //! ```
 //!
-//! # How a parser chooses
+//! # Matching
 //!
-//! A parser matches exactly the inputs its grammar describes. Where an input
-//! reads more than one way, each part, from the outside in and left to right,
-//! takes the most text it can while the rest still matches, and the first
-//! written of alternatives that tie wins:
+//! A grammar can describe the same input in more than one way. In a file name
+//! such as `archive.tar.gz`, a name can hold dots, so the grammar alone does
+//! not say where the name ends:
 //!
 //! ```
-//! caiaphas::grammar!(mod call {
-//!     "call = name, '()';
-//!      (* as String *) name = letter, {letter};
-//!      (* hide *) letter = ? U+0061..U+007A ? | '(';"
+//! caiaphas::grammar!(mod file {
+//!     "file = name, '.', extension;
+//!      (* as String *) name = character, {character};
+//!      (* as String *) extension = letter, {letter};
+//!      (* hide *) character = letter | '.';
+//!      (* hide *) letter = ? U+0061..U+007A ?;"
 //! });
 //!
-//! assert_eq!(call::Call::parse("f(()").unwrap().name, "f(");
+//! let file = file::File::parse("archive.tar.gz").unwrap();
+//! assert_eq!(file.name, "archive.tar");
+//! assert_eq!(file.extension, "gz");
 //! ```
 //!
-//! A name here can take a `(`, so it takes the most it can and leaves the `()`
-//! that the call needs. A parser that took each way as it came would have read
-//! `f((` as the name and failed.
+//! A parser matches every input its grammar describes. Where there is more
+//! than one way, each part takes the most text it can while the rest still
+//! matches, so the name takes `archive.tar` and leaves `.gz`. Of alternatives
+//! that match the same text, the first written wins. A parser that took each
+//! way as it came would have read the whole input as the name, and then found
+//! no `.` for the extension.
 //!
-//! - `(* first match *)` makes the choices of a rule take the first
-//!   alternative after which the rest still matches, in the order written.
-//! - `(* greedy *)` makes a rule take each way as it comes and never go back.
-//!   Its parser stays fast, and that suits rules where taking each way as it
-//!   comes is what the grammar means, such as the `else` of a nested `if`.
+//! Most choices need no such care, since the next character tells which way
+//! goes on, and the parser takes those as it comes. caiaphas finds the few
+//! rules where that is not so, and only those try every way. Two annotations
+//! change how a rule chooses:
 //!
-//! Most rules can be matched taking each way as it comes, since the next
-//! character tells which way goes on. caiaphas finds the rules where it does
-//! not, and only those try every way.
+//! - `(* first match *)` makes its choices take the first alternative after
+//!   which the rest still matches, in the order written.
+//! - `(* greedy *)` makes it take each way as it comes and never go back, as
+//!   the `else` of a nested `if` does. That keeps its parser fast.
 //!
 //! # Problems and suggestions
 //!
