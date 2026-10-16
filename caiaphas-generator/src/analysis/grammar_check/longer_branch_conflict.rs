@@ -85,7 +85,7 @@ pub(super) fn rest_after<'e>(
 
 /// Returns the expressions of the single definition `expression` is, or the
 /// expression alone.
-fn sequence(expression: &Expression) -> &[Expression] {
+pub(super) fn sequence(expression: &Expression) -> &[Expression] {
     match &expression.kind {
         ExpressionKind::SingleDefinition(expressions) => expressions,
         _ => std::slice::from_ref(expression),

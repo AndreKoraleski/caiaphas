@@ -82,6 +82,9 @@ pub(crate) enum FindingKind {
     /// A visible rule only ever matches one character and a repetition reads
     /// it, so every character it matches builds a value of its own.
     SingleCharacterRule { meta_identifier: MetaIdentifier },
+    /// An alternative starts the same way as an earlier one of the same
+    /// choice, so a parser reads that start twice.
+    SharedStart,
     /// An expectation names no kind of finding.
     UnknownExpectation { code: String },
     /// An expectation names a kind of finding that cannot be intended, such as
@@ -212,6 +215,11 @@ impl FindingKind {
                  the rules that read it keep its text",
                 meta_identifier.as_str()
             ),
+            Self::SharedStart => {
+                "write the shared start once, before a choice of what follows \
+                 it, so `a, x | a, y` becomes `a, (x | y)`"
+                    .to_owned()
+            }
             Self::UnknownExpectation { .. } => {
                 "write the code a finding reports, such as \
                  `repeated-follow-conflict`"
@@ -336,6 +344,10 @@ impl fmt::Display for FindingKind {
                 "`{}` only ever matches one character, and a repetition reads \
                  it, so every character it matches builds a value of its own",
                 meta_identifier.as_str()
+            ),
+            Self::SharedStart => f.write_str(
+                "this alternative starts the same way as an earlier one, so a \
+                 parser reads that start twice",
             ),
             Self::UnknownExpectation { code } => {
                 write!(f, "`{code}` is not the code of any finding")

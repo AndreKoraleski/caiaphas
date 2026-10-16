@@ -229,6 +229,17 @@ const CASES: &[Case] = &[
                before the rule, and the grammar stays as it is",
     },
     Case {
+        source: "s = a, 'x' | a, 'y'; a = 'z';",
+        code: FindingCode::SharedStart,
+        severity: Severity::Suggestion,
+        message: "this alternative starts the same way as an earlier one, so \
+                  a parser reads that start twice",
+        help: "write the shared start once, before a choice of what follows \
+               it, so `a, x | a, y` becomes `a, (x | y)`; if this is \
+               intended, write `(* expect shared-start: reason *)` right \
+               before the rule, and the grammar stays as it is",
+    },
+    Case {
         source: "(* expect no-such-finding: none *) a = 'x';",
         code: FindingCode::UnknownExpectation,
         severity: Severity::Error,
