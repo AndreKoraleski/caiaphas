@@ -19,13 +19,11 @@
 //! # Ok::<(), caiaphas::Error>(())
 //! ```
 //!
-//! The [`tutorial`] goes through grammars, the types generated from them,
-//! errors, how a parser chooses between the ways an input reads, and the
-//! checks caiaphas runs on a grammar. Every finding those checks report is
-//! listed on the `findings` page of the [caiaphas-generator docs][generator],
-//! and `caiaphas explain` from the `caiaphas-cli` crate prints the same.
+//! The [`tutorial`] covers grammars, types, errors, matching and checks. The
+//! [findings] page explains every finding, as `caiaphas explain` from the
+//! `caiaphas-cli` crate does.
 //!
-//! [generator]: https://docs.rs/caiaphas-generator
+//! [findings]: https://docs.rs/caiaphas-generator/latest/caiaphas_generator/findings/
 
 mod error;
 mod span;
