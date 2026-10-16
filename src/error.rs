@@ -75,11 +75,10 @@ impl fmt::Display for Expected {
                 Shown(&last.to_string())
             ),
             Self::Rule(name) => {
-                let article = if name.starts_with(['a', 'e', 'i', 'o', 'u']) {
-                    "an"
-                } else {
-                    "a"
-                };
+                let vowels =
+                    ['a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U'];
+                let article =
+                    if name.starts_with(vowels) { "an" } else { "a" };
                 write!(f, "{article} {name}")
             }
             Self::End => f.write_str("the end of the input"),
@@ -178,11 +177,16 @@ mod tests {
         let error = Error::new(
             "]",
             0,
-            vec![Expected::Rule("value"), Expected::Rule("object")],
+            vec![
+                Expected::Rule("value"),
+                Expected::Rule("object"),
+                Expected::Rule("Element"),
+            ],
         );
         assert_eq!(
             error.to_string(),
-            "expected an object or a value, found `]` at line 1, column 1"
+            "expected an Element, an object or a value, found `]` at line 1, \
+             column 1"
         );
     }
 
