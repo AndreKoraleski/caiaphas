@@ -12,8 +12,11 @@ use crate::{
 /// Reports every choice point with more than one branch that can match
 /// nothing. For a repeated sequence that means its body can match nothing, so
 /// it could repeat forever.
+///
+/// Only the alternatives of a definitions list get labels, since the finding
+/// already points at the only body of an optional or repeated sequence.
 pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
-    let labels: Vec<Label> = choice_point
+    let nullable: Vec<Label> = choice_point
         .branches
         .iter()
         .filter(|branch| branch.nullable)
@@ -22,13 +25,18 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
             message: "this branch can match nothing",
         })
         .collect();
-    if labels.len() < 2 {
+    if nullable.len() < 2 {
         return;
     }
-    let kind = match choice_point.kind {
-        ChoiceKind::RepeatedSequence => FindingKind::NullableRepeatedSequence,
-        ChoiceKind::DefinitionsList | ChoiceKind::OptionalSequence => {
-            FindingKind::AmbiguousNullableBranches
+    let (kind, labels) = match choice_point.kind {
+        ChoiceKind::DefinitionsList => {
+            (FindingKind::AmbiguousNullableBranches, nullable)
+        }
+        ChoiceKind::OptionalSequence => {
+            (FindingKind::AmbiguousNullableBranches, Vec::new())
+        }
+        ChoiceKind::RepeatedSequence => {
+            (FindingKind::NullableRepeatedSequence, Vec::new())
         }
     };
     findings.push(Finding {
@@ -78,7 +86,7 @@ mod tests {
             [(
                 FindingKind::AmbiguousNullableBranches,
                 Span { start: 4, end: 11 },
-                2
+                0
             )]
         );
     }
@@ -90,7 +98,7 @@ mod tests {
             [(
                 FindingKind::NullableRepeatedSequence,
                 Span { start: 4, end: 11 },
-                2
+                0
             )]
         );
     }

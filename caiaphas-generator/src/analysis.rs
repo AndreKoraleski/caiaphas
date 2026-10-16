@@ -23,7 +23,7 @@ use grammar_check::GRAMMAR_CHECKS;
 use crate::ir::Grammar;
 
 /// Returns every finding about `grammar`, in the order they appear in its
-/// source.
+/// source, and those at the same place in the order of their codes.
 ///
 /// The grammar should be one the dictionary built without errors.
 pub(crate) fn analyse(grammar: &Grammar) -> Vec<Finding> {
@@ -38,7 +38,7 @@ pub(crate) fn analyse(grammar: &Grammar) -> Vec<Finding> {
         }
     }
     expectations::apply(grammar, &mut findings);
-    findings.sort_by_key(|finding| finding.span.start);
+    findings.sort_by_key(|finding| (finding.span.start, finding.kind.code()));
     findings
 }
 

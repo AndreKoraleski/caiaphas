@@ -83,7 +83,7 @@ pub(crate) enum FindingKind {
 
 /// The kind of a finding without its details, which an expectation names in
 /// kebab case.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum FindingCode {
     LeftRecursion,
     IndirectLeftRecursion,
