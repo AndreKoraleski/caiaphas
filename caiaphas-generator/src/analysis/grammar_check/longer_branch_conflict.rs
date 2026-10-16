@@ -5,8 +5,9 @@
 //! A parser takes the alternative that matches the most, so it takes the
 //! longer one whenever it can, even when what comes after the choice needed
 //! the shorter one. It is the follow conflict of an optional sequence, since
-//! `a | a, b` matches like `a, [b]`. Rules that take the first match are left
-//! alone, since there the first written alternative is meant to win.
+//! `a | a, b` matches like `a, [b]`. A rule that takes the first match never
+//! takes a longer alternative written after the shorter one, so only one
+//! written before it counts there.
 
 use crate::{
     analysis::{
@@ -27,17 +28,19 @@ pub(super) fn check(
     findings: &mut Vec<Finding>,
 ) {
     for (position, rule) in grammar.syntax_rules.iter().enumerate() {
-        if rule.first_match {
-            continue;
-        }
         facts.walk_rule(RuleId(position), &mut |expression, after| {
             let ExpressionKind::DefinitionsList(alternatives) =
                 &expression.kind
             else {
                 return;
             };
-            for longer in alternatives {
-                let conflict = alternatives.iter().find_map(|shorter| {
+            for (index, longer) in alternatives.iter().enumerate() {
+                let shorter_ones = if rule.first_match {
+                    &alternatives[index + 1..]
+                } else {
+                    alternatives.as_slice()
+                };
+                let conflict = shorter_ones.iter().find_map(|shorter| {
                     let rest = rest_after(shorter, longer)?;
                     let characters = rest
                         .iter()
@@ -49,15 +52,16 @@ pub(super) fn check(
                     (!characters.is_empty()).then_some((shorter, characters))
                 });
                 if let Some((shorter, characters)) = conflict {
-                    findings.push(Finding {
-                    kind: FindingKind::LongerBranchConflict { characters },
-                    span: longer.span,
-                    labels: vec![Label {
+                    let label = Label {
                         span: shorter.span,
                         message: "this branch ends where the longer one goes \
                                   on",
-                    }],
-                });
+                    };
+                    findings.push(Finding {
+                        kind: FindingKind::LongerBranchConflict { characters },
+                        span: longer.span,
+                        labels: vec![label],
+                    });
                 }
             }
         });
@@ -120,6 +124,16 @@ mod tests {
                 Span { start: 11, end: 19 },
                 Span { start: 5, end: 8 },
             )]
+        );
+    }
+
+    #[test]
+    fn finds_a_longer_branch_a_first_match_takes_before_the_shorter() {
+        let first_match = "(* first match *) s = ('x', 'y' | 'x'), 'y';";
+        assert_eq!(conflicts(first_match).len(), 1);
+        assert_eq!(
+            conflicts("(* first match *) s = ('x' | 'x', 'y'), 'y';"),
+            []
         );
     }
 
