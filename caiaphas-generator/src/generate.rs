@@ -21,6 +21,7 @@ use crate::{
 
 /// The module that parses a grammar.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Module {
     /// The items of the module.
     pub items: TokenStream,
@@ -31,6 +32,7 @@ pub struct Module {
 
 /// How to generate the module that parses a grammar.
 #[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
 pub struct Options {
     /// Whether the parser matches the grammar rearranged where that keeps its
     /// types the same, such as with a start that alternatives share written
@@ -83,6 +85,7 @@ pub fn generate(
 
 /// What checking a grammar found.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Report {
     /// Every problem and suggestion, as text that starts with how serious it
     /// is and shows where in the grammar it is.

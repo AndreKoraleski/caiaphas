@@ -154,7 +154,8 @@ pub fn grammar(input: TokenStream) -> TokenStream {
             .collect::<proc_macro2::TokenStream>()
             .into()
     };
-    let options = caiaphas_generator::Options { optimize };
+    let mut options = caiaphas_generator::Options::default();
+    options.optimize = optimize;
     let module = match caiaphas_generator::generate(&grammar, &label, options)
     {
         Ok(module) if suggest && !module.suggestions.is_empty() => {
