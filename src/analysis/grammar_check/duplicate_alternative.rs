@@ -13,7 +13,7 @@ use crate::{
         finding::{Finding, FindingKind},
     },
     diagnostic::Label,
-    ir::{Expression, ExpressionKind, Grammar},
+    ir::{ExpressionKind, Grammar},
 };
 
 /// Reports every alternative that an earlier alternative of the same
@@ -31,7 +31,7 @@ pub(super) fn check(
         for (index, later) in alternatives.iter().enumerate() {
             if let Some(earlier) = alternatives[..index]
                 .iter()
-                .find(|earlier| same(earlier, later))
+                .find(|earlier| earlier.is_written_like(later))
             {
                 findings.push(Finding {
                     kind: FindingKind::DuplicateAlternative,
@@ -44,72 +44,6 @@ pub(super) fn check(
             }
         }
     });
-}
-
-/// Returns whether `left` and `right` are written the same way, wherever they
-/// are.
-fn same(left: &Expression, right: &Expression) -> bool {
-    match (&left.kind, &right.kind) {
-        (
-            ExpressionKind::SingleDefinition(left),
-            ExpressionKind::SingleDefinition(right),
-        )
-        | (
-            ExpressionKind::DefinitionsList(left),
-            ExpressionKind::DefinitionsList(right),
-        ) => {
-            left.len() == right.len()
-                && left
-                    .iter()
-                    .zip(right)
-                    .all(|(left, right)| same(left, right))
-        }
-        (
-            ExpressionKind::OptionalSequence(left),
-            ExpressionKind::OptionalSequence(right),
-        )
-        | (
-            ExpressionKind::RepeatedSequence(left),
-            ExpressionKind::RepeatedSequence(right),
-        ) => same(left, right),
-        (
-            ExpressionKind::SyntacticFactor {
-                integer: left_integer,
-                syntactic_primary: left,
-            },
-            ExpressionKind::SyntacticFactor {
-                integer: right_integer,
-                syntactic_primary: right,
-            },
-        ) => left_integer == right_integer && same(left, right),
-        (
-            ExpressionKind::SyntacticTerm {
-                syntactic_factor: left_factor,
-                syntactic_exception: left_exception,
-            },
-            ExpressionKind::SyntacticTerm {
-                syntactic_factor: right_factor,
-                syntactic_exception: right_exception,
-            },
-        ) => {
-            same(left_factor, right_factor)
-                && same(left_exception, right_exception)
-        }
-        (
-            ExpressionKind::MetaIdentifier(left),
-            ExpressionKind::MetaIdentifier(right),
-        ) => left == right,
-        (
-            ExpressionKind::TerminalString(left),
-            ExpressionKind::TerminalString(right),
-        ) => left == right,
-        (
-            ExpressionKind::SpecialSequence(left),
-            ExpressionKind::SpecialSequence(right),
-        ) => left == right,
-        (ExpressionKind::EmptySequence, ExpressionKind::EmptySequence) => true,
-        _ => false,
-    }
 }
 
 #[cfg(test)]

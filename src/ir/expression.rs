@@ -93,4 +93,72 @@ impl Expression {
             }
         });
     }
+
+    /// Returns whether this expression is written the same way as `other`,
+    /// wherever each is.
+    pub(crate) fn is_written_like(&self, other: &Self) -> bool {
+        match (&self.kind, &other.kind) {
+            (
+                ExpressionKind::SingleDefinition(left),
+                ExpressionKind::SingleDefinition(right),
+            )
+            | (
+                ExpressionKind::DefinitionsList(left),
+                ExpressionKind::DefinitionsList(right),
+            ) => {
+                left.len() == right.len()
+                    && left
+                        .iter()
+                        .zip(right)
+                        .all(|(left, right)| left.is_written_like(right))
+            }
+            (
+                ExpressionKind::OptionalSequence(left),
+                ExpressionKind::OptionalSequence(right),
+            )
+            | (
+                ExpressionKind::RepeatedSequence(left),
+                ExpressionKind::RepeatedSequence(right),
+            ) => left.is_written_like(right),
+            (
+                ExpressionKind::SyntacticFactor {
+                    integer: left_integer,
+                    syntactic_primary: left,
+                },
+                ExpressionKind::SyntacticFactor {
+                    integer: right_integer,
+                    syntactic_primary: right,
+                },
+            ) => left_integer == right_integer && left.is_written_like(right),
+            (
+                ExpressionKind::SyntacticTerm {
+                    syntactic_factor: left_factor,
+                    syntactic_exception: left_exception,
+                },
+                ExpressionKind::SyntacticTerm {
+                    syntactic_factor: right_factor,
+                    syntactic_exception: right_exception,
+                },
+            ) => {
+                left_factor.is_written_like(right_factor)
+                    && left_exception.is_written_like(right_exception)
+            }
+            (
+                ExpressionKind::MetaIdentifier(left),
+                ExpressionKind::MetaIdentifier(right),
+            ) => left == right,
+            (
+                ExpressionKind::TerminalString(left),
+                ExpressionKind::TerminalString(right),
+            ) => left == right,
+            (
+                ExpressionKind::SpecialSequence(left),
+                ExpressionKind::SpecialSequence(right),
+            ) => left == right,
+            (ExpressionKind::EmptySequence, ExpressionKind::EmptySequence) => {
+                true
+            }
+            _ => false,
+        }
+    }
 }
