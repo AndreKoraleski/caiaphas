@@ -18,7 +18,7 @@ pub struct Span {
     end: usize,
 }
 
-/// The input of a parse, which every span of the parse shares.
+/// The text of a parse, with where its lines start.
 #[derive(Debug)]
 pub(crate) struct Input {
     text: Box<str>,

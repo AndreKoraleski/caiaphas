@@ -36,8 +36,8 @@ pub(crate) enum ChoicePointKind {
 pub(crate) struct Branch {
     /// Skipping and stopping have an empty span at the end of the sequence.
     pub(crate) span: Span,
-    /// The characters a parser can see when the branch is the one to take,
-    /// which are those it starts with, and what comes after the choice point
+    /// The characters a parser can see when the branch is the one to take.
+    /// They are those it starts with, and what comes after the choice point
     /// when the branch can match nothing.
     pub(crate) lookahead: CharacterSet,
     pub(crate) nullable: bool,
@@ -46,8 +46,8 @@ pub(crate) struct Branch {
 }
 
 impl ChoicePoint {
-    /// Returns whether two branches can start with the same character, so a
-    /// parser can try both after reading the same characters.
+    /// Returns whether a parser can see the same character when either of two
+    /// branches is the one to take, so it can try both at the same place.
     pub(crate) fn overlaps(&self) -> bool {
         self.branches.iter().enumerate().any(|(index, branch)| {
             self.branches[index + 1..].iter().any(|other| {

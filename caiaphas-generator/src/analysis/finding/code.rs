@@ -8,8 +8,8 @@ use crate::{analysis::finding::FindingKind, diagnostic::Severity};
 /// miss a code. Each code has the name of its kind.
 macro_rules! finding_codes {
     ($($code:ident => $name:literal,)*) => {
-        /// The kind of a finding without its details, which an expectation
-        /// names in kebab case.
+        /// The kind of a finding without its details. An expectation names it
+        /// in kebab case.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
         pub(crate) enum FindingCode {
             $($code,)*

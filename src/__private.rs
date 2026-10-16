@@ -144,8 +144,8 @@ impl<'t> Node<'t> {
         self.children().next()
     }
 
-    /// Returns the rule numbered `rule` matched inside this one, which the
-    /// grammar makes sure is there.
+    /// Returns the rule numbered `rule` matched inside this one. The grammar
+    /// makes sure it is there.
     pub fn one<T: FromNode>(&self, rule: usize) -> T {
         self.optional(rule)
             .expect("the grammar always matches this rule here")
