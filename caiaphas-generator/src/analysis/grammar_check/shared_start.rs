@@ -11,7 +11,6 @@ use crate::{
     analysis::{
         facts::Facts,
         finding::{Finding, FindingKind},
-        grammar_check::longer_branch_conflict::rest_after,
     },
     diagnostic::Label,
     ir::{Expression, ExpressionKind, Grammar},
@@ -37,7 +36,7 @@ pub(super) fn check(
                         // A first match never takes an alternative that starts
                         // with all of an earlier one.
                         && !(rule.first_match
-                            && rest_after(earlier, later).is_some())
+                            && later.rest_after(earlier).is_some())
                 });
                 if let Some(earlier) = earlier {
                     findings.push(Finding {

@@ -17,7 +17,7 @@ use crate::{
         finding::{Finding, FindingKind},
     },
     diagnostic::Label,
-    ir::{Expression, ExpressionKind, Grammar, RuleId},
+    ir::{ExpressionKind, Grammar, RuleId},
 };
 
 /// Reports every alternative of a greedy rule that goes on from where another
@@ -45,7 +45,7 @@ pub(super) fn check(
                     alternatives.as_slice()
                 };
                 let conflict = shorter_ones.iter().find_map(|shorter| {
-                    let rest = rest_after(shorter, longer)?;
+                    let rest = longer.rest_after(shorter)?;
                     let characters = rest
                         .iter()
                         .rev()
@@ -70,21 +70,6 @@ pub(super) fn check(
             }
         });
     }
-}
-
-/// Returns what `longer` goes on with after `shorter`, when `longer` starts
-/// with every expression of `shorter` and has more.
-pub(super) fn rest_after<'e>(
-    shorter: &Expression,
-    longer: &'e Expression,
-) -> Option<&'e [Expression]> {
-    let (shorter, longer) = (shorter.steps(), longer.steps());
-    let starts_alike = shorter
-        .iter()
-        .zip(longer)
-        .all(|(shorter, longer)| shorter.is_written_like(longer));
-    (starts_alike && longer.len() > shorter.len())
-        .then(|| &longer[shorter.len()..])
 }
 
 #[cfg(test)]

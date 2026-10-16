@@ -55,6 +55,18 @@ impl Expression {
         }
     }
 
+    /// Returns what this expression goes on with after `shorter`, when it
+    /// starts with every expression of `shorter` and has more.
+    pub(crate) fn rest_after(&self, shorter: &Self) -> Option<&[Self]> {
+        let (shorter, longer) = (shorter.steps(), self.steps());
+        let starts_alike = shorter
+            .iter()
+            .zip(longer)
+            .all(|(shorter, longer)| shorter.is_written_like(longer));
+        (starts_alike && longer.len() > shorter.len())
+            .then(|| &longer[shorter.len()..])
+    }
+
     /// Returns the expressions directly inside this one.
     pub(crate) fn children(&self) -> impl Iterator<Item = &Self> {
         let (list, first, second): (&[Self], Option<&Self>, Option<&Self>) =

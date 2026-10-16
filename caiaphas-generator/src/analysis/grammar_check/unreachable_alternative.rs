@@ -15,7 +15,6 @@ use crate::{
     analysis::{
         facts::Facts,
         finding::{Finding, FindingKind},
-        grammar_check::longer_branch_conflict::rest_after,
         matcher,
     },
     diagnostic::Label,
@@ -80,7 +79,7 @@ pub(super) fn covers(
         || rule.first_match
             && rule.greedy
             && (facts.always_matches(earlier)
-                || rest_after(earlier, later).is_some()
+                || later.rest_after(earlier).is_some()
                 || starts_every_text(grammar, earlier, later))
 }
 
