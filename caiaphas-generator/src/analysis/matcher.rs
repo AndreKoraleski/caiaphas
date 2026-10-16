@@ -1,9 +1,11 @@
 //! The matcher runs expressions on texts the way a generated parser does, to
 //! tell which texts a branch matches.
 //!
-//! Each choice takes the branch that matches the most text, and optional and
-//! repeated sequences take as much as they can. Recursion can make matching
-//! run long or deep, so it gives up after a fixed number of steps or levels.
+//! Each choice takes the branch that matches the most text, unless its rule
+//! takes the first match, when it takes the first branch that matches.
+//! Optional and repeated sequences take as much as they can. Recursion can
+//! make matching run long or deep, so it gives up after a fixed number of
+//! steps or levels.
 
 use crate::ir::{Expression, ExpressionKind, Grammar, RuleId};
 
@@ -16,8 +18,8 @@ const DEPTH: usize = 200;
 /// How many texts a branch can match for the analysis to list them all.
 const TEXTS: usize = 64;
 
-/// Returns whether `expression` matches all of `text`, or `None` if matching
-/// gave up first.
+/// Returns whether `expression`, written in a rule that takes the longest
+/// match, matches all of `text`, or `None` if matching gave up first.
 pub(crate) fn matches_all(
     grammar: &Grammar,
     expression: &Expression,
@@ -28,8 +30,9 @@ pub(crate) fn matches_all(
         text,
         steps: STEPS,
         depth: DEPTH,
+        first_match: false,
     };
-    let end = matcher.longest(expression, 0)?;
+    let end = matcher.end(expression, 0)?;
     Some(end == Some(text.len()))
 }
 
@@ -87,16 +90,15 @@ fn texts_within(
             found
         }
         ExpressionKind::MetaIdentifier(rule_id) => {
-            if entered.contains(rule_id) {
+            let RuleId(position) = *rule_id;
+            let rule = &grammar.syntax_rules[position];
+            // A first match can leave out what later branches match, so the
+            // texts of its rule are not listed.
+            if rule.first_match || entered.contains(rule_id) {
                 return None;
             }
             entered.push(*rule_id);
-            let RuleId(position) = *rule_id;
-            let found = texts_within(
-                grammar,
-                &grammar.syntax_rules[position].expression,
-                entered,
-            );
+            let found = texts_within(grammar, &rule.expression, entered);
             entered.pop();
             found?
         }
@@ -129,12 +131,15 @@ struct Matcher<'a> {
     steps: usize,
     /// How many more levels matching can nest.
     depth: usize,
+    /// Whether the choices being matched take their first branch that
+    /// matches.
+    first_match: bool,
 }
 
 impl Matcher<'_> {
-    /// Returns where the longest match of `expression` at `position` ends, if
-    /// it matches, or `None` once there are no steps or levels left.
-    fn longest(
+    /// Returns where the match of `expression` at `position` ends, if it
+    /// matches, or `None` once there are no steps or levels left.
+    fn end(
         &mut self,
         expression: &Expression,
         position: usize,
@@ -163,11 +168,12 @@ impl Matcher<'_> {
                 .map(|c| position + c.len_utf8()),
             ExpressionKind::EmptySequence => Some(position),
             ExpressionKind::MetaIdentifier(RuleId(rule)) => {
-                let grammar = self.grammar;
-                return self.longest(
-                    &grammar.syntax_rules[*rule].expression,
-                    position,
-                );
+                let rule = &self.grammar.syntax_rules[*rule];
+                let around =
+                    std::mem::replace(&mut self.first_match, rule.first_match);
+                let end = self.end(&rule.expression, position);
+                self.first_match = around;
+                return end;
             }
             ExpressionKind::SingleDefinition(expressions) => {
                 return self.sequence(expressions.iter(), position);
@@ -182,16 +188,20 @@ impl Matcher<'_> {
             ExpressionKind::DefinitionsList(expressions) => {
                 let mut longest = None;
                 for expression in expressions {
-                    longest = longest.max(self.longest(expression, position)?);
+                    let end = self.end(expression, position)?;
+                    if self.first_match && end.is_some() {
+                        return Some(end);
+                    }
+                    longest = longest.max(end);
                 }
                 longest
             }
             ExpressionKind::OptionalSequence(expression) => {
-                Some(self.longest(expression, position)?.unwrap_or(position))
+                Some(self.end(expression, position)?.unwrap_or(position))
             }
             ExpressionKind::RepeatedSequence(expression) => {
                 let mut end = position;
-                while let Some(next) = self.longest(expression, end)? {
+                while let Some(next) = self.end(expression, end)? {
                     if next == end {
                         break;
                     }
@@ -203,8 +213,7 @@ impl Matcher<'_> {
                 syntactic_factor,
                 syntactic_exception,
             } => {
-                let Some(end) = self.longest(syntactic_factor, position)?
-                else {
+                let Some(end) = self.end(syntactic_factor, position)? else {
                     return Some(None);
                 };
                 // The exception only reads what the factor matched.
@@ -213,10 +222,10 @@ impl Matcher<'_> {
                     text: &self.text[..end],
                     steps: self.steps,
                     depth: self.depth,
+                    first_match: self.first_match,
                 };
-                let excluded = within
-                    .longest(syntactic_exception, position)?
-                    == Some(end);
+                let excluded =
+                    within.end(syntactic_exception, position)? == Some(end);
                 self.steps = within.steps;
                 (!excluded).then_some(end)
             }
@@ -231,7 +240,7 @@ impl Matcher<'_> {
     ) -> Option<Option<usize>> {
         let mut end = position;
         for expression in expressions {
-            match self.longest(expression, end)? {
+            match self.end(expression, end)? {
                 Some(next) => end = next,
                 None => return Some(None),
             }
@@ -272,6 +281,14 @@ mod tests {
         let source = "s = 'a' | 'a', 'b' | 'a', 'b', 'c';";
         assert_eq!(first_rule_matches(source, "abc"), Some(true));
         assert_eq!(first_rule_matches(source, "ab"), Some(true));
+    }
+
+    #[test]
+    fn takes_the_first_branch_that_matches_where_the_rule_asks() {
+        let source = "s = k; (* first match *) k = 'i' | 'if';";
+        assert_eq!(first_rule_matches(source, "i"), Some(true));
+        assert_eq!(first_rule_matches(source, "if"), Some(false));
+        assert_eq!(first_rule_texts(source), None);
     }
 
     #[test]

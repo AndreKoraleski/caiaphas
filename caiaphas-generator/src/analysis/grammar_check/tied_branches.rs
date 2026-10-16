@@ -165,4 +165,12 @@ mod tests {
         assert_eq!(ties("a = {'x'} , 'y' | {'x'}, 'z';"), []);
         assert_eq!(ties("s = a; a = a, 'x' | 'y';"), []);
     }
+
+    #[test]
+    fn matches_a_rule_that_takes_the_first_match_as_its_parser_does() {
+        assert_eq!(
+            ties("s = k | o; (* first match *) k = 'i' | 'if'; o = 'if';"),
+            []
+        );
+    }
 }
