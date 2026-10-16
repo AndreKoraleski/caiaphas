@@ -1,0 +1,7 @@
+(* A name other than `if`, an `f`, then another name, where the first name
+   could take the `f`. *)
+split = name - 'if', 'f', name;
+(* expect repeated-follow-conflict: a name leaves the `f` after it *)
+name = letter, {letter};
+(* hide *)
+letter = ? U+0061..U+007A ?;

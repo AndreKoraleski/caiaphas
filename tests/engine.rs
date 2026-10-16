@@ -166,3 +166,77 @@ fn parses_a_grammar_written_in_the_macro() {
     assert_eq!(inline::Inline::parse("xyy").unwrap().text(), "xyy");
     assert!(inline::Inline::parse("y").is_err());
 }
+
+caiaphas::grammar!(mod split = "tests/grammars/split.ebnf");
+caiaphas::grammar!(mod twice = "tests/grammars/twice.ebnf");
+
+/// Returns every text of at most `length` characters of `alphabet`.
+fn every_text(alphabet: &str, length: usize) -> Vec<String> {
+    let mut texts = vec![String::new()];
+    let mut longest = texts.clone();
+    for _ in 0..length {
+        longest = longest
+            .iter()
+            .flat_map(|text| {
+                alphabet.chars().map(move |c| format!("{text}{c}"))
+            })
+            .collect();
+        texts.extend(longest.iter().cloned());
+    }
+    texts
+}
+
+#[test]
+fn matches_exactly_the_texts_of_its_grammar() {
+    let letters = |text: &str| {
+        !text.is_empty() && text.chars().all(|c| c.is_ascii_lowercase())
+    };
+    for text in every_text("ab;", 6) {
+        let item = |item: &str| {
+            item.strip_prefix('a')
+                .is_some_and(|rest| rest.chars().all(|c| c == 'b'))
+        };
+        let matches = text.split(';').all(item);
+        assert_eq!(items::Items::parse(&text).is_ok(), matches, "{text:?}");
+    }
+    for text in every_text("ify", 6) {
+        let matches = text.strip_suffix("fy").is_some_and(letters);
+        assert_eq!(phrase::Phrase::parse(&text).is_ok(), matches, "{text:?}");
+    }
+    for text in every_text("ifx", 6) {
+        let matches = text.match_indices('f').any(|(index, _)| {
+            let (name, other) = (&text[..index], &text[index + 1..]);
+            letters(name) && name != "if" && letters(other)
+        });
+        assert_eq!(split::Split::parse(&text).is_ok(), matches, "{text:?}");
+    }
+    for text in every_text("ab", 7) {
+        let matches = text.starts_with('a')
+            && text.ends_with('b')
+            && text.matches('a').count() == 2;
+        assert_eq!(twice::Twice::parse(&text).is_ok(), matches, "{text:?}");
+    }
+    for text in every_text("zx", 7) {
+        let maybe = text == "z" || text == "zxz";
+        assert_eq!(going_back::Maybe::parse(&text).is_ok(), maybe, "{text:?}");
+        let several = text.strip_suffix('z').is_some_and(|rounds| {
+            rounds.len() % 2 == 0
+                && rounds.as_bytes().chunks(2).all(|round| round == b"zx")
+        });
+        assert_eq!(
+            going_back::Several::parse(&text).is_ok(),
+            several,
+            "{text:?}"
+        );
+    }
+}
+
+#[test]
+fn gives_each_part_the_most_text_the_rest_leaves() {
+    let parsed = split::Split::parse("iffx").unwrap();
+    let names: Vec<&str> = parsed.name.iter().map(split::Name::text).collect();
+    assert_eq!(names, ["i", "fx"]);
+    let parsed = twice::Twice::parse("abab").unwrap();
+    let runs: Vec<&str> = parsed.run.iter().map(twice::Run::text).collect();
+    assert_eq!(runs, ["ab", "a"]);
+}
