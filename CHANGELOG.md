@@ -28,6 +28,8 @@ adheres to [Semantic Versioning][semver].
   back, so its parser stays fast.
 - `Span`, which tells where a rule matched in its input, and `Error`, which
   tells where an input stops matching and what could have come there.
+  `Error::expected` and `Error::found` give the same as values, with
+  `Expected` at the root of the crate.
 
 [keep-a-changelog]: https://keepachangelog.com/en/1.1.0/
 [semver]: https://semver.org/spec/v2.0.0.html

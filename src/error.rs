@@ -17,6 +17,7 @@ pub struct Error {
 
 /// What a parser could have read where an [`Error`] is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum Expected {
     /// This text.
     Text(&'static str),
@@ -61,6 +62,17 @@ impl Error {
     /// Returns the column the error is at, counted in characters from 1.
     pub fn column(&self) -> usize {
         self.column
+    }
+
+    /// Returns what could have come where the error is, in order.
+    pub fn expected(&self) -> &[Expected] {
+        &self.expected
+    }
+
+    /// Returns the character found where the error is, or `None` at the end of
+    /// the input.
+    pub fn found(&self) -> Option<char> {
+        self.found
     }
 }
 
@@ -153,6 +165,11 @@ mod tests {
             "expected `,` or `}`, found `]` at line 1, column 8"
         );
         assert_eq!((error.offset(), error.line(), error.column()), (7, 1, 8));
+        assert_eq!(
+            error.expected(),
+            [Expected::Text(","), Expected::Text("}")]
+        );
+        assert_eq!(error.found(), Some(']'));
     }
 
     #[test]

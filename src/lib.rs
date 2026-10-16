@@ -76,5 +76,5 @@ mod span;
 pub mod __private;
 
 pub use caiaphas_macros::grammar;
-pub use error::Error;
+pub use error::{Error, Expected};
 pub use span::Span;
