@@ -167,6 +167,17 @@ fn structure(
                 ),
                 quote! { node.optional(#index) },
             ),
+            Count::Fixed(times) => {
+                let length = Literal::usize_unsuffixed(usize::from(times));
+                (
+                    quote! { [#inner; #length] },
+                    format!(
+                        " The {times} `{held_name}` matches of this \
+                         `{this}`, in order."
+                    ),
+                    quote! { node.array(#index) },
+                )
+            }
             Count::Many => (
                 quote! { ::std::vec::Vec<#inner> },
                 format!(

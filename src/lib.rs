@@ -28,8 +28,8 @@
 //!   with a variant for each, such as `Value::Object` and `Value::True`.
 //! - Any other rule becomes a struct with a field for each rule it holds,
 //!   named after that rule. A field holds `T`, `Option<T>` or `Vec<T>`, as
-//!   many times as the rule can hold it, and a type that could contain itself
-//!   holds itself in a `Box`.
+//!   many times as the rule can hold it, or `[T; N]` when it always holds it
+//!   `N` times. A type that could contain itself holds itself in a `Box`.
 //! - Every type has `text()`, the text its rule matched, and every struct has
 //!   `span()`, which tells where. Types own what they hold, so they need no
 //!   lifetimes.

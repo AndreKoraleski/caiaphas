@@ -255,3 +255,14 @@ fn takes_each_way_as_it_comes_in_a_greedy_rule() {
     assert!(matches!(sentence.pair.word, greedy::Word::Keyword(_)));
     assert!(greedy::Sentence::parse("aff;").is_err());
 }
+
+caiaphas::grammar!(mod assignment {
+    "assignment = name, '=', name; name = letter, {letter};
+     (* hide *) letter = ? U+0061..U+007A ?;"
+});
+
+#[test]
+fn holds_a_rule_held_the_same_number_of_times_in_an_array() {
+    let [target, value] = assignment::Assignment::parse("x=y").unwrap().name;
+    assert_eq!((target.text(), value.text()), ("x", "y"));
+}

@@ -2,9 +2,10 @@
 //!
 //! A rule whose alternatives are each another rule or a word becomes an enum
 //! with a variant for each. Any other rule becomes a struct with a field for
-//! each rule it holds, typed by how many times it can hold it. Hidden rules
-//! get no type and no field, and neither do rules that no start rule holds. A
-//! type that could contain itself holds itself in a box.
+//! each rule it holds, typed by how many times it can hold it, and a rule it
+//! always holds the same number of times becomes an array. Hidden rules get no
+//! type and no field, and neither do rules that no start rule holds. A type
+//! that could contain itself holds itself in a box.
 
 use std::collections::HashSet;
 
@@ -35,8 +36,14 @@ pub(crate) struct Field {
 pub(crate) enum Count {
     One,
     Optional,
+    /// The same number of times, more than once, on every way through.
+    Fixed(u8),
     Many,
 }
+
+/// The fewest times a rule holds another that count as many, so fixed counts
+/// stay small enough for an array.
+const MANY: u8 = 16;
 
 /// A variant of an enum, for one alternative of its rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,7 +125,9 @@ fn fields(grammar: &Grammar, expression: &Expression) -> Vec<Field> {
         .into_iter()
         .map(|(rule, Occurrences { least, most })| Field {
             rule,
-            count: if most > 1 {
+            count: if least == most && (2..MANY).contains(&most) {
+                Count::Fixed(most)
+            } else if most > 1 {
                 Count::Many
             } else if least == 1 {
                 Count::One
@@ -130,8 +139,8 @@ fn fields(grammar: &Grammar, expression: &Expression) -> Vec<Field> {
         .collect()
 }
 
-/// How many times an expression holds a rule, at least and at most, where 2
-/// stands for more than once.
+/// How many times an expression holds a rule, at least and at most, where
+/// [`MANY`] stands for that many or more.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Occurrences {
     least: u8,
@@ -156,8 +165,8 @@ fn occurrences(
         ExpressionKind::SingleDefinition(expressions) => {
             expressions.iter().fold(Vec::new(), |held, expression| {
                 combine(held, of(expression), |first, second| Occurrences {
-                    least: (first.least + second.least).min(2),
-                    most: (first.most + second.most).min(2),
+                    least: first.least.saturating_add(second.least).min(MANY),
+                    most: first.most.saturating_add(second.most).min(MANY),
                 })
             })
         }
@@ -175,15 +184,21 @@ fn occurrences(
             scaled(of(expression), |count| Occurrences { least: 0, ..count })
         }
         ExpressionKind::RepeatedSequence(expression) => {
-            scaled(of(expression), |_| Occurrences { least: 0, most: 2 })
+            scaled(of(expression), |_| Occurrences {
+                least: 0,
+                most: MANY,
+            })
         }
-        // Lowering only makes a factor that repeats two or more times.
         ExpressionKind::SyntacticFactor {
-            syntactic_primary, ..
-        } => scaled(of(syntactic_primary), |count| Occurrences {
-            most: 2,
-            ..count
-        }),
+            integer,
+            syntactic_primary,
+        } => {
+            let times = u8::try_from(*integer).unwrap_or(MANY);
+            scaled(of(syntactic_primary), |count| Occurrences {
+                least: count.least.saturating_mul(times).min(MANY),
+                most: count.most.saturating_mul(times).min(MANY),
+            })
+        }
         ExpressionKind::SyntacticTerm {
             syntactic_factor, ..
         } => of(syntactic_factor),
@@ -393,6 +408,16 @@ mod tests {
                 shape("d", "struct {}"),
                 ("e".to_owned(), None),
             ]
+        );
+    }
+
+    #[test]
+    fn holds_a_rule_held_the_same_number_of_times_in_an_array() {
+        assert_eq!(
+            shapes_of(
+                "s = a, '=', a, 3 * b, 20 * c; a = 'x'; b = 'y'; c = 'z';"
+            )[0],
+            shape("s", "struct {a Fixed(2), b Fixed(3), c Many}")
         );
     }
 

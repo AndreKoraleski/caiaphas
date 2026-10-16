@@ -60,7 +60,7 @@ Each rule becomes a type named after it, so `syntax rule` becomes
   `Value::True`.
 * Any other rule becomes a struct with a field for each rule it holds, named
   after that rule. A field holds `T`, `Option<T>` or `Vec<T>`, as many times as
-  the rule can hold it.
+  the rule can hold it, or `[T; N]` when it always holds it `N` times.
 * Every type has `text()`, the text its rule matched, and every struct has
   `span()`, where it matched. Types own what they hold, so they need no
   lifetimes.

@@ -103,6 +103,14 @@ impl<'t> Node<'t> {
             .map(T::from_node)
     }
 
+    /// Returns the `N` times the rule numbered `rule` matched inside this one,
+    /// in order. The grammar makes sure there are that many.
+    pub fn array<T: FromNode, const N: usize>(&self, rule: usize) -> [T; N] {
+        self.many(rule).try_into().unwrap_or_else(|_| {
+            panic!("the grammar always matches this rule {N} times here")
+        })
+    }
+
     /// Returns every rule numbered `rule` matched inside this one, in order.
     pub fn many<T: FromNode>(&self, rule: usize) -> Vec<T> {
         self.children()
