@@ -47,7 +47,9 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
         (ChoiceKind::RepeatedSequence, false) => {
             FindingKind::RepeatedFollowConflict { characters }
         }
-        (ChoiceKind::RepeatedSequence, true) => FindingKind::DeadEndRepetition,
+        (ChoiceKind::RepeatedSequence, true) => {
+            FindingKind::DeadEndRepeatedSequence
+        }
         (ChoiceKind::DefinitionsList, _) => return,
     };
     findings.push(Finding {
@@ -77,7 +79,7 @@ mod tests {
                 FindingKind::RequiredOptionalSequence => {
                     Some(("required".to_owned(), finding.span))
                 }
-                FindingKind::DeadEndRepetition => {
+                FindingKind::DeadEndRepeatedSequence => {
                     Some(("dead end".to_owned(), finding.span))
                 }
                 _ => None,

@@ -1,8 +1,8 @@
 //! Choice checks read one choice point at a time, where a parser has to pick
 //! one of its branches, and compare the branches.
 
-mod empty_branches;
 mod follow_conflict;
+mod nullable_branches;
 mod overlapping_branches;
 mod shadowed_branch;
 
@@ -15,6 +15,6 @@ pub(super) type ChoiceCheck = fn(&ChoicePoint, &mut Vec<Finding>);
 pub(super) const CHOICE_CHECKS: &[ChoiceCheck] = &[
     overlapping_branches::check,
     shadowed_branch::check,
-    empty_branches::check,
+    nullable_branches::check,
     follow_conflict::check,
 ];

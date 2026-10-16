@@ -154,7 +154,7 @@ mod tests {
                 "(* expect repeated-follow-conflict: wanted *) \
                  a = {'x'}, 'x';"
             ),
-            ["unfulfilled-expectation", "dead-end-repetition"]
+            ["unfulfilled-expectation", "dead-end-repeated-sequence"]
         );
     }
 

@@ -33,7 +33,7 @@ pub(crate) enum FindingKind {
     /// No input can ever finish matching a rule.
     UnproductiveRule { meta_identifier: MetaIdentifier },
     /// A repeated sequence can match nothing, so it could repeat forever.
-    EmptyRepetition,
+    NullableRepeatedSequence,
     /// Two branches of a choice can start with some of the same characters.
     OverlappingBranches { characters: CharacterSet },
     /// An optional sequence can start with characters that can also come right
@@ -47,7 +47,7 @@ pub(crate) enum FindingKind {
     RequiredOptionalSequence,
     /// A repeated sequence takes every character that can come after it, so
     /// nothing after it can ever match.
-    DeadEndRepetition,
+    DeadEndRepeatedSequence,
     /// An alternative starts and ends with its own rule, so it can group
     /// either way.
     AmbiguousRecursion { meta_identifier: MetaIdentifier },
@@ -55,7 +55,7 @@ pub(crate) enum FindingKind {
     /// choice can start with too.
     ShadowedBranch,
     /// More than one branch of a choice can match nothing.
-    AmbiguousEmptyBranches,
+    AmbiguousNullableBranches,
     /// No start rule can reach a rule, so no parser uses it.
     UnreachableRule { meta_identifier: MetaIdentifier },
     /// An alternative is written the same way as an earlier alternative of the
@@ -90,15 +90,15 @@ pub(crate) enum FindingCode {
     LeftRecursion,
     IndirectLeftRecursion,
     UnproductiveRule,
-    EmptyRepetition,
+    NullableRepeatedSequence,
     OverlappingBranches,
     OptionalFollowConflict,
     RepeatedFollowConflict,
     RequiredOptionalSequence,
-    DeadEndRepetition,
+    DeadEndRepeatedSequence,
     AmbiguousRecursion,
     ShadowedBranch,
-    AmbiguousEmptyBranches,
+    AmbiguousNullableBranches,
     UnreachableRule,
     DuplicateAlternative,
     IneffectiveException,
@@ -116,15 +116,15 @@ impl FindingCode {
         Self::LeftRecursion,
         Self::IndirectLeftRecursion,
         Self::UnproductiveRule,
-        Self::EmptyRepetition,
+        Self::NullableRepeatedSequence,
         Self::OverlappingBranches,
         Self::OptionalFollowConflict,
         Self::RepeatedFollowConflict,
         Self::RequiredOptionalSequence,
-        Self::DeadEndRepetition,
+        Self::DeadEndRepeatedSequence,
         Self::AmbiguousRecursion,
         Self::ShadowedBranch,
-        Self::AmbiguousEmptyBranches,
+        Self::AmbiguousNullableBranches,
         Self::UnreachableRule,
         Self::DuplicateAlternative,
         Self::IneffectiveException,
@@ -141,15 +141,15 @@ impl FindingCode {
             Self::LeftRecursion => "left-recursion",
             Self::IndirectLeftRecursion => "indirect-left-recursion",
             Self::UnproductiveRule => "unproductive-rule",
-            Self::EmptyRepetition => "empty-repetition",
+            Self::NullableRepeatedSequence => "nullable-repeated-sequence",
             Self::OverlappingBranches => "overlapping-branches",
             Self::OptionalFollowConflict => "optional-follow-conflict",
             Self::RepeatedFollowConflict => "repeated-follow-conflict",
             Self::RequiredOptionalSequence => "required-optional-sequence",
-            Self::DeadEndRepetition => "dead-end-repetition",
+            Self::DeadEndRepeatedSequence => "dead-end-repeated-sequence",
             Self::AmbiguousRecursion => "ambiguous-recursion",
             Self::ShadowedBranch => "shadowed-branch",
-            Self::AmbiguousEmptyBranches => "ambiguous-empty-branches",
+            Self::AmbiguousNullableBranches => "ambiguous-nullable-branches",
             Self::UnreachableRule => "unreachable-rule",
             Self::DuplicateAlternative => "duplicate-alternative",
             Self::IneffectiveException => "ineffective-exception",
@@ -172,17 +172,17 @@ impl FindingCode {
             Self::LeftRecursion
             | Self::IndirectLeftRecursion
             | Self::UnproductiveRule
-            | Self::EmptyRepetition
+            | Self::NullableRepeatedSequence
             | Self::UnknownExpectation
             | Self::UnexpectableFinding => Severity::Error,
             Self::OverlappingBranches
             | Self::OptionalFollowConflict
             | Self::RepeatedFollowConflict
             | Self::RequiredOptionalSequence
-            | Self::DeadEndRepetition
+            | Self::DeadEndRepeatedSequence
             | Self::AmbiguousRecursion
             | Self::ShadowedBranch
-            | Self::AmbiguousEmptyBranches
+            | Self::AmbiguousNullableBranches
             | Self::UnreachableRule
             | Self::DuplicateAlternative
             | Self::IneffectiveException
@@ -206,7 +206,7 @@ impl FindingCode {
             Self::OverlappingBranches
             | Self::ShadowedBranch
             | Self::DuplicateAlternative
-            | Self::AmbiguousEmptyBranches => {
+            | Self::AmbiguousNullableBranches => {
                 Some("the parser takes the first branch that matches")
             }
             Self::OptionalFollowConflict => Some(
@@ -218,7 +218,7 @@ impl FindingCode {
                  can start it, so it extends as far as it can",
             ),
             Self::RequiredOptionalSequence
-            | Self::DeadEndRepetition
+            | Self::DeadEndRepeatedSequence
             | Self::AmbiguousRecursion
             | Self::UnreachableRule
             | Self::IneffectiveException
@@ -228,7 +228,7 @@ impl FindingCode {
             Self::LeftRecursion
             | Self::IndirectLeftRecursion
             | Self::UnproductiveRule
-            | Self::EmptyRepetition
+            | Self::NullableRepeatedSequence
             | Self::UnknownExpectation
             | Self::UnexpectableFinding
             | Self::UnfulfilledExpectation => None,
@@ -244,7 +244,9 @@ impl FindingKind {
                 FindingCode::IndirectLeftRecursion
             }
             Self::UnproductiveRule { .. } => FindingCode::UnproductiveRule,
-            Self::EmptyRepetition => FindingCode::EmptyRepetition,
+            Self::NullableRepeatedSequence => {
+                FindingCode::NullableRepeatedSequence
+            }
             Self::OverlappingBranches { .. } => {
                 FindingCode::OverlappingBranches
             }
@@ -257,11 +259,13 @@ impl FindingKind {
             Self::RequiredOptionalSequence => {
                 FindingCode::RequiredOptionalSequence
             }
-            Self::DeadEndRepetition => FindingCode::DeadEndRepetition,
+            Self::DeadEndRepeatedSequence => {
+                FindingCode::DeadEndRepeatedSequence
+            }
             Self::AmbiguousRecursion { .. } => FindingCode::AmbiguousRecursion,
             Self::ShadowedBranch => FindingCode::ShadowedBranch,
-            Self::AmbiguousEmptyBranches => {
-                FindingCode::AmbiguousEmptyBranches
+            Self::AmbiguousNullableBranches => {
+                FindingCode::AmbiguousNullableBranches
             }
             Self::UnreachableRule { .. } => FindingCode::UnreachableRule,
             Self::DuplicateAlternative => FindingCode::DuplicateAlternative,
@@ -322,7 +326,7 @@ impl FindingKind {
                  the recursive part optional with `[...]` or `{{...}}`",
                 meta_identifier.as_str()
             ),
-            Self::EmptyRepetition => {
+            Self::NullableRepeatedSequence => {
                 "make what repeats read something, such as by removing \
                  `[...]` inside the `{...}`"
                     .to_owned()
@@ -346,7 +350,7 @@ impl FindingKind {
                  what comes after it start with a character it cannot take"
                     .to_owned()
             }
-            Self::DeadEndRepetition => {
+            Self::DeadEndRepeatedSequence => {
                 "move what comes after the repetition before it, so `{'x'}, \
                  'x'` becomes `'x', {'x'}`, or make what comes after it start \
                  with a character it cannot take"
@@ -366,7 +370,7 @@ impl FindingKind {
                  does, or exclude it from the other with `-`"
                     .to_owned()
             }
-            Self::AmbiguousEmptyBranches => {
+            Self::AmbiguousNullableBranches => {
                 "make all but one of these branches read something, such as \
                  by removing `[...]` around one of them"
                     .to_owned()
@@ -442,7 +446,7 @@ impl fmt::Display for Finding {
                  needs a rule that cannot either",
                 meta_identifier.as_str()
             ),
-            FindingKind::EmptyRepetition => f.write_str(
+            FindingKind::NullableRepeatedSequence => f.write_str(
                 "this repeated sequence can match nothing, so it could repeat \
                  forever",
             ),
@@ -465,7 +469,7 @@ impl fmt::Display for Finding {
                 "this optional sequence takes every character that can come \
                  after it, so skipping it never leads to a match",
             ),
-            FindingKind::DeadEndRepetition => f.write_str(
+            FindingKind::DeadEndRepeatedSequence => f.write_str(
                 "this repeated sequence takes every character that can come \
                  after it, so nothing after it can ever match",
             ),
@@ -478,7 +482,7 @@ impl fmt::Display for Finding {
             FindingKind::ShadowedBranch => f.write_str(
                 "another branch can start with every character this one can",
             ),
-            FindingKind::AmbiguousEmptyBranches => {
+            FindingKind::AmbiguousNullableBranches => {
                 f.write_str("more than one branch can match nothing")
             }
             FindingKind::UnreachableRule { meta_identifier } => write!(
@@ -596,7 +600,7 @@ mod tests {
         },
         Case {
             source: "a = {['x']};",
-            code: FindingCode::EmptyRepetition,
+            code: FindingCode::NullableRepeatedSequence,
             severity: Severity::Error,
             message: "this repeated sequence can match nothing, so it could \
                       repeat forever",
@@ -655,15 +659,16 @@ mod tests {
         },
         Case {
             source: "a = {'x'}, 'x';",
-            code: FindingCode::DeadEndRepetition,
+            code: FindingCode::DeadEndRepeatedSequence,
             severity: Severity::Warning,
             message: "this repeated sequence takes every character that can \
                       come after it, so nothing after it can ever match",
             help: "move what comes after the repetition before it, so `{'x'}, \
                    'x'` becomes `'x', {'x'}`, or make what comes after it \
                    start with a character it cannot take; if this is \
-                   intended, write `(* expect dead-end-repetition: reason *)` \
-                   right before the rule, and the grammar stays as it is",
+                   intended, write `(* expect dead-end-repeated-sequence: \
+                   reason *)` right before the rule, and the grammar stays as \
+                   it is",
         },
         Case {
             source: "e = e, '+', e | 'n';",
@@ -691,12 +696,12 @@ mod tests {
         },
         Case {
             source: "a = ['x'] | ['y'];",
-            code: FindingCode::AmbiguousEmptyBranches,
+            code: FindingCode::AmbiguousNullableBranches,
             severity: Severity::Warning,
             message: "more than one branch can match nothing",
             help: "make all but one of these branches read something, such as \
                    by removing `[...]` around one of them; if this is \
-                   intended, write `(* expect ambiguous-empty-branches: \
+                   intended, write `(* expect ambiguous-nullable-branches: \
                    reason *)` right before the rule, and the parser takes the \
                    first branch that matches",
         },
@@ -853,14 +858,14 @@ mod tests {
             Diagnostic::from(finding),
             Diagnostic {
                 severity: Severity::Warning,
-                code: Some("ambiguous-empty-branches"),
+                code: Some("ambiguous-nullable-branches"),
                 message: "more than one branch can match nothing".to_owned(),
                 span: Span { start: 4, end: 17 },
                 labels,
                 help: Some(
                     "make all but one of these branches read something, such \
                      as by removing `[...]` around one of them; if this is \
-                     intended, write `(* expect ambiguous-empty-branches: \
+                     intended, write `(* expect ambiguous-nullable-branches: \
                      reason *)` right before the rule, and the parser takes \
                      the first branch that matches"
                         .to_owned()

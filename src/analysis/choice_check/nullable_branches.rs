@@ -1,5 +1,5 @@
-//! Empty branches can match nothing, and a choice with more than one of them
-//! has more than one way to match nothing.
+//! Nullable branches can match nothing, and a choice with more than one of
+//! them has more than one way to match nothing.
 
 use crate::{
     analysis::{
@@ -26,9 +26,9 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
         return;
     }
     let kind = match choice_point.kind {
-        ChoiceKind::RepeatedSequence => FindingKind::EmptyRepetition,
+        ChoiceKind::RepeatedSequence => FindingKind::NullableRepeatedSequence,
         ChoiceKind::DefinitionsList | ChoiceKind::OptionalSequence => {
-            FindingKind::AmbiguousEmptyBranches
+            FindingKind::AmbiguousNullableBranches
         }
     };
     findings.push(Finding {
@@ -51,8 +51,8 @@ mod tests {
             .filter(|finding| {
                 matches!(
                     finding.kind,
-                    FindingKind::AmbiguousEmptyBranches
-                        | FindingKind::EmptyRepetition
+                    FindingKind::AmbiguousNullableBranches
+                        | FindingKind::NullableRepeatedSequence
                 )
             })
             .map(|finding| (finding.kind, finding.span, finding.labels.len()))
@@ -64,7 +64,7 @@ mod tests {
         assert_eq!(
             empty("a = ['x'] | ['y'];"),
             [(
-                FindingKind::AmbiguousEmptyBranches,
+                FindingKind::AmbiguousNullableBranches,
                 Span { start: 4, end: 17 },
                 2
             )]
@@ -76,7 +76,7 @@ mod tests {
         assert_eq!(
             empty("a = [['x']], 'y';"),
             [(
-                FindingKind::AmbiguousEmptyBranches,
+                FindingKind::AmbiguousNullableBranches,
                 Span { start: 4, end: 11 },
                 2
             )]
@@ -87,7 +87,11 @@ mod tests {
     fn finds_a_repeated_sequence_that_can_match_nothing() {
         assert_eq!(
             empty("a = {['x']};"),
-            [(FindingKind::EmptyRepetition, Span { start: 4, end: 11 }, 2)]
+            [(
+                FindingKind::NullableRepeatedSequence,
+                Span { start: 4, end: 11 },
+                2
+            )]
         );
     }
 
