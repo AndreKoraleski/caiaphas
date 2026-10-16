@@ -31,10 +31,12 @@ pub(crate) struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
+    /// Returns a lexer at the start of `source`, past the byte order mark some
+    /// editors write first.
     pub(crate) fn new(source: &'a str) -> Self {
         Self {
             source,
-            position: 0,
+            position: if source.starts_with('\u{FEFF}') { 3 } else { 0 },
             comments: Vec::new(),
         }
     }
@@ -272,6 +274,11 @@ mod tests {
     #[test]
     fn reads_nothing_from_empty_source() {
         assert_eq!(Lexer::new("").count(), 0);
+    }
+
+    #[test]
+    fn starts_past_a_byte_order_mark() {
+        assert_eq!(texts("\u{FEFF}a = 'x';"), ["a", "=", "'x'", ";"]);
     }
 
     #[test]
