@@ -136,8 +136,8 @@ pub struct Square { pub size: [u32; 2] }
   `span()`. An enum has `text()` too, unless a variant holds an `(* as T *)`
   value. A type with `text()` displays as that text, and a rule that only
   ever matches one character also has `char()`.
-* Two values are equal when they matched the same way at the same place, since
-  each holds where it matched.
+* A struct holds where it matched, so two are equal only when they matched at
+  the same place.
 * The type of a start rule has `parse` and implements `FromStr`. A start rule
   is one that no other rule uses, so a grammar whose top rule recurs needs
   one more above it, such as `calculation = expression;`.
@@ -151,13 +151,14 @@ A comment right before a rule can tell caiaphas more about it.
 | `(* hide *)`                | no type and no field, as for whitespace        |
 | `(* inline *)`              | no type: rules that hold it hold what it holds |
 | `(* as u16 *)`              | the type is `u16`, read from the rule's text   |
-| `(* first match *)`         | choices take the first alternative that works  |
-| `(* greedy *)`              | the rule takes each way as it comes            |
-| `(* expect code: reason *)` | marks a warning as intended                    |
+| `(* first match *)`         | how the rule chooses, see [Matching](#matching)|
+| `(* greedy *)`              | how the rule chooses, see [Matching](#matching)|
+| `(* expect code: reason *)` | marks a warning or suggestion as intended      |
 
 `(* as T *)` takes any type with `FromStr`, `Debug`, `Clone` and `PartialEq`,
-such as `String`, `f64` or `std::net::Ipv4Addr`. Text the type does not read
-fails to match there, as `300` does for a `u8`.
+named as where `grammar!` is called, such as `String`, `f64`,
+`std::net::Ipv4Addr` or a type of your own. Text the type does not read fails
+to match there, as `300` does for a `u8`.
 
 ## Matching
 
@@ -172,10 +173,9 @@ extension = letter, {letter};
 character = letter | '.';
 ```
 
-A parser matches every input its grammar describes. Where there is more than
-one way, each part takes the most text it can while the rest still matches, so
-the name takes `archive.tar` and leaves `.gz`. Of alternatives that match the
-same text, the first written wins.
+Where an input reads more than one way, each part takes the most text it can
+while the rest still matches, so the name takes `archive.tar` and leaves
+`.gz`. Of alternatives that match the same text, the first written wins.
 
 Most choices need no such care, since the next character tells which way goes
 on, and the parser takes those as it comes. caiaphas finds the few rules where
@@ -186,17 +186,18 @@ the `else` of a nested `if` does.
 
 ## Checks
 
-Before generating, caiaphas checks the grammar. Each finding has a code,
-and `caiaphas explain <code>` tells what it means, with an example and the
-usual fix.
+Each finding has a code in its title, as in `warning[tied-branches]`, and
+`caiaphas explain <code>` tells what it means, with an example and the usual
+fix.
 
-* An error stops the build, as `left-recursion` and `unproductive-rule` do.
+* An error stops the build, as `unproductive-rule` and
+  `nullable-repeated-sequence` do.
 * A warning stops it too, as `tied-branches` and `unreachable-alternative` do,
   unless a comment right before its rule expects it with a reason:
 
   ```ebnf
-  (* expect tied-branches: a keyword is never an identifier *)
-  token = keyword | identifier;
+  (* expect tied-branches: a keyword is never a name *)
+  word = keyword | name;
   ```
 
 * A suggestion, such as `nondeterministic-choice`, does not stop the build
