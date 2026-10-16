@@ -66,6 +66,7 @@ caiaphas-macros.workspace = true
 rustc-hash.workspace = true
 
 [dev-dependencies]
+caiaphas-generator.workspace = true
 trybuild.workspace = true
 
 [lints]

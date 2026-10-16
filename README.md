@@ -197,6 +197,7 @@ file = name, '.', extension;
 name = character, {character};
 extension = letter, {letter};
 character = letter | '.';
+letter = ? U+0061..U+007A ?;
 ```
 
 Where an input reads more than one way, each part takes the most text it can
@@ -224,6 +225,8 @@ fix.
   ```ebnf
   (* expect tied-branches: a keyword is never a name *)
   word = keyword | name;
+  keyword = 'if' | 'else';
+  name = ? /[a-z]+/ ?;
   ```
 
 * A suggestion, such as `nondeterministic-choice`, does not stop the build
