@@ -105,6 +105,11 @@ Rust 1.85 or later.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Acknowledgements
+
+The scaffolding of this repository was generated with
+[rust-lib-template](https://github.com/AndreKoraleski/rust-lib-template).
+
 ## License
 
 Licensed under either of
