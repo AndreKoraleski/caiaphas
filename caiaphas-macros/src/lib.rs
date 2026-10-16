@@ -79,36 +79,22 @@ impl Parse for Input {
 /// Generates a module that parses a grammar, with a type for each of its
 /// rules.
 ///
-/// It takes the module's attributes and visibility, its name and the path of
-/// the grammar's file from the root of the crate:
-///
 /// ```text
+/// // A grammar in a file, with a path from the root of the crate.
 /// caiaphas::grammar!(pub mod json = "grammars/json.ebnf");
-/// ```
 ///
-/// A short grammar can be written in the macro instead, as a string between
-/// braces:
-///
-/// ```text
+/// // A short grammar written in the macro.
 /// caiaphas::grammar!(pub mod pair { "pair = 'x', ',', 'y';" });
 /// ```
 ///
-/// With `suggest` after the grammar, every change that would make the parser
-/// faster stops the build, as a problem in the grammar does:
+/// Attributes and doc comments before `mod` go to the module. `suggest` after
+/// the grammar makes every suggestion stop the build, as a warning does.
+/// `optimize` makes the parser match the grammar rearranged wherever that
+/// keeps its types, such as with a start that alternatives share written once,
+/// and leaves those suggestions out. The [tutorial] tells what the module
+/// holds.
 ///
-/// ```text
-/// caiaphas::grammar!(pub mod json = "grammars/json.ebnf", suggest);
-/// ```
-///
-/// With `optimize`, the parser matches the grammar rearranged wherever that
-/// keeps its types the same, such as with a start that alternatives share
-/// written once, and those suggestions are left out:
-///
-/// ```text
-/// caiaphas::grammar!(pub mod json = "grammars/json.ebnf", optimize);
-/// ```
-///
-/// The crate documentation of `caiaphas` tells what the module holds.
+/// [tutorial]: https://docs.rs/caiaphas/latest/caiaphas/tutorial/
 #[proc_macro]
 pub fn grammar(input: TokenStream) -> TokenStream {
     let Input {
