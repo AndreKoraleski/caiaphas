@@ -26,8 +26,8 @@ fixes
 caiaphas generates parsers from grammars written in the EBNF that ISO/IEC 14977
 defines. Its `grammar!` macro reads a grammar when your crate compiles, and
 writes a module with a parser and a Rust type for each rule. The types own what
-they hold, so there are no lifetimes to carry around, and they follow the
-rules, so the shape of the grammar is the shape of the data.
+they hold, so they carry no lifetimes, and each follows its rule, so the data
+has the shape of the grammar.
 
 A parser matches exactly the inputs its grammar describes. Before writing
 anything, caiaphas checks the grammar, and stops with a way to fix each
@@ -58,7 +58,7 @@ ws = {' ' | ? U+0009 ? | ? U+000A ? | ? U+000D ?};
 ```
 
 Then generate its module, with a path from the root of your crate, and parse
-with the type of the rule that no other rule uses:
+with the type of its [start rule](#types), `json`:
 
 ```rust
 caiaphas::grammar!(pub mod json = "grammars/json.ebnf");
@@ -68,7 +68,9 @@ use json::{Json, Value};
 let document: Json = r#"{"name": "caiaphas"}"#.parse()?;
 if let Value::Object(object) = &document.value {
     for member in &object.member {
-        println!("{} is {}", member.string.text(), member.value.text());
+        if let Value::String(value) = &member.value {
+            println!("{} is {}", member.string, value);
+        }
     }
 }
 ```
