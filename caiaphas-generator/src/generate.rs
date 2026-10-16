@@ -2,3 +2,4 @@
 //! types of its rules.
 
 mod name;
+mod shape;
