@@ -57,7 +57,7 @@ pub(crate) enum FindingKind {
     /// No start rule can reach a rule, so no parser uses it.
     UnreachableRule { meta_identifier: MetaIdentifier },
     /// An alternative of a rule that takes the first match comes after one
-    /// that can match nothing, so a parser never tries it.
+    /// that matches wherever it would, so a parser never takes it.
     UnreachableAlternative,
     /// An alternative is written the same way as an earlier alternative of the
     /// same choice.
@@ -347,9 +347,9 @@ impl FindingKind {
                 meta_identifier.as_str()
             ),
             Self::UnreachableAlternative => {
-                "move it before the alternative that can match nothing, or \
-                 make that one read something"
-                    .to_owned()
+                "move it before the alternative that matches first, or remove \
+                 it"
+                .to_owned()
             }
             Self::DuplicateAlternative => "remove this alternative".to_owned(),
             Self::IneffectiveException => {
@@ -463,8 +463,8 @@ impl fmt::Display for FindingKind {
                 meta_identifier.as_str()
             ),
             Self::UnreachableAlternative => f.write_str(
-                "this alternative comes after one that can match nothing, so \
-                 a parser that takes the first match never tries it",
+                "an earlier alternative matches wherever this one would, so a \
+                 parser that takes the first match never takes this one",
             ),
             Self::DuplicateAlternative => f.write_str(
                 "this alternative is written the same way as an earlier one, \
@@ -685,13 +685,13 @@ mod tests {
             source: "(* first match *) a = ['y'] | 'x';",
             code: FindingCode::UnreachableAlternative,
             severity: Severity::Warning,
-            message: "this alternative comes after one that can match \
-                      nothing, so a parser that takes the first match never \
-                      tries it",
-            help: "move it before the alternative that can match nothing, or \
-                   make that one read something; if this is intended, write \
-                   `(* expect unreachable-alternative: reason *)` right \
-                   before the rule, and the grammar stays as it is",
+            message: "an earlier alternative matches wherever this one would, \
+                      so a parser that takes the first match never takes this \
+                      one",
+            help: "move it before the alternative that matches first, or \
+                   remove it; if this is intended, write `(* expect \
+                   unreachable-alternative: reason *)` right before the rule, \
+                   and the grammar stays as it is",
         },
         Case {
             source: "a = 'x' | 'x';",

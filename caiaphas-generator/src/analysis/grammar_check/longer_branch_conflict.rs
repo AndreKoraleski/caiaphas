@@ -66,7 +66,7 @@ pub(super) fn check(
 
 /// Returns what `longer` goes on with after `shorter`, when `longer` starts
 /// with every expression of `shorter` and has more.
-fn rest_after<'e>(
+pub(super) fn rest_after<'e>(
     shorter: &Expression,
     longer: &'e Expression,
 ) -> Option<&'e [Expression]> {

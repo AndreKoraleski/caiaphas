@@ -16,8 +16,7 @@ use crate::{
 /// Only the alternatives of a definitions list get labels, since the finding
 /// already points at the only body of an optional or repeated sequence. The
 /// alternatives of a rule that takes the first match are left to the
-/// unreachable alternative check, since the first that can match nothing
-/// always matches.
+/// unreachable alternative check.
 pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
     let nullable: Vec<Label> = choice_point
         .branches

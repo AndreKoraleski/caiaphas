@@ -2,7 +2,6 @@
 
 mod follow_conflict;
 mod nullable_branches;
-mod unreachable_alternative;
 
 use crate::analysis::{choice_point::ChoicePoint, finding::Finding};
 
@@ -10,8 +9,5 @@ use crate::analysis::{choice_point::ChoicePoint, finding::Finding};
 pub(super) type ChoiceCheck = fn(&ChoicePoint, &mut Vec<Finding>);
 
 /// Every choice check. A new one goes in its own file and in this list.
-pub(super) const CHOICE_CHECKS: &[ChoiceCheck] = &[
-    nullable_branches::check,
-    follow_conflict::check,
-    unreachable_alternative::check,
-];
+pub(super) const CHOICE_CHECKS: &[ChoiceCheck] =
+    &[nullable_branches::check, follow_conflict::check];

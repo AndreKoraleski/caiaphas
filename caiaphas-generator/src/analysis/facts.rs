@@ -14,6 +14,8 @@ pub(crate) struct Facts<'a> {
     grammar: &'a Grammar,
     /// Whether each rule can match nothing.
     nullable: OnceCell<Vec<bool>>,
+    /// Whether each rule matches wherever it is tried.
+    always_matching: OnceCell<Vec<bool>>,
     /// Whether each rule can finish matching some input.
     productive: OnceCell<Vec<bool>>,
     /// The characters each rule can start with.
@@ -29,6 +31,7 @@ impl<'a> Facts<'a> {
         Self {
             grammar,
             nullable: OnceCell::new(),
+            always_matching: OnceCell::new(),
             productive: OnceCell::new(),
             first: OnceCell::new(),
             follow: OnceCell::new(),
@@ -43,6 +46,15 @@ impl<'a> Facts<'a> {
     /// than too little.
     pub(crate) fn is_nullable(&self, expression: &Expression) -> bool {
         is_nullable(expression, self.nullable_rules())
+    }
+
+    /// Returns whether `expression` matches wherever it is tried, if only
+    /// nothing.
+    ///
+    /// A syntactic term never counts as one, since its exception can take its
+    /// match away.
+    pub(crate) fn always_matches(&self, expression: &Expression) -> bool {
+        always_matches(expression, self.always_matching_rules())
     }
 
     /// Returns whether some input can finish matching `expression`.
@@ -237,6 +249,11 @@ impl<'a> Facts<'a> {
             .get_or_init(|| self.fixed_point(false, is_nullable))
     }
 
+    fn always_matching_rules(&self) -> &[bool] {
+        self.always_matching
+            .get_or_init(|| self.fixed_point(false, always_matches))
+    }
+
     fn productive_rules(&self) -> &[bool] {
         self.productive
             .get_or_init(|| self.fixed_point(false, is_productive))
@@ -366,6 +383,27 @@ fn is_nullable(expression: &Expression, rules: &[bool]) -> bool {
         } => is_nullable(expression, rules),
         ExpressionKind::MetaIdentifier(RuleId(position)) => rules[*position],
         ExpressionKind::TerminalString(_)
+        | ExpressionKind::SpecialSequence(_) => false,
+    }
+}
+
+fn always_matches(expression: &Expression, rules: &[bool]) -> bool {
+    match &expression.kind {
+        ExpressionKind::SingleDefinition(expressions) => expressions
+            .iter()
+            .all(|expression| always_matches(expression, rules)),
+        ExpressionKind::DefinitionsList(expressions) => expressions
+            .iter()
+            .any(|expression| always_matches(expression, rules)),
+        ExpressionKind::OptionalSequence(_)
+        | ExpressionKind::RepeatedSequence(_)
+        | ExpressionKind::EmptySequence => true,
+        ExpressionKind::SyntacticFactor {
+            syntactic_primary, ..
+        } => always_matches(syntactic_primary, rules),
+        ExpressionKind::MetaIdentifier(RuleId(position)) => rules[*position],
+        ExpressionKind::SyntacticTerm { .. }
+        | ExpressionKind::TerminalString(_)
         | ExpressionKind::SpecialSequence(_) => false,
     }
 }

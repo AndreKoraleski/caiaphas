@@ -11,6 +11,7 @@ mod left_recursion;
 mod longer_branch_conflict;
 mod tied_branches;
 mod unproductive_rule;
+mod unreachable_alternative;
 mod unreachable_rule;
 
 use crate::{
@@ -34,4 +35,5 @@ pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     empty_rule::check,
     exhaustive_exception::check,
     case_only_names::check,
+    unreachable_alternative::check,
 ];
