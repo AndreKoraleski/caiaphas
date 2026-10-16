@@ -1,5 +1,7 @@
 //! Meta identifiers of ISO/IEC 14977 EBNF.
 
+use std::hash::{Hash, Hasher};
+
 use crate::lexer::{gap_separator, terminal_character::TerminalCharacter};
 
 /// A meta identifier names a rule.
@@ -7,8 +9,13 @@ use crate::lexer::{gap_separator, terminal_character::TerminalCharacter};
 /// It is a letter followed by any number of letters and digits. Gaps may come
 /// between those characters but are not part of the name, so `syntax rule` and
 /// `syntaxrule` are the same meta identifier.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct MetaIdentifier(String);
+#[derive(Debug, Clone)]
+pub(crate) struct MetaIdentifier {
+    name: String,
+    /// The meta identifier as written, gaps included, which tells where its
+    /// words start.
+    written: String,
+}
 
 impl MetaIdentifier {
     /// Returns the meta identifier at the start of `input`, and how long it
@@ -19,12 +26,34 @@ impl MetaIdentifier {
         }
         let (name, length) =
             gap_separator::remove(input, is_meta_identifier_character);
-        Some((Self(name), length))
+        let written = input[..length].to_owned();
+        Some((Self { name, written }, length))
     }
 
     /// Returns the name, without gaps.
     pub(crate) fn as_str(&self) -> &str {
-        &self.0
+        &self.name
+    }
+
+    /// Returns the words that the gaps in the meta identifier separate.
+    pub(crate) fn words(&self) -> impl Iterator<Item = &str> {
+        self.written
+            .split(|c: char| !c.is_ascii_alphanumeric())
+            .filter(|word| !word.is_empty())
+    }
+}
+
+impl PartialEq for MetaIdentifier {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for MetaIdentifier {}
+
+impl Hash for MetaIdentifier {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
     }
 }
 
@@ -84,6 +113,17 @@ mod tests {
             MetaIdentifier::read("syntaxrule")
                 .map(|(identifier, _)| identifier)
         );
+    }
+
+    #[test]
+    fn keeps_the_words_the_gaps_separate() {
+        let words = |input| {
+            let (identifier, _) = MetaIdentifier::read(input).unwrap();
+            identifier.words().map(str::to_owned).collect::<Vec<_>>()
+        };
+        assert_eq!(words("syntax rule"), ["syntax", "rule"]);
+        assert_eq!(words("decimal\r\n digit 2"), ["decimal", "digit", "2"]);
+        assert_eq!(words("syntaxRule = x"), ["syntaxRule"]);
     }
 
     #[test]
