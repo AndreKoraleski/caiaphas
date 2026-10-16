@@ -55,7 +55,7 @@ jobs:
           rustup update stable
           rustup default stable
           rustup component add rustfmt
-      - run: cargo fmt --check
+      - run: cargo fmt --all --check
 
   docs:
     name: Documentation

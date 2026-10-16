@@ -1,0 +1,16 @@
+[package]
+name = "caiaphas-generator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = """
+Reads ISO/IEC 14977 EBNF grammars for caiaphas, finds their problems and \
+generates their parsers"""
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+annotate-snippets.workspace = true
+
+[lints]
+workspace = true

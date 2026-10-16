@@ -1,13 +1,28 @@
-[package]
-name = "caiaphas"
+[workspace]
+members = ["caiaphas-generator"]
+# Plain `cargo test` and `cargo clippy` cover every crate, not only this one.
+default-members = [".", "caiaphas-generator"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/AndreKoraleski/caiaphas"
+
+[workspace.dependencies]
+annotate-snippets = "0.12.16"
+
+[package]
+name = "caiaphas"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 description = """
 EBNF parser generator for Rust that detects grammar ambiguities and suggests \
 fixes"""
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/AndreKoraleski/caiaphas"
+license.workspace = true
+repository.workspace = true
 # Up to five each. Categories must match https://crates.io/category_slugs.
 keywords = []
 categories = []
@@ -18,13 +33,13 @@ categories = []
 # Makes `cargo publish` refuse until the line is removed.
 # publish = false
 
-[dependencies]
-annotate-snippets = "0.12.16"
+[lints]
+workspace = true
 
 # Lints warn locally. CI denies every warning.
 #
 # Backed by the Rust API Guidelines. Anything commented out is an opt-in extra.
-[lints.rust]
+[workspace.lints.rust]
 missing_docs = "warn"                  # C-CRATE-DOC, C-EXAMPLE
 missing_debug_implementations = "warn" # C-DEBUG
 # unsafe_code = "forbid"
@@ -42,7 +57,7 @@ missing_debug_implementations = "warn" # C-DEBUG
 # unused_macro_rules = "warn"
 # non_ascii_idents = "warn"
 
-[lints.clippy]
+[workspace.lints.clippy]
 # pedantic = { level = "warn", priority = -1 }
 # missing_errors_doc = "warn"    # C-FAILURE, part of pedantic
 # missing_panics_doc = "warn"    # C-FAILURE, part of pedantic

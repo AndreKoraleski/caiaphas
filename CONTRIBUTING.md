@@ -9,7 +9,7 @@ Run these before CI so you don't have to do a round trip.
 ```sh
 cargo test
 cargo clippy --all-targets -- -D warnings
-cargo fmt --check
+cargo fmt --all --check
 cargo doc --no-deps
 ```
 
