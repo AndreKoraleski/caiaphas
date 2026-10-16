@@ -8,16 +8,39 @@ use crate::__private::{Expected, Rule};
 
 /// Where the matches of an expression at a position can end, each once, in the
 /// order a parser prefers them.
-#[derive(Debug, Clone, Default)]
-pub struct Ends {
-    ends: Vec<usize>,
-    /// The same ends once there are more than [`FEW_ENDS`], to tell quickly
-    /// whether one is there.
-    seen: Option<FxHashSet<usize>>,
+#[derive(Debug, Clone)]
+pub struct Ends(Held);
+
+/// How [`Ends`] holds its ends. Most expressions have few, so those are held
+/// without allocating.
+#[derive(Debug, Clone)]
+enum Held {
+    Few {
+        count: usize,
+        ends: [usize; FEW_ENDS],
+    },
+    Many {
+        ends: Vec<usize>,
+        /// The same ends once there are more than [`LISTED_ENDS`], to tell
+        /// quickly whether one is there.
+        seen: Option<FxHashSet<usize>>,
+    },
 }
 
+/// How many ends [`Ends`] holds without allocating.
+const FEW_ENDS: usize = 4;
+
 /// How many ends [`Ends`] looks through one by one.
-const FEW_ENDS: usize = 16;
+const LISTED_ENDS: usize = 16;
+
+impl Default for Ends {
+    fn default() -> Self {
+        Self(Held::Few {
+            count: 0,
+            ends: [0; FEW_ENDS],
+        })
+    }
+}
 
 impl Ends {
     /// Returns no ends, as of an expression that does not match.
@@ -26,10 +49,9 @@ impl Ends {
     }
 
     pub fn one(end: usize) -> Self {
-        Self {
-            ends: vec![end],
-            seen: None,
-        }
+        let mut ends = Self::none();
+        ends.add(end);
+        ends
     }
 
     /// Returns `end` alone, if there is one.
@@ -37,21 +59,30 @@ impl Ends {
         end.map_or_else(Self::none, Self::one)
     }
 
+    fn as_slice(&self) -> &[usize] {
+        match &self.0 {
+            Held::Few { count, ends } => &ends[..*count],
+            Held::Many { ends, .. } => ends,
+        }
+    }
+
     pub fn contains(&self, end: usize) -> bool {
-        match &self.seen {
-            Some(seen) => seen.contains(&end),
-            None => self.ends.contains(&end),
+        match &self.0 {
+            Held::Many {
+                seen: Some(seen), ..
+            } => seen.contains(&end),
+            _ => self.as_slice().contains(&end),
         }
     }
 
     /// Returns the end a parser prefers, if any.
     pub fn first(&self) -> Option<usize> {
-        self.ends.first().copied()
+        self.as_slice().first().copied()
     }
 
     /// Returns the ends in order.
     pub fn iter(&self) -> impl Iterator<Item = usize> + '_ {
-        self.ends.iter().copied()
+        self.as_slice().iter().copied()
     }
 
     /// Adds `end` after the others, unless it is there already.
@@ -59,43 +90,71 @@ impl Ends {
         if self.contains(end) {
             return;
         }
-        self.ends.push(end);
-        match &mut self.seen {
-            Some(seen) => {
-                seen.insert(end);
+        match &mut self.0 {
+            Held::Few { count, ends } if *count < FEW_ENDS => {
+                ends[*count] = end;
+                *count += 1;
             }
-            None if self.ends.len() > FEW_ENDS => {
-                self.seen = Some(self.ends.iter().copied().collect());
+            Held::Few { ends, .. } => {
+                let mut many = Vec::with_capacity(FEW_ENDS * 2);
+                many.extend_from_slice(ends);
+                many.push(end);
+                self.0 = Held::Many {
+                    ends: many,
+                    seen: None,
+                };
             }
-            None => {}
+            Held::Many { ends, seen } => {
+                ends.push(end);
+                match seen {
+                    Some(seen) => {
+                        seen.insert(end);
+                    }
+                    None if ends.len() > LISTED_ENDS => {
+                        *seen = Some(ends.iter().copied().collect());
+                    }
+                    None => {}
+                }
+            }
         }
     }
 
     /// Adds each of `other` after these, in its order.
     pub fn extend(&mut self, other: Self) {
-        for end in other.ends {
+        for &end in other.as_slice() {
             self.add(end);
         }
     }
 
     /// Keeps only the ends `keep` holds for.
     pub fn retain(&mut self, mut keep: impl FnMut(usize) -> bool) {
-        self.ends.retain(|&end| keep(end));
-        self.seen = (self.ends.len() > FEW_ENDS)
-            .then(|| self.ends.iter().copied().collect());
+        let kept = Self::none();
+        let kept = self.iter().filter(|&end| keep(end)).fold(
+            kept,
+            |mut kept, end| {
+                kept.add(end);
+                kept
+            },
+        );
+        *self = kept;
     }
 
     /// Returns the ends with the end of the most text first.
     pub fn longest_first(mut self) -> Self {
-        self.ends.sort_unstable_by(|left, right| right.cmp(left));
+        let ends = match &mut self.0 {
+            Held::Few { count, ends } => &mut ends[..*count],
+            Held::Many { ends, .. } => ends,
+        };
+        ends.sort_unstable_by(|left, right| right.cmp(left));
         self
     }
 
     /// Returns the only end of an expression that has at most one, and that
     /// the rest of a match goes on from.
     pub fn only(&self) -> usize {
-        debug_assert_eq!(self.ends.len(), 1, "the expression has one end");
-        self.ends[0]
+        let ends = self.as_slice();
+        debug_assert_eq!(ends.len(), 1, "the expression has one end");
+        ends[0]
     }
 }
 
@@ -139,7 +198,7 @@ impl<const REPORTS: bool> Parser<'_, REPORTS> {
         mut step: impl FnMut(&mut Self, usize) -> Ends,
     ) -> Ends {
         let mut after = Ends::none();
-        for end in ends.ends {
+        for &end in ends.as_slice() {
             after.extend(step(self, end));
         }
         after
@@ -173,7 +232,8 @@ impl<const REPORTS: bool> Parser<'_, REPORTS> {
         // end, and how many of those have been followed.
         let mut followed = vec![(position, round(self, position), 0)];
         while let Some((start, nexts, taken)) = followed.last_mut() {
-            let (start, next) = (*start, nexts.ends.get(*taken).copied());
+            let (start, next) =
+                (*start, nexts.as_slice().get(*taken).copied());
             *taken += 1;
             match next {
                 Some(next) if !reached.contains(next) => {
@@ -208,8 +268,10 @@ impl<const REPORTS: bool> Parser<'_, REPORTS> {
             if start == end || nexts.contains_key(&start) {
                 continue;
             }
-            let mut ends = round(self, start).ends;
-            ends.retain(|&next| next <= end);
+            let ends: Vec<usize> = round(self, start)
+                .iter()
+                .filter(|&next| next <= end)
+                .collect();
             pending.extend(&ends);
             nexts.insert(start, ends);
         }
@@ -243,8 +305,7 @@ impl<const REPORTS: bool> Parser<'_, REPORTS> {
         mut leads: impl FnMut(&mut Self, usize) -> bool,
     ) -> usize {
         candidates
-            .ends
-            .into_iter()
+            .iter()
             .find(|&candidate| leads(self, candidate))
             .expect("one of the candidates leads to the end")
     }
