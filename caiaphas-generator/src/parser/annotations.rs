@@ -18,56 +18,55 @@ pub(super) fn attach(
     errors: &mut Vec<ParseError>,
 ) {
     for &span in comments {
-        let text = &source[span.range()];
-        let annotation = match Comment::read(text, span) {
+        let kind = match Comment::read(&source[span.range()], span) {
             Comment::Ordinary => continue,
-            Comment::Annotation(annotation) => annotation,
+            Comment::Annotation(annotation) => {
+                if give(annotation, span, attempts, rules) {
+                    continue;
+                }
+                ParseErrorKind::AnnotationWithoutRule
+            }
             Comment::MalformedExpectation => {
-                errors.push(ParseError {
-                    kind: ParseErrorKind::MalformedExpectation,
-                    span,
-                });
-                continue;
+                ParseErrorKind::MalformedExpectation
             }
-            Comment::MalformedHide => {
-                errors.push(ParseError {
-                    kind: ParseErrorKind::MalformedHide,
-                    span,
-                });
-                continue;
-            }
+            Comment::MalformedHide => ParseErrorKind::MalformedHide,
             Comment::MalformedFirstMatch => {
-                errors.push(ParseError {
-                    kind: ParseErrorKind::MalformedFirstMatch,
-                    span,
-                });
-                continue;
+                ParseErrorKind::MalformedFirstMatch
             }
         };
-        let inside = attempts
-            .iter()
-            .any(|rule| rule.start < span.start && span.end < rule.end);
-        match attempts.iter().find(|rule| rule.start >= span.end) {
-            Some(next) if !inside => {
-                let Some(rule) =
-                    rules.iter_mut().find(|rule| rule.span == *next)
-                else {
-                    continue;
-                };
-                match annotation {
-                    Annotation::Expectation(expectation) => {
-                        rule.expectations.push(expectation);
-                    }
-                    Annotation::Hide => rule.hidden = true,
-                    Annotation::FirstMatch => rule.first_match = true,
-                }
+        errors.push(ParseError { kind, span });
+    }
+}
+
+/// Gives `annotation`, written at `span`, to the rule right after it, and
+/// returns whether there is a rule right after it. A rule the parser could
+/// not read is left out with its annotations.
+fn give(
+    annotation: Annotation,
+    span: Span,
+    attempts: &[Span],
+    rules: &mut [SyntaxRule],
+) -> bool {
+    let inside = attempts
+        .iter()
+        .any(|rule| rule.start < span.start && span.end < rule.end);
+    let Some(next) = attempts.iter().find(|rule| rule.start >= span.end)
+    else {
+        return false;
+    };
+    if inside {
+        return false;
+    }
+    if let Some(rule) = rules.iter_mut().find(|rule| rule.span == *next) {
+        match annotation {
+            Annotation::Expectation(expectation) => {
+                rule.expectations.push(expectation);
             }
-            _ => errors.push(ParseError {
-                kind: ParseErrorKind::AnnotationWithoutRule,
-                span,
-            }),
+            Annotation::Hide => rule.hidden = true,
+            Annotation::FirstMatch => rule.first_match = true,
         }
     }
+    true
 }
 
 #[cfg(test)]
