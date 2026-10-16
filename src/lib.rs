@@ -42,12 +42,16 @@
 //! special sequence holds one code point, such as `? U+00E9 ?`, or a range of
 //! them, such as `? U+0041..U+005A ?`.
 //!
-//! Where a choice has more than one way to go, the parser takes the
-//! alternative that matches the most text, and the first written of those that
-//! tie. Optional and repeated sequences take as much as they can.
+//! A parser matches exactly the inputs its grammar describes. Where an input
+//! can be read more than one way, each part, from the outside in and left to
+//! right, takes the most text it can while the rest still matches, and the
+//! first written of alternatives that tie wins.
 //!
 //! The choices of a rule written right after `(* first match *)` take the
-//! first alternative that matches instead, in the order written, as in a PEG.
+//! first alternative after which the rest still matches instead, in the order
+//! written. A rule written right after `(* greedy *)` takes each way as it
+//! comes and never goes back, which keeps its parser fast where that is what
+//! the grammar means, such as the `else` of a nested `if`.
 //!
 //! # Problems
 //!

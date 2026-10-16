@@ -16,9 +16,9 @@
 //! rules whose matches nobody reads, such as whitespace between tokens.
 //!
 //! A first match, written `(* first match *)`, makes every choice written in
-//! the rule take the first alternative that matches, in the order written,
-//! instead of the one that matches the most. It suits rules whose order says
-//! which alternative wins, as it does in a PEG.
+//! the rule take the first alternative after which the rest of the input still
+//! matches, in the order written, instead of the one that matches the most. It
+//! suits rules whose order says which alternative wins, as it does in a PEG.
 //!
 //! A greedy, written `(* greedy *)`, makes the rule take each way through it
 //! as it comes to it, even where the rest of the input needs another, so its

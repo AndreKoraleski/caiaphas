@@ -72,23 +72,31 @@ caiaphas reads the syntax of ISO/IEC 14977, and works on characters, so a
 grammar describes its whitespace too. A special sequence holds one code point,
 such as `? U+00E9 ?`, or a range of them, such as `? U+0041..U+005A ?`.
 
-Where a choice has more than one way to go, a parser takes the alternative
-that matches the most text, and optional and repeated sequences take as much
-as they can. The choices of a rule marked `(* first match *)` take the first
-alternative that matches instead, in the order written, as in a PEG, so here
-`nullable` starts with `null`, where the longest match would read a `name`:
+A parser matches exactly the inputs its grammar describes. Where an input can
+be read more than one way, each part, from the outside in and left to right,
+takes the most text it can while the rest still matches, and the first written
+of alternatives that tie wins.
+
+The choices of a rule marked `(* first match *)` take the first alternative
+after which the rest still matches instead, in the order written, so here `ab`
+reads as `a` then `b`, where taking the most text would read one `ab`:
 
 ```ebnf
+list = item, {item};
 (* first match *)
-value = 'null' | name;
+item = 'a' | 'ab' | 'b';
 ```
+
+A rule marked `(* greedy *)` takes each way as it comes and never goes back,
+which keeps its parser fast where that is what the grammar means, such as the
+`else` of a nested `if`.
 
 ## Problems
 
 Before generating, caiaphas looks for what would make the parser fail, or not
 do what the grammar seems to mean, such as left recursion, alternatives that
-can match the same text, or a repetition that leaves nothing for what comes
-after it. Each problem stops the build with a suggestion. When a warning
+can match the same text, or a rule that can never finish matching. Each
+problem stops the build with a suggestion. When a warning
 describes what you intend, mark it right before its rule with the code the
 suggestion gives and a reason:
 

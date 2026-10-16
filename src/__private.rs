@@ -1,27 +1,20 @@
-//! What generated parsers are made of. Generated code writes a function for
-//! each rule of its grammar, which matches the rule with a [`Parser`], and
-//! turns the tree the parser builds into its own types. Nothing here is meant
-//! to be used directly, so it can change in any release.
+//! What generated parsers are made of. Generated code matches each rule of its
+//! grammar with a [`Parser`], and turns the tree the parser builds into its
+//! own types. Nothing here is meant to be used directly, so it can change in
+//! any release.
 //!
-//! Each choice takes the branch that matches the most text, and the first
-//! written of those that tie, unless its rule takes the first match, when it
-//! takes the first branch that matches. Optional and repeated sequences take
-//! as much as they can. A rule that a parser can try more than once at the
-//! same place remembers its match there, so trying every branch never matches
-//! it twice.
+//! The function of most rules takes one way through each choice as it comes:
+//! the branch that matches the most text and the first written of those that
+//! tie, or the first that matches with a first match, and as much of an
+//! optional or repeated sequence as it can. Outside greedy rules, the analysis
+//! makes sure that never misses a match. A rule that a parser can try more
+//! than once at the same place remembers its match there.
 //!
-//! Taking one way through each choice as it comes can leave out the way the
-//! rest of the input needs. A rule where it could gets two functions that try
-//! every way instead. One tells every place where the rule's matches at a
-//! position can end, in the order the rule prefers them, and remembers them
-//! there. The other builds the node of the match that ends where the rule
-//! around it picks. Each part of a match takes the first end it prefers that
-//! the rest of the match can go on from, and the start rule takes the end of
-//! the input. A rule prefers the end of the most text, unless it takes the
-//! first match, when it prefers each way by the first branch it takes, then by
-//! what comes after. The analysis tells which rules need this. Every other
-//! rule has at most one end the rest of an input can go on from, and its
-//! function finds it.
+//! Every other rule gets two functions that try every way. One tells where the
+//! rule's matches at a position can end, in the order the rule prefers them,
+//! and remembers them. The other builds the node of the match up to the end
+//! the rule around it picks, the first it prefers that the rest of the input
+//! can go on from.
 //!
 //! A parse notes nothing about why an input might not match, and skips the
 //! branches that cannot start with the next character. Only when the input
