@@ -25,7 +25,9 @@ pub(super) fn check(
 ) {
     for (position, rule) in grammar.syntax_rules.iter().enumerate() {
         let rule_id = RuleId(position);
+        // A converted rule builds a value from each character on purpose.
         if rule.hidden
+            || rule.converts_to.is_some()
             || grammar.start_syntax_rules.contains(&rule_id)
             || facts.single_characters(&rule.expression).is_none()
         {
@@ -88,7 +90,7 @@ mod tests {
     }
 
     #[test]
-    fn leaves_rules_that_are_hidden_longer_or_not_repeated_alone() {
+    fn leaves_rules_that_are_hidden_converted_longer_or_not_repeated_alone() {
         assert_eq!(
             suggested(
                 "number = digit, {digit}; (* hide *) digit = 'x' | 'y';"
@@ -97,5 +99,9 @@ mod tests {
         );
         assert_eq!(suggested("pair = digit, {digit}; digit = 'xy';"), []);
         assert_eq!(suggested("pair = digit, digit; digit = 'x';"), []);
+        assert_eq!(
+            suggested("number = digit, {digit}; (* as u8 *) digit = 'x';"),
+            []
+        );
     }
 }
