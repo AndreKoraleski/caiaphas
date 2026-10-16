@@ -53,6 +53,11 @@ pub enum Expression {
     Times(u32, &'static Expression),
     /// Matches what the first matches, unless the second matches all of it.
     Except(&'static Expression, &'static Expression),
+    /// Matches the expression, which can only start with a character in one
+    /// of the ranges, given in order. When the next character is in none of
+    /// them, the expression is not tried at all, unless the parser is finding
+    /// out why an input does not match.
+    StartsWith(&'static [(char, char)], &'static Expression),
     /// Matches what the rule with this number matches.
     Rule(usize),
     Text(&'static str),
@@ -372,6 +377,16 @@ impl<'i> Parser<'i> {
                     }
                 }
             }
+            Expression::StartsWith(ranges, expression) => {
+                let starts = rest.chars().next().is_some_and(|c| {
+                    let index = ranges.partition_point(|&(_, last)| last < c);
+                    ranges.get(index).is_some_and(|&(first, _)| first <= c)
+                });
+                if !starts && !self.reports {
+                    return None;
+                }
+                self.match_expression(expression, position, children)
+            }
             Expression::Except(factor, exception) => {
                 let end = self.expression(factor, position, children)?;
                 // The exception only reads what the factor matched.
@@ -398,25 +413,37 @@ mod tests {
                 name: "list",
                 expression: Expression::Sequence(&[
                     Expression::Rule(1),
-                    Expression::Repeated(&Expression::Sequence(&[
-                        Expression::Text(","),
-                        Expression::Rule(1),
-                    ])),
+                    Expression::Repeated(&Expression::StartsWith(
+                        &[(',', ',')],
+                        &Expression::Sequence(&[
+                            Expression::Text(","),
+                            Expression::Rule(1),
+                        ]),
+                    )),
                 ]),
                 hidden: false,
             },
             Rule {
                 name: "item",
                 expression: Expression::Choice(&[
-                    Expression::Sequence(&[
-                        Expression::Rule(2),
-                        Expression::Repeated(&Expression::Rule(2)),
-                    ]),
-                    Expression::Sequence(&[
-                        Expression::Text("("),
-                        Expression::Rule(0),
-                        Expression::Text(")"),
-                    ]),
+                    Expression::StartsWith(
+                        &[('0', '9')],
+                        &Expression::Sequence(&[
+                            Expression::Rule(2),
+                            Expression::Repeated(&Expression::StartsWith(
+                                &[('0', '9')],
+                                &Expression::Rule(2),
+                            )),
+                        ]),
+                    ),
+                    Expression::StartsWith(
+                        &[('(', '(')],
+                        &Expression::Sequence(&[
+                            Expression::Text("("),
+                            Expression::Rule(0),
+                            Expression::Text(")"),
+                        ]),
+                    ),
                 ]),
                 hidden: false,
             },
@@ -463,6 +490,25 @@ mod tests {
             "expected `,` or the end of the input, found `)` at line 1, \
              column 2"
         );
+    }
+
+    /// `s = 'b' | 'c';`, where the table wrongly says the first branch can
+    /// only start with `a`.
+    static WRONG: Grammar = Grammar {
+        rules: &[Rule {
+            name: "s",
+            expression: Expression::Choice(&[
+                Expression::StartsWith(&[('a', 'a')], &Expression::Text("b")),
+                Expression::Text("c"),
+            ]),
+            hidden: false,
+        }],
+    };
+
+    #[test]
+    fn skips_a_branch_that_cannot_start_with_the_next_character() {
+        assert!(parse(&WRONG, 0, "c").is_ok());
+        assert!(parse(&WRONG, 0, "b").is_err());
     }
 
     /// `word = keyword | name; keyword = 'if'; name = letter, {letter};`

@@ -95,6 +95,19 @@ mod tests {
     }
 
     #[test]
+    fn tells_what_each_branch_can_start_with() {
+        let items = generate(
+            "s = a | b | 'w'; a = 'x', 'y'; b = ['v'], 'u';",
+            "g.ebnf",
+        )
+        .unwrap()
+        .to_string();
+        assert!(items.contains("StartsWith (& [('x' , 'x')]"), "{items}");
+        assert!(items.contains("StartsWith (& [('u' , 'v')]"), "{items}");
+        assert_eq!(items.matches("StartsWith").count(), 2, "{items}");
+    }
+
+    #[test]
     fn stops_at_errors() {
         assert_eq!(
             problems("s = a;"),

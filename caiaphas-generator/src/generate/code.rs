@@ -8,6 +8,7 @@ use proc_macro2::{Ident, Literal, TokenStream};
 use quote::quote;
 
 use crate::{
+    analysis::Facts,
     generate::{
         name,
         shape::{Count, Field, Shape, Variant},
@@ -36,9 +37,10 @@ pub(crate) fn module(
         types: written_names.clone().map(name::type_name).collect(),
         fields: written_names.map(name::field_name).collect(),
     };
+    let facts = Facts::new(grammar);
     let rules = grammar.syntax_rules.iter().map(|rule| {
         let name = written(rule);
-        let expression = expression(&rule.expression);
+        let expression = expression(&rule.expression, &facts);
         let hidden = rule.hidden;
         quote! {
             __caiaphas::Rule {
@@ -95,43 +97,41 @@ fn written(rule: &Rule) -> String {
     rule.meta_identifier.words().collect::<Vec<_>>().join(" ")
 }
 
-/// Returns the table of `expression`.
-fn expression(expression: &Expression) -> TokenStream {
-    let list = |expressions: &[Expression]| {
-        let expressions = expressions.iter().map(self::expression);
-        quote! { &[#(#expressions),*] }
-    };
+/// Returns the table of `expression`, with `facts` about its grammar.
+fn expression(expression: &Expression, facts: &Facts<'_>) -> TokenStream {
+    let table_of = |expression| self::expression(expression, facts);
     match &expression.kind {
         ExpressionKind::SingleDefinition(expressions) => {
-            let expressions = list(expressions);
-            quote! { __caiaphas::Expression::Sequence(#expressions) }
+            let expressions = expressions.iter().map(table_of);
+            quote! { __caiaphas::Expression::Sequence(&[#(#expressions),*]) }
         }
         ExpressionKind::DefinitionsList(expressions) => {
-            let expressions = list(expressions);
-            quote! { __caiaphas::Expression::Choice(#expressions) }
+            let branches =
+                expressions.iter().map(|branch| self::branch(branch, facts));
+            quote! { __caiaphas::Expression::Choice(&[#(#branches),*]) }
         }
         ExpressionKind::OptionalSequence(expression) => {
-            let expression = self::expression(expression);
-            quote! { __caiaphas::Expression::Optional(&#expression) }
+            let branch = branch(expression, facts);
+            quote! { __caiaphas::Expression::Optional(&#branch) }
         }
         ExpressionKind::RepeatedSequence(expression) => {
-            let expression = self::expression(expression);
-            quote! { __caiaphas::Expression::Repeated(&#expression) }
+            let branch = branch(expression, facts);
+            quote! { __caiaphas::Expression::Repeated(&#branch) }
         }
         ExpressionKind::SyntacticFactor {
             integer,
             syntactic_primary,
         } => {
             let integer = Literal::u32_unsuffixed(*integer);
-            let expression = self::expression(syntactic_primary);
+            let expression = table_of(syntactic_primary);
             quote! { __caiaphas::Expression::Times(#integer, &#expression) }
         }
         ExpressionKind::SyntacticTerm {
             syntactic_factor,
             syntactic_exception,
         } => {
-            let factor = self::expression(syntactic_factor);
-            let exception = self::expression(syntactic_exception);
+            let factor = table_of(syntactic_factor);
+            let exception = table_of(syntactic_exception);
             quote! { __caiaphas::Expression::Except(&#factor, &#exception) }
         }
         ExpressionKind::MetaIdentifier(RuleId(position)) => {
@@ -149,6 +149,30 @@ fn expression(expression: &Expression) -> TokenStream {
             quote! { __caiaphas::Expression::Empty }
         }
     }
+}
+
+/// Returns the table of `expression` as a branch a parser can take or not,
+/// with the characters it can start with, so a parser can skip it when the
+/// next character is none of them.
+///
+/// A branch that can match nothing can start anywhere, and a terminal string
+/// or special sequence already fails on its first character, so those are
+/// left as they are.
+fn branch(expression: &Expression, facts: &Facts<'_>) -> TokenStream {
+    let table = self::expression(expression, facts);
+    let checks_itself = matches!(
+        expression.kind,
+        ExpressionKind::TerminalString(_) | ExpressionKind::SpecialSequence(_)
+    );
+    if checks_itself || facts.is_nullable(expression) {
+        return table;
+    }
+    let first = facts.first(expression);
+    let ranges = first.ranges().iter().map(|range| {
+        let (first, last) = (range.start(), range.end());
+        quote! { (#first, #last) }
+    });
+    quote! { __caiaphas::Expression::StartsWith(&[#(#ranges),*], &#table) }
 }
 
 /// Returns the `parse` function of the start rule `rule`, numbered `position`.

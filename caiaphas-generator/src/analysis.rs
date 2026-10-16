@@ -16,7 +16,7 @@ mod grammar_check;
 mod matcher;
 
 use choice_check::CHOICE_CHECKS;
-use facts::Facts;
+pub(crate) use facts::Facts;
 pub(crate) use finding::Finding;
 use grammar_check::GRAMMAR_CHECKS;
 

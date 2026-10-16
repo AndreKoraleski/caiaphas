@@ -23,6 +23,11 @@ impl CharacterSet {
         Self::from_range(c..=c)
     }
 
+    /// Returns the ranges of the set, in order.
+    pub(crate) fn ranges(&self) -> &[RangeInclusive<char>] {
+        &self.ranges
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         self.ranges.is_empty()
     }
