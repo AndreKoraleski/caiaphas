@@ -13,6 +13,7 @@ mod expectations;
 mod facts;
 mod finding;
 mod grammar_check;
+mod matcher;
 
 use choice_check::CHOICE_CHECKS;
 use facts::Facts;
