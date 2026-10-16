@@ -24,6 +24,8 @@ pub(crate) struct SyntaxRule {
     pub(crate) first_match: bool,
     /// Whether a `(* greedy *)` comes right before the rule.
     pub(crate) greedy: bool,
+    /// Whether an `(* inline *)` comes right before the rule.
+    pub(crate) inline: bool,
     /// From the meta identifier to the terminator, both included.
     pub(crate) span: Span,
 }
@@ -52,6 +54,7 @@ impl SyntaxRule {
             hidden: false,
             first_match: false,
             greedy: false,
+            inline: false,
             span: start.to(end),
         })
     }

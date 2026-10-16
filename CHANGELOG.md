@@ -15,6 +15,10 @@ adheres to [Semantic Versioning][semver].
 - Checks for problems in a grammar, each with a suggestion, which stop the
   build unless an `(* expect code: reason *)` comment marks them as intended.
 - `(* hide *)`, which leaves a rule out of the generated types.
+- `(* inline *)`, which gives the rules that hold a rule what it holds instead
+  of its type.
+- Fields of `[T; N]` for a rule held the same number of times on every way,
+  and `char()` on the type of a rule that only ever matches one character.
 - Parsers that match exactly the inputs a grammar describes. Where an input
   reads more than one way, each part takes the most text it can while the
   rest still matches.

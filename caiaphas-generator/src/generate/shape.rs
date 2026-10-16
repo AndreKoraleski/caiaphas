@@ -3,9 +3,11 @@
 //! A rule whose alternatives are each another rule or a word becomes an enum
 //! with a variant for each. Any other rule becomes a struct with a field for
 //! each rule it holds, typed by how many times it can hold it, and a rule it
-//! always holds the same number of times becomes an array. Hidden rules get no
-//! type and no field, and neither do rules that no start rule holds. A type
-//! that could contain itself holds itself in a box.
+//! always holds the same number of times becomes an array. A rule that holds
+//! an inline rule holds what the inline rule holds instead, as if its
+//! definition were written there. Hidden and inline rules get no type and no
+//! field, and neither do rules that no start rule holds. A type that could
+//! contain itself holds itself in a box.
 
 use std::collections::HashSet;
 
@@ -67,7 +69,10 @@ pub(crate) fn shapes(grammar: &Grammar) -> Vec<Option<Shape>> {
     shapes
         .into_iter()
         .zip(reached)
-        .map(|(shape, reached)| reached.then_some(shape))
+        .zip(&grammar.syntax_rules)
+        .map(|((shape, reached), rule)| {
+            (reached && !rule.inline).then_some(shape)
+        })
         .collect()
 }
 
@@ -96,7 +101,7 @@ fn variants(
                 ExpressionKind::MetaIdentifier(rule_id) => {
                     let RuleId(position) = *rule_id;
                     let rule = &grammar.syntax_rules[position];
-                    if rule.hidden {
+                    if rule.hidden || rule.inline {
                         return None;
                     }
                     let name = name::type_name(rule.meta_identifier.written());
@@ -157,8 +162,14 @@ fn occurrences(
     match &expression.kind {
         ExpressionKind::MetaIdentifier(rule_id) => {
             let RuleId(position) = *rule_id;
-            if grammar.syntax_rules[position].hidden {
+            let rule = &grammar.syntax_rules[position];
+            if rule.hidden {
                 return Vec::new();
+            }
+            // The dictionary makes sure no inline rule holds itself through
+            // inline rules alone.
+            if rule.inline {
+                return of(&rule.expression);
             }
             vec![(*rule_id, Occurrences { least: 1, most: 1 })]
         }
@@ -418,6 +429,27 @@ mod tests {
                 "s = a, '=', a, 3 * b, 20 * c; a = 'x'; b = 'y'; c = 'z';"
             )[0],
             shape("s", "struct {a Fixed(2), b Fixed(3), c Many}")
+        );
+    }
+
+    #[test]
+    fn gives_a_rule_that_holds_an_inline_rule_what_it_holds() {
+        assert_eq!(
+            shapes_of(
+                "s = g, g; (* inline *) g = '(', e, ')'; e = 'x' | f; \
+                 f = 'y';"
+            ),
+            [
+                shape("s", "struct {e Fixed(2)}"),
+                ("g".to_owned(), None),
+                shape("e", "enum {\"x\", f}"),
+                shape("f", "struct {}"),
+            ]
+        );
+        assert_eq!(
+            shapes_of("s = g | h; (* inline *) g = e, e; e = 'x'; h = 'y';")
+                [0],
+            shape("s", "struct {e Many, h Optional}")
         );
     }
 

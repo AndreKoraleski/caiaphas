@@ -26,6 +26,15 @@
 //! each step is what the grammar means, such as the `else` of a nested `if`,
 //! and keeps their parser fast.
 //!
+//! An inline, written `(* inline *)`, gives the rule no type of its own. Each
+//! rule that holds it holds what it holds instead, as if its definition were
+//! written there, so a rule holding `group` below holds its `expression`:
+//!
+//! ```text
+//! (* inline *)
+//! group = '(', expression, ')';
+//! ```
+//!
 //! Each comment holds one annotation, and a rule can have several. The
 //! standard reads quotes in a comment as terminal strings, so a reason cannot
 //! hold a lone `'` or `"`.
@@ -54,6 +63,8 @@ pub(crate) enum Annotation {
     FirstMatch,
     /// Makes the rule take each way through it as it comes to it.
     Greedy,
+    /// Gives the rules that hold the rule what it holds, instead of its type.
+    Inline,
 }
 
 /// What a comment holds.
@@ -70,6 +81,8 @@ pub(crate) enum Comment {
     MalformedFirstMatch,
     /// Text that starts with `greedy` but holds more than that.
     MalformedGreedy,
+    /// Text that starts with `inline` but holds more than that.
+    MalformedInline,
 }
 
 impl Comment {
@@ -85,6 +98,13 @@ impl Comment {
                 Self::Annotation(Annotation::Hide)
             } else {
                 Self::MalformedHide
+            };
+        }
+        if let Some(rest) = after_word(content, "inline") {
+            return if rest.is_empty() {
+                Self::Annotation(Annotation::Inline)
+            } else {
+                Self::MalformedInline
             };
         }
         if let Some(rest) = after_word(content, "greedy") {
@@ -266,6 +286,18 @@ mod tests {
             );
         }
         assert_eq!(read("(* greedy else *)"), Comment::MalformedGreedy);
+    }
+
+    #[test]
+    fn reads_an_inline() {
+        for text in ["(* inline *)", "(*inline*)", "(*\n  inline\n*)"] {
+            assert_eq!(
+                read(text),
+                Comment::Annotation(Annotation::Inline),
+                "{text:?}"
+            );
+        }
+        assert_eq!(read("(* inline group *)"), Comment::MalformedInline);
     }
 
     #[test]

@@ -36,6 +36,8 @@ pub(crate) enum ParseErrorKind {
     MalformedFirstMatch,
     /// A comment starts with `greedy` but holds more than that.
     MalformedGreedy,
+    /// A comment starts with `inline` but holds more than that.
+    MalformedInline,
     /// An annotation is not right before a syntax rule.
     AnnotationWithoutRule,
 }
@@ -92,9 +94,12 @@ impl fmt::Display for ParseError {
             ParseErrorKind::MalformedGreedy => {
                 f.write_str("a rule is made greedy with `(* greedy *)` alone")
             }
+            ParseErrorKind::MalformedInline => {
+                f.write_str("a rule is made inline with `(* inline *)` alone")
+            }
             ParseErrorKind::AnnotationWithoutRule => f.write_str(
-                "an `expect`, `hide`, `first match` or `greedy` comment must \
-                 come right before the syntax rule it is about",
+                "an `expect`, `hide`, `first match`, `greedy` or `inline` \
+                 comment must come right before the syntax rule it is about",
             ),
         }
     }
@@ -198,9 +203,13 @@ mod tests {
                 "a rule is made greedy with `(* greedy *)` alone",
             ),
             (
+                error(ParseErrorKind::MalformedInline),
+                "a rule is made inline with `(* inline *)` alone",
+            ),
+            (
                 error(ParseErrorKind::AnnotationWithoutRule),
-                "an `expect`, `hide`, `first match` or `greedy` comment must \
-                 come right before the syntax rule it is about",
+                "an `expect`, `hide`, `first match`, `greedy` or `inline` \
+                 comment must come right before the syntax rule it is about",
             ),
         ];
         for (error, message) in cases {

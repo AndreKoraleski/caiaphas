@@ -36,6 +36,9 @@
 //!   lifetimes.
 //! - A rule written right after `(* hide *)`, such as whitespace, gets no type
 //!   and no field.
+//! - A rule written right after `(* inline *)` gets no type, and each rule
+//!   that holds it holds what it holds instead, as if its definition were
+//!   written there.
 //!
 //! # Grammars
 //!

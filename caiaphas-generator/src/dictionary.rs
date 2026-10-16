@@ -1,6 +1,7 @@
 //! The dictionary resolves the syntax rules of a grammar into its intermediate
 //! representation.
 
+mod inline_rules;
 mod lower;
 mod start_rules;
 mod syntactic_exception;
@@ -32,6 +33,7 @@ pub(crate) fn build(syntax: &Syntax) -> (Grammar, Vec<DictionaryError>) {
     let start_syntax_rules =
         start_rules::start_rules(syntax, &syntax_rules, &mut errors);
     syntactic_exception::check(&syntax_rules, &mut errors);
+    inline_rules::check(&syntax_rules, &start_syntax_rules, &mut errors);
     errors.sort_by_key(|error| error.span.start);
     (
         Grammar {
@@ -115,6 +117,11 @@ pub(crate) enum DictionaryErrorKind {
     /// A hide comes right before a start rule, whose parser has to return its
     /// type.
     HiddenStartSyntaxRule { meta_identifier: MetaIdentifier },
+    /// An inline comes right before a start rule, whose parser has to return
+    /// its type.
+    InlineStartSyntaxRule { meta_identifier: MetaIdentifier },
+    /// An inline rule holds itself through inline rules alone.
+    RecursiveInlineSyntaxRule { meta_identifier: MetaIdentifier },
 }
 
 impl fmt::Display for DictionaryError {
@@ -150,6 +157,21 @@ impl fmt::Display for DictionaryError {
                     meta_identifier.as_str()
                 )
             }
+            DictionaryErrorKind::InlineStartSyntaxRule { meta_identifier } => {
+                write!(
+                    f,
+                    "`{}` is a start rule, so it cannot be inline",
+                    meta_identifier.as_str()
+                )
+            }
+            DictionaryErrorKind::RecursiveInlineSyntaxRule {
+                meta_identifier,
+            } => write!(
+                f,
+                "`{}` holds itself through inline rules alone, so what it \
+                 gives the rules that hold it would never end",
+                meta_identifier.as_str()
+            ),
         }
     }
 }
@@ -188,6 +210,16 @@ impl DictionaryError {
             DictionaryErrorKind::HiddenStartSyntaxRule { .. } => {
                 "remove the `(* hide *)` before it, since its parser returns \
                  its type"
+                    .to_owned()
+            }
+            DictionaryErrorKind::InlineStartSyntaxRule { .. } => {
+                "remove the `(* inline *)` before it, since its parser \
+                 returns its type"
+                    .to_owned()
+            }
+            DictionaryErrorKind::RecursiveInlineSyntaxRule { .. } => {
+                "remove the `(* inline *)` before one of those rules, so its \
+                 type holds the rest"
                     .to_owned()
             }
         }
@@ -336,6 +368,10 @@ pub(crate) mod tests {
                     ..
                 } => "recursive",
                 DictionaryErrorKind::HiddenStartSyntaxRule { .. } => "hidden",
+                DictionaryErrorKind::InlineStartSyntaxRule { .. } => "inline",
+                DictionaryErrorKind::RecursiveInlineSyntaxRule { .. } => {
+                    "recursive inline"
+                }
             })
             .collect();
         assert_eq!(kinds, ["undefined", "duplicate", "recursive"]);

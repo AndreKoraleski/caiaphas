@@ -278,3 +278,24 @@ fn tells_the_character_of_a_rule_of_one_character() {
         digits.digit.iter().map(digits::Digit::char).collect();
     assert_eq!(characters, "42");
 }
+
+caiaphas::grammar!(mod grouped {
+    "sum = group, {'+', group};
+     (* inline *) group = '(', number, ')' | number;
+     number = digit, {digit};
+     (* hide *) digit = ? U+0030..U+0039 ?;"
+});
+
+caiaphas::grammar!(mod remembered {
+    "pair = both, 'x' | both, 'y'; (* inline *) both = a, b; a = 'a'; b = 'b';"
+});
+
+#[test]
+fn gives_a_rule_that_holds_an_inline_rule_what_it_holds() {
+    let sum = grouped::Sum::parse("(1)+23").unwrap();
+    let numbers: Vec<&str> =
+        sum.number.iter().map(grouped::Number::text).collect();
+    assert_eq!(numbers, ["1", "23"]);
+    let pair = remembered::Pair::parse("aby").unwrap();
+    assert_eq!((pair.a.text(), pair.b.text()), ("a", "b"));
+}

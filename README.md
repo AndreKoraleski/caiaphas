@@ -66,6 +66,8 @@ Each rule becomes a type named after it, so `syntax rule` becomes
   `span()`, where it matched. Types own what they hold, so they need no
   lifetimes.
 * A rule marked `(* hide *)`, such as `ws`, gets no type and no field.
+* A rule marked `(* inline *)` gets no type, and each rule that holds it holds
+  what it holds instead, as if its definition were written there.
 
 ## Grammars
 
