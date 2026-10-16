@@ -4,6 +4,7 @@
 mod code;
 mod matching;
 mod name;
+mod rearrange;
 mod shape;
 
 use std::collections::{HashMap, hash_map::Entry};
@@ -27,6 +28,15 @@ pub struct Module {
     pub suggestions: Vec<String>,
 }
 
+/// How to generate the module that parses a grammar.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Options {
+    /// Whether the parser matches the grammar rearranged where that keeps its
+    /// types the same, such as with a start that alternatives share written
+    /// once. The suggestions to rearrange it that way are then left out.
+    pub optimize: bool,
+}
+
 /// Returns the module that parses the grammar `source`, or every problem that
 /// stops it, rendered with `path` naming the grammar's file.
 ///
@@ -37,14 +47,18 @@ pub struct Module {
 /// # Errors
 ///
 /// Returns each problem as text that shows where in the grammar it is.
-pub fn generate(source: &str, path: &str) -> Result<Module, Vec<String>> {
+pub fn generate(
+    source: &str,
+    path: &str,
+    options: Options,
+) -> Result<Module, Vec<String>> {
     let render = |diagnostics: Vec<Diagnostic>| {
         diagnostics
             .iter()
             .map(|diagnostic| diagnostic.render(path, source, false))
             .collect()
     };
-    let (grammar, diagnostics) = compile(source);
+    let (grammar, diagnostics) = compile(source, options.optimize);
     let (suggestions, problems): (Vec<_>, Vec<_>) = diagnostics
         .into_iter()
         .partition(|diagnostic| diagnostic.severity == Severity::Suggestion);
@@ -56,8 +70,12 @@ pub fn generate(source: &str, path: &str) -> Result<Module, Vec<String>> {
     if !clashes.is_empty() {
         return Err(render(clashes));
     }
+    let rearranged = options
+        .optimize
+        .then(|| rearrange::rearranged(grammar.clone()));
+    let matched = rearranged.as_ref().unwrap_or(&grammar);
     Ok(Module {
-        items: code::module(&grammar, &shapes, source),
+        items: code::module(&grammar, matched, &shapes, source),
         suggestions: render(suggestions),
     })
 }
@@ -75,7 +93,7 @@ pub struct Report {
 /// Returns every problem and suggestion about the grammar `source`, rendered
 /// with `path` naming the grammar's file, without generating its module.
 pub fn check(source: &str, path: &str) -> Report {
-    let (grammar, mut diagnostics) = compile(source);
+    let (grammar, mut diagnostics) = compile(source, false);
     if let Some(grammar) = grammar {
         diagnostics.extend(clashes(&grammar, &shape::shapes(&grammar)));
     }
@@ -128,13 +146,17 @@ mod tests {
     use super::*;
 
     fn problems(source: &str) -> Vec<String> {
-        generate(source, "g.ebnf").err().unwrap_or_default()
+        generate(source, "g.ebnf", Options::default())
+            .err()
+            .unwrap_or_default()
     }
 
     #[test]
     fn generates_the_items_of_a_grammar_without_problems() {
         let items =
-            generate("s = 'x', [a]; a = 'y';", "g.ebnf").unwrap().items;
+            generate("s = 'x', [a]; a = 'y';", "g.ebnf", Options::default())
+                .unwrap()
+                .items;
         let items = items.to_string();
         assert!(items.contains("pub struct S"), "{items}");
         assert!(items.contains("pub struct A"), "{items}");
@@ -146,6 +168,7 @@ mod tests {
         let items = generate(
             "s = a | b | 'w'; a = 'x', 'y'; b = ['v'], 'u';",
             "g.ebnf",
+            Options::default(),
         )
         .unwrap()
         .items
@@ -158,7 +181,10 @@ mod tests {
     #[test]
     fn takes_the_longest_match_unless_a_rule_asks_for_the_first() {
         let items = |source: String| {
-            generate(&source, "g.ebnf").unwrap().items.to_string()
+            generate(&source, "g.ebnf", Options::default())
+                .unwrap()
+                .items
+                .to_string()
         };
         let rules = "a = 'x'; b = 'x', 'y';";
         let longest = items(format!("s = a | b; {rules}"));
@@ -169,18 +195,35 @@ mod tests {
 
     #[test]
     fn stops_at_the_one_branch_that_can_match_where_branches_start_apart() {
-        let items = generate("s = a | b; a = 'x'; b = 'y';", "g.ebnf")
-            .unwrap()
-            .items
-            .to_string();
+        let items = generate(
+            "s = a | b; a = 'x'; b = 'y';",
+            "g.ebnf",
+            Options::default(),
+        )
+        .unwrap()
+        .items
+        .to_string();
         assert!(items.contains("found"), "{items}");
         assert!(!items.contains("longest"), "{items}");
     }
 
     #[test]
+    fn leaves_out_the_suggestions_it_takes_care_of_when_optimizing() {
+        let source = "s = a, 'x' | a, 'y'; a = 'z';";
+        let suggestions = |optimize| {
+            generate(source, "g.ebnf", Options { optimize })
+                .unwrap()
+                .suggestions
+                .len()
+        };
+        assert_eq!(suggestions(false), 1);
+        assert_eq!(suggestions(true), 0);
+    }
+
+    #[test]
     fn generates_a_grammar_that_only_has_suggestions() {
         let source = "number = digit, {digit}; digit = ? U+0030..U+0039 ?;";
-        let module = generate(source, "g.ebnf").unwrap();
+        let module = generate(source, "g.ebnf", Options::default()).unwrap();
         assert_eq!(module.suggestions.len(), 1);
         assert!(
             module.suggestions[0].starts_with("`digit` only ever matches"),

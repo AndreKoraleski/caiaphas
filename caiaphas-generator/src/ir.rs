@@ -8,7 +8,7 @@ pub(crate) use expression::{Expression, ExpressionKind};
 pub(crate) use rule::{Rule, RuleId, reachable};
 
 /// A grammar is its rules, with every reference between them resolved.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Grammar {
     /// The rules in the order they are written, without the later definitions
     /// of a meta identifier.

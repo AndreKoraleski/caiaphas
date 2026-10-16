@@ -5,7 +5,7 @@ use std::ops::RangeInclusive;
 use crate::{ir::RuleId, span::Span};
 
 /// An expression is what a rule, or part of one, matches.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Expression {
     pub(crate) kind: ExpressionKind,
     /// The part of the syntax it comes from.
@@ -13,7 +13,7 @@ pub(crate) struct Expression {
 }
 
 /// What an [`Expression`] is.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ExpressionKind {
     /// Matches each expression one after another.
     SingleDefinition(Vec<Expression>),
@@ -46,6 +46,15 @@ pub(crate) enum ExpressionKind {
 }
 
 impl Expression {
+    /// Returns the expressions the expression matches one after another, which
+    /// is the expression alone unless it is a single definition.
+    pub(crate) fn steps(&self) -> &[Self] {
+        match &self.kind {
+            ExpressionKind::SingleDefinition(steps) => steps,
+            _ => std::slice::from_ref(self),
+        }
+    }
+
     /// Returns the expressions directly inside this one.
     pub(crate) fn children(&self) -> impl Iterator<Item = &Self> {
         let (list, first, second): (&[Self], Option<&Self>, Option<&Self>) =

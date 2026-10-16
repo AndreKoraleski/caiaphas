@@ -94,6 +94,14 @@ pub(crate) enum FindingKind {
     UnfulfilledExpectation { code: FindingCode },
 }
 
+impl Finding {
+    /// Returns whether rearranging the grammar takes care of the finding, so a
+    /// module generated with the grammar rearranged leaves it out.
+    pub(crate) fn is_rearranged_away(&self) -> bool {
+        self.kind == FindingKind::SharedStart
+    }
+}
+
 impl FindingKind {
     pub(crate) fn severity(&self) -> Severity {
         self.code().severity()

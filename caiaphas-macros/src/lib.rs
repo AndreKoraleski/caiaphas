@@ -101,7 +101,11 @@ pub fn grammar(input: TokenStream) -> TokenStream {
             .collect::<proc_macro2::TokenStream>()
             .into()
     };
-    let module = match caiaphas_generator::generate(&source, &relative) {
+    let module = match caiaphas_generator::generate(
+        &source,
+        &relative,
+        caiaphas_generator::Options::default(),
+    ) {
         Ok(module) if suggest && !module.suggestions.is_empty() => {
             return errors(module.suggestions);
         }

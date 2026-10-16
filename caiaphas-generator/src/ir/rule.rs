@@ -27,7 +27,7 @@ pub(crate) fn reachable(
 }
 
 /// A rule gives a meta identifier the expression it matches.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Rule {
     pub(crate) meta_identifier: MetaIdentifier,
     /// What the rule matches, lowered from the definitions list of its syntax

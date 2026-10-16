@@ -23,9 +23,11 @@ struct Names {
 }
 
 /// Returns the items of the module that parses `grammar`, whose source is
-/// `source`, with a type for each rule that has a shape in `shapes`.
+/// `source`, with a type for each rule that has a shape in `shapes`. The
+/// parser matches `matched`, which is `grammar` or the same rules rearranged.
 pub(crate) fn module(
     grammar: &Grammar,
+    matched: &Grammar,
     shapes: &[Option<Shape>],
     source: &str,
 ) -> TokenStream {
@@ -37,7 +39,7 @@ pub(crate) fn module(
         types: written_names.clone().map(name::type_name).collect(),
         fields: written_names.map(name::field_name).collect(),
     };
-    let functions = matching::functions(&Facts::new(grammar));
+    let functions = matching::functions(&Facts::new(matched));
     let types = shapes.iter().enumerate().filter_map(|(position, shape)| {
         let shape = shape.as_ref()?;
         let rule = &grammar.syntax_rules[position];

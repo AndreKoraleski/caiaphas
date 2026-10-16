@@ -238,7 +238,7 @@ pub(crate) mod tests {
 
     /// Writes the rule `name` defines as a compact expression, such as
     /// `seq(alt('x', 'y'), opt(b))`.
-    pub(super) fn render(grammar: &Grammar, name: &str) -> String {
+    pub(crate) fn render(grammar: &Grammar, name: &str) -> String {
         let rule = grammar
             .syntax_rules
             .iter()
