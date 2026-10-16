@@ -209,7 +209,8 @@ The [findings] page lists every code.
 ## Errors
 
 An input that does not match tells where it stops matching, and what could
-have come there:
+have come there. For `{"a": 1]`, the parser of the [overview](#overview)
+gives:
 
 ```text
 expected `,`, `}`, a digit, an exponent or a fraction, found `]` at line 1, column 8
@@ -224,19 +225,24 @@ expected `,`, `}`, a digit, an exponent or a fraction, found `]` at line 1, colu
 // A grammar in a file, with a path from the root of the crate.
 caiaphas::grammar!(pub mod json = "grammars/json.ebnf");
 
-// A short grammar written in the macro.
+// A short grammar written in the macro, in a raw string when it holds `"`.
 caiaphas::grammar!(mod pair { "pair = 'x', ',', 'y';" });
+caiaphas::grammar!(mod quoted { r#"quoted = '"', 'x', '"';"# });
 
 // Stop at every suggestion too.
 caiaphas::grammar!(pub mod json = "grammars/json.ebnf", suggest);
 
-// Rewrite what can be, such as a start that alternatives share, without
-// changing the types.
+// Read a start that alternatives share once, without changing the types.
 caiaphas::grammar!(pub mod json = "grammars/json.ebnf", optimize);
+
+// Attributes and doc comments go before `mod`, inside the macro.
+caiaphas::grammar!(
+    /// Reads JSON.
+    pub mod json = "grammars/json.ebnf"
+);
 ```
 
-Attributes and doc comments before `mod` go to the generated module, and Cargo
-builds again when the grammar's file changes.
+Cargo builds again when the grammar's file changes.
 
 ## Command line
 
@@ -267,6 +273,7 @@ cargo run --example calculator -- "1.5 + 2 * (3 - 4)"
 * Left recursion is an error. Its message tells how to write the rule as a
   repetition.
 * There is no separate lexer, so a grammar describes its whitespace.
+* An exception cannot use a recursive rule after the `-`.
 * A parser reads the whole input as a `&str`, and stops at the first place it
   cannot match.
 
