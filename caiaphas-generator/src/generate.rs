@@ -16,7 +16,7 @@ use shape::Shape;
 use crate::{
     compile::compile,
     diagnostic::{Diagnostic, Label, Severity},
-    ir::Grammar,
+    ir::{Grammar, Rule},
 };
 
 /// The module that parses a grammar.
@@ -114,8 +114,17 @@ pub fn check(source: &str, path: &str) -> Report {
 }
 
 /// Returns an error for every rule whose type would have the name of an
-/// earlier rule's type.
+/// earlier rule's type, and for every conversion whose type one of them would
+/// hide.
 fn clashes(grammar: &Grammar, shapes: &[Option<Shape>]) -> Vec<Diagnostic> {
+    let mut errors = same_names(grammar, shapes);
+    errors.extend(hidden_conversions(grammar, shapes));
+    errors
+}
+
+/// Returns an error for every rule whose type would have the name of an
+/// earlier rule's type.
+fn same_names(grammar: &Grammar, shapes: &[Option<Shape>]) -> Vec<Diagnostic> {
     let mut named = HashMap::new();
     let mut errors = Vec::new();
     for (rule, shape) in grammar.syntax_rules.iter().zip(shapes) {
@@ -144,6 +153,62 @@ fn clashes(grammar: &Grammar, shapes: &[Option<Shape>]) -> Vec<Diagnostic> {
                 note: None,
             }),
         }
+    }
+    errors
+}
+
+/// Returns an error for every conversion whose type starts with the name of a
+/// rule's type, since that type hides it in the generated module.
+fn hidden_conversions(
+    grammar: &Grammar,
+    shapes: &[Option<Shape>],
+) -> Vec<Diagnostic> {
+    let types: HashMap<String, &Rule> = grammar
+        .syntax_rules
+        .iter()
+        .zip(shapes)
+        .filter(|(_, shape)| {
+            matches!(shape, Some(Shape::Struct(_) | Shape::Enum(_)))
+        })
+        .map(|(rule, _)| {
+            (
+                name::type_name(rule.meta_identifier.written()).to_string(),
+                rule,
+            )
+        })
+        .collect();
+    let mut errors = Vec::new();
+    for rule in &grammar.syntax_rules {
+        let Some(ty) = &rule.converts_to else {
+            continue;
+        };
+        let first = ty.split("::").next().unwrap_or_default();
+        let Some(hiding) = types.get(first) else {
+            continue;
+        };
+        let path = if first == "String" {
+            "::std::string::String".to_owned()
+        } else {
+            format!("super::{ty}")
+        };
+        errors.push(Diagnostic {
+            severity: Severity::Error,
+            code: None,
+            message: format!(
+                "`{first}` in `(* as {ty} *)` names the type of `{}`",
+                hiding.meta_identifier.as_str()
+            ),
+            span: rule.span,
+            labels: vec![Label {
+                span: hiding.span,
+                message: "this rule's type has the name",
+            }],
+            help: Some(format!(
+                "write the path to the type, such as `{path}`, or rename the \
+                 rule"
+            )),
+            note: None,
+        });
     }
     errors
 }
@@ -312,6 +377,31 @@ mod tests {
                  `Digit`"
             ),
             "{found:?}"
+        );
+    }
+
+    #[test]
+    fn stops_at_a_conversion_that_a_rule_type_hides() {
+        let found = problems(
+            "pair = string, word; string = 'x'; (* as String *) word = 'y';",
+        );
+        assert_eq!(found.len(), 1);
+        assert!(
+            found[0].starts_with(
+                "`String` in `(* as String *)` names the type of `string`"
+            ),
+            "{found:?}"
+        );
+        assert!(
+            found[0].contains("such as `::std::string::String`"),
+            "{found:?}"
+        );
+        assert_eq!(
+            problems(
+                "pair = string, word; string = 'x'; \
+                 (* as ::std::string::String *) word = 'y';"
+            ),
+            Vec::<String>::new()
         );
     }
 }

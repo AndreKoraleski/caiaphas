@@ -95,6 +95,9 @@ pub(crate) fn module(
     });
     quote! {
         use ::caiaphas::__private as __caiaphas;
+        // A conversion names its type as where the macro is called.
+        #[allow(unused_imports, clippy::wildcard_imports)]
+        use super::*;
 
         #functions
 
@@ -119,7 +122,7 @@ fn hashable(shapes: &[Option<Shape>]) -> Vec<bool> {
     let mut hashable: Vec<bool> = shapes
         .iter()
         .map(|shape| match shape {
-            Some(Shape::Converted(ty)) => WHOLE.contains(&ty.as_str()),
+            Some(Shape::Converted(ty)) => WHOLE.contains(&last_part(ty)),
             _ => true,
         })
         .collect();
@@ -167,6 +170,22 @@ fn textual(shapes: &[Option<Shape>]) -> Vec<bool> {
         }
     }
     textual
+}
+
+/// Returns the type `ty` without the path to it, when the path is one of the
+/// standard library's, such as `String` for `::std::string::String`.
+fn last_part(ty: &str) -> &str {
+    const PATHS: &[&str] = &[
+        "std::string::",
+        "alloc::string::",
+        "std::primitive::",
+        "core::primitive::",
+    ];
+    let ty = ty.strip_prefix("::").unwrap_or(ty);
+    PATHS
+        .iter()
+        .find_map(|path| ty.strip_prefix(path))
+        .unwrap_or(ty)
 }
 
 /// Returns the `parse` function of the start rule `rule_id`, written `rule`.

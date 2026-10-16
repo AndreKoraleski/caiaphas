@@ -389,3 +389,35 @@ fn leaves_out_the_text_of_an_enum_that_holds_one_without_it() {
     assert_eq!(Outer::parse("1").unwrap(), Outer::Inner(Inner::Number(1)));
     assert_eq!(Outer::parse("y").unwrap(), Outer::Y);
 }
+
+/// An operator read from its sign.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Operator {
+    Plus,
+    Minus,
+}
+
+impl std::str::FromStr for Operator {
+    type Err = ();
+
+    fn from_str(sign: &str) -> Result<Self, ()> {
+        match sign {
+            "+" => Ok(Self::Plus),
+            "-" => Ok(Self::Minus),
+            _ => Err(()),
+        }
+    }
+}
+
+caiaphas::grammar!(mod signs {
+    "signs = operator, {operator}, text; string = 'x';
+     (* as Operator *) operator = '+' | '-';
+     (* as ::std::string::String *) text = string, {string};"
+});
+
+#[test]
+fn names_the_type_of_a_conversion_as_where_the_macro_is() {
+    let signs = signs::Signs::parse("+-xx").unwrap();
+    assert_eq!(signs.operator, [Operator::Plus, Operator::Minus]);
+    assert_eq!(signs.text, "xx");
+}
