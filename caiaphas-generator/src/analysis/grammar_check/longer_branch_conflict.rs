@@ -115,8 +115,8 @@ mod tests {
         assert_eq!(
             conflicts("s = ('x' | 'x', 'y'), 'y';"),
             [(
-                "this branch goes on from where another ends with 'y', which \
-                 can also come after the choice, so a parser cannot tell \
+                "this branch, past where another ends, and what comes after \
+                 the choice can both start with 'y', so a parser cannot tell \
                  which to take"
                     .to_owned(),
                 Span { start: 11, end: 19 },

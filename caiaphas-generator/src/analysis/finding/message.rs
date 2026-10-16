@@ -1,6 +1,7 @@
-//! Each kind of finding says what is wrong and how to fix it.
+//! Each kind of finding says what is wrong and how to fix it. Kinds of one
+//! family build their sentences from the same template, so they stay alike.
 
-use std::fmt;
+use std::fmt::{self, Display};
 
 use crate::{analysis::finding::FindingKind, diagnostic::Severity};
 
@@ -39,31 +40,25 @@ impl FindingKind {
                  `identifier - keyword`"
                     .to_owned()
             }
-            Self::LongerBranchConflict { .. } => {
-                "make what comes after the choice start differently from how \
-                 this branch goes on"
-                    .to_owned()
-            }
+            Self::LongerBranchConflict { .. } => format!(
+                "{} from how this branch goes on",
+                start_differently("the choice")
+            ),
             Self::OptionalFollowConflict { .. } => {
-                "make what comes after the sequence start differently"
-                    .to_owned()
+                start_differently("the sequence")
             }
-            Self::RepeatedFollowConflict { .. } => {
+            Self::RepeatedFollowConflict { .. } => format!(
                 "end the repetition with something it cannot start with, or \
-                 make what comes after it start differently"
-                    .to_owned()
-            }
-            Self::RequiredOptionalSequence => {
-                "remove the `[...]` if the sequence is always needed, or make \
-                 what comes after it start with a character it cannot take"
-                    .to_owned()
-            }
-            Self::DeadEndRepeatedSequence => {
+                 {}",
+                start_differently("it")
+            ),
+            Self::RequiredOptionalSequence => cannot_take(
+                "remove the `[...]` if the sequence is always needed",
+            ),
+            Self::DeadEndRepeatedSequence => cannot_take(
                 "move what comes after the repetition before it, so `{'x'}, \
-                 'x'` becomes `'x', {'x'}`, or make what comes after it start \
-                 with a character it cannot take"
-                    .to_owned()
-            }
+                 'x'` becomes `'x', {'x'}`",
+            ),
             Self::AmbiguousNullableBranches => {
                 "make all but one of these branches read something, such as \
                  by removing `[...]` around one of them"
@@ -123,9 +118,9 @@ impl FindingKind {
                 meta_identifier, ..
             } => format!(
                 "write `(* greedy *)` right before `{}` if it should take \
-                 each way as it comes, which keeps its parser fast, or make \
-                 what comes after the choice start differently",
-                meta_identifier.as_str()
+                 each way as it comes, which keeps its parser fast, or {}",
+                meta_identifier.as_str(),
+                start_differently("the choice")
             ),
             Self::UnknownExpectation { .. } => {
                 "write the code a finding reports, such as \
@@ -149,22 +144,16 @@ impl FindingKind {
 impl fmt::Display for FindingKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::LeftRecursion { meta_identifier } => write!(
-                f,
-                "`{}` can reach itself before reading anything, so its parser \
-                 would never end",
-                meta_identifier.as_str()
-            ),
+            Self::LeftRecursion { meta_identifier } => {
+                f.write_str(&reaches_itself(meta_identifier.as_str(), ""))
+            }
             Self::IndirectLeftRecursion {
                 meta_identifier,
                 through,
-            } => write!(
-                f,
-                "`{}` can reach itself through `{}` before reading anything, \
-                 so its parser would never end",
+            } => f.write_str(&reaches_itself(
                 meta_identifier.as_str(),
-                through.as_str()
-            ),
+                &format!(" through `{}`", through.as_str()),
+            )),
             Self::UnproductiveRule { meta_identifier } => write!(
                 f,
                 "`{}` can never finish matching, since every way through it \
@@ -180,32 +169,38 @@ impl fmt::Display for FindingKind {
                 "these branches can both match {matched}, so the parser takes \
                  the one written first"
             ),
-            Self::LongerBranchConflict { characters } => write!(
-                f,
-                "this branch goes on from where another ends with \
-                 {characters}, which can also come after the choice, so a \
-                 parser cannot tell which to take"
-            ),
-            Self::OptionalFollowConflict { characters } => write!(
-                f,
-                "this optional sequence and what comes after it can both \
-                 start with {characters}, so a parser cannot tell whether to \
-                 take it"
-            ),
-            Self::RepeatedFollowConflict { characters } => write!(
-                f,
-                "this repeated sequence and what comes after it can both \
-                 start with {characters}, so a parser cannot tell whether to \
-                 repeat it again"
-            ),
-            Self::RequiredOptionalSequence => f.write_str(
-                "this optional sequence takes every character that can come \
-                 after it, so skipping it never leads to a match",
-            ),
-            Self::DeadEndRepeatedSequence => f.write_str(
-                "this repeated sequence takes every character that can come \
-                 after it, so nothing after it can ever match",
-            ),
+            Self::LongerBranchConflict { characters } => {
+                f.write_str(&cannot_tell(
+                    "this branch, past where another ends,",
+                    "the choice",
+                    characters,
+                    "which to take",
+                ))
+            }
+            Self::OptionalFollowConflict { characters } => {
+                f.write_str(&cannot_tell(
+                    "this optional sequence",
+                    "it",
+                    characters,
+                    "whether to take it",
+                ))
+            }
+            Self::RepeatedFollowConflict { characters } => {
+                f.write_str(&cannot_tell(
+                    "this repeated sequence",
+                    "it",
+                    characters,
+                    "whether to repeat it again",
+                ))
+            }
+            Self::RequiredOptionalSequence => f.write_str(&takes_every(
+                "optional",
+                "skipping it never leads to a match",
+            )),
+            Self::DeadEndRepeatedSequence => f.write_str(&takes_every(
+                "repeated",
+                "nothing after it can ever match",
+            )),
             Self::AmbiguousNullableBranches => {
                 f.write_str("more than one branch can match nothing")
             }
@@ -313,4 +308,50 @@ impl fmt::Display for FindingKind {
             ),
         }
     }
+}
+
+/// Says that `rule` can reach itself before reading anything, and `how` when
+/// that needs saying.
+fn reaches_itself(rule: &str, how: &str) -> String {
+    format!(
+        "`{rule}` can reach itself{how} before reading anything, so its \
+         parser would never end"
+    )
+}
+
+/// Says that `subject` and what comes after `after` can both start with
+/// `characters`, so a parser cannot tell `what`.
+fn cannot_tell(
+    subject: &str,
+    after: &str,
+    characters: &impl Display,
+    what: &str,
+) -> String {
+    format!(
+        "{subject} and what comes after {after} can both start with \
+         {characters}, so a parser cannot tell {what}"
+    )
+}
+
+/// Says that a `kind` sequence takes every character that can come after it,
+/// so `outcome`.
+fn takes_every(kind: &str, outcome: &str) -> String {
+    format!(
+        "this {kind} sequence takes every character that can come after it, \
+         so {outcome}"
+    )
+}
+
+/// Returns the remedy of making what comes after `after` start differently.
+fn start_differently(after: &str) -> String {
+    format!("make what comes after {after} start differently")
+}
+
+/// Returns `remedy`, or the remedy of making what comes after a sequence start
+/// with a character the sequence cannot take.
+fn cannot_take(remedy: &str) -> String {
+    format!(
+        "{remedy}, or make what comes after it start with a character it \
+         cannot take"
+    )
 }

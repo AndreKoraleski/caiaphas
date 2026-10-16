@@ -63,8 +63,8 @@ const CASES: &[Case] = &[
         source: "(* greedy *) s = ('x' | 'x', 'y'), 'y';",
         code: FindingCode::LongerBranchConflict,
         severity: Severity::Warning,
-        message: "this branch goes on from where another ends with 'y', \
-                  which can also come after the choice, so a parser \
+        message: "this branch, past where another ends, and what comes \
+                  after the choice can both start with 'y', so a parser \
                   cannot tell which to take",
         help: "make what comes after the choice start differently from \
                how this branch goes on, or remove `(* greedy *)` so the \
