@@ -182,7 +182,12 @@ pub fn grammar(input: TokenStream) -> TokenStream {
         let file = file.to_string_lossy().into_owned();
         quote! { const _: &[u8] = ::core::include_bytes!(#file); }
     });
-    let items = module.items;
+    // Errors in what the grammar names, such as the type of a conversion,
+    // point at the grammar rather than at the whole call.
+    let items = located(
+        module.items,
+        proc_macro2::Span::call_site().located_at(literal.span()),
+    );
     quote! {
         #documentation
         #(#attributes)*
@@ -194,6 +199,28 @@ pub fn grammar(input: TokenStream) -> TokenStream {
         }
     }
     .into()
+}
+
+/// Returns `items` with every token placed at `span`.
+fn located(
+    items: proc_macro2::TokenStream,
+    span: proc_macro2::Span,
+) -> proc_macro2::TokenStream {
+    items
+        .into_iter()
+        .map(|mut token| {
+            if let proc_macro2::TokenTree::Group(group) = &token {
+                let mut inner = proc_macro2::Group::new(
+                    group.delimiter(),
+                    located(group.stream(), span),
+                );
+                inner.set_span(span);
+                token = proc_macro2::TokenTree::Group(inner);
+            }
+            token.set_span(span);
+            token
+        })
+        .collect()
 }
 
 #[cfg(test)]
