@@ -137,7 +137,9 @@ pub struct Square { pub size: [u32; 2] }
 ```
 
 * A rule whose alternatives are each another rule or a word, such as
-  `'true'`, becomes an enum, and any other rule a struct.
+  `'true'`, becomes an enum, and any other rule a struct. An alternative can
+  also be an inline rule that holds one rule once, so with
+  `(* inline *) group = '(', sum, ')';` it gives the variant `Group(Sum)`.
 * A type is named in upper camel case and a field in snake case, so
   `syntax rule` gives `SyntaxRule` and `syntax_rule`. A word Rust keeps, such
   as `type`, becomes `r#type`, and `self` and `span` become `self_` and
