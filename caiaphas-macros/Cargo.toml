@@ -7,7 +7,7 @@ description = "The grammar! macro of caiaphas"
 license.workspace = true
 repository.workspace = true
 keywords = ["ebnf", "grammar", "parser-generator", "proc-macro", "iso-14977"]
-categories = ["parsing", "development-tools::procedural-macro-helpers"]
+categories = ["parsing"]
 
 [lib]
 proc-macro = true

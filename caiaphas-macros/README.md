@@ -1,7 +1,7 @@
 # caiaphas-macros
 
-The `grammar!` macro of [caiaphas], which caiaphas exports, so depend on
-[caiaphas] instead of this crate.
+The `grammar!` macro of [caiaphas]. Depend on [caiaphas] instead, since it
+exports the macro.
 
 ## License
 
