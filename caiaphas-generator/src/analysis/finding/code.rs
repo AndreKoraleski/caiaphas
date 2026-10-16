@@ -187,4 +187,23 @@ mod tests {
         }
         assert_eq!(FindingCode::from_name("left_recursion"), None);
     }
+
+    #[test]
+    fn explains_every_code_and_nothing_else() {
+        for &code in FindingCode::ALL {
+            let explanation = crate::explain(code.name());
+            assert!(
+                explanation.is_some_and(|text| !text.is_empty()),
+                "{}",
+                code.name()
+            );
+        }
+        let explained = include_str!("../../findings.md")
+            .lines()
+            .filter_map(|line| line.strip_prefix("## "));
+        for name in explained {
+            assert!(FindingCode::from_name(name).is_some(), "{name}");
+        }
+        assert_eq!(crate::explain("no-such-code"), None);
+    }
 }
