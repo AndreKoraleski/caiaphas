@@ -1,12 +1,13 @@
-//! An unreachable alternative comes after one that matches wherever it would,
-//! in a rule that takes the first match, such as `'xy'` in
-//! `(* first match *) a = 'x' | 'xy';`. A parser takes the earlier one there
-//! first, so it never takes the later one.
+//! An unreachable alternative comes after one that takes every match it could
+//! have, in a rule that takes the first match, such as the second `'x'` in
+//! `(* first match *) a = 'x' | 'x';`.
 //!
-//! An earlier alternative matches wherever a later one would when it always
-//! matches, when both are written the same way, when the later one starts with
-//! all of it, when it matches every single character the later one does, or
-//! when it is one fixed text that every text of the later one starts with.
+//! An earlier alternative does when it matches every text the later one does:
+//! when both are written the same way, when it matches every single character
+//! the later one does, or every one of the few fixed texts. A greedy rule
+//! takes the earlier one wherever it matches at all, so there it also does
+//! when it always matches, when the later one starts with all of it, or when
+//! it is one fixed text that every text of the later one starts with.
 
 use crate::{
     analysis::{
@@ -36,9 +37,9 @@ pub(super) fn check(
                 return;
             };
             for (index, later) in alternatives.iter().enumerate() {
-                let earlier = alternatives[..index]
-                    .iter()
-                    .find(|earlier| covers(grammar, facts, earlier, later));
+                let earlier = alternatives[..index].iter().find(|earlier| {
+                    covers(grammar, facts, rule.greedy, earlier, later)
+                });
                 if let Some(earlier) = earlier {
                     findings.push(Finding {
                         kind: FindingKind::UnreachableAlternative,
@@ -54,10 +55,12 @@ pub(super) fn check(
     }
 }
 
-/// Returns whether `earlier` matches wherever `later` would.
+/// Returns whether `earlier` takes every match `later` could have, in a rule
+/// that is `greedy` or not.
 fn covers(
     grammar: &Grammar,
     facts: &Facts<'_>,
+    greedy: bool,
     earlier: &Expression,
     later: &Expression,
 ) -> bool {
@@ -65,14 +68,31 @@ fn covers(
         facts.single_characters(earlier),
         facts.single_characters(later),
     );
-    facts.always_matches(earlier)
-        || earlier.is_written_like(later)
-        || rest_after(earlier, later).is_some()
+    let every_text = earlier.is_written_like(later)
         || matches!(
             single_characters,
             (Some(earlier), Some(later)) if later.is_subset(&earlier)
         )
-        || starts_every_text(grammar, earlier, later)
+        || has_every_text(grammar, earlier, later);
+    every_text
+        || greedy
+            && (facts.always_matches(earlier)
+                || rest_after(earlier, later).is_some()
+                || starts_every_text(grammar, earlier, later))
+}
+
+/// Returns whether `earlier` matches every one of the few fixed texts `later`
+/// can match.
+fn has_every_text(
+    grammar: &Grammar,
+    earlier: &Expression,
+    later: &Expression,
+) -> bool {
+    let Some(earlier) = matcher::texts(grammar, earlier) else {
+        return false;
+    };
+    matcher::texts(grammar, later)
+        .is_some_and(|texts| texts.iter().all(|text| earlier.contains(text)))
 }
 
 /// Returns whether `earlier` only ever matches one fixed text that every text
@@ -97,15 +117,29 @@ fn starts_every_text(
 #[cfg(test)]
 mod tests {
     use crate::{
-        analysis::{finding::FindingCode, tests::findings_with},
+        analysis::{
+            finding::{Finding, FindingCode},
+            tests::{findings, greedy_findings},
+        },
         span::Span,
     };
 
-    fn unreachable(source: &str) -> Vec<(Span, Span)> {
-        findings_with(source, FindingCode::UnreachableAlternative)
+    fn spans(found: Vec<Finding>) -> Vec<(Span, Span)> {
+        found
             .into_iter()
+            .filter(|finding| {
+                finding.kind.code() == FindingCode::UnreachableAlternative
+            })
             .map(|finding| (finding.span, finding.labels[0].span))
             .collect()
+    }
+
+    fn unreachable(source: &str) -> Vec<(Span, Span)> {
+        spans(findings(source))
+    }
+
+    fn unreachable_when_greedy(source: &str) -> Vec<(Span, Span)> {
+        spans(greedy_findings(source))
     }
 
     fn span(start: usize, end: usize) -> Span {
@@ -113,26 +147,41 @@ mod tests {
     }
 
     #[test]
-    fn finds_every_alternative_after_one_that_always_matches() {
+    fn finds_every_alternative_after_one_that_always_matches_when_greedy() {
+        let source = "(* first match *) a = 'z' | ['y'] | 'x' | 'w';";
         assert_eq!(
-            unreachable("(* first match *) a = 'z' | ['y'] | 'x' | 'w';"),
+            unreachable_when_greedy(source),
             [(span(36, 39), span(28, 33)), (span(42, 45), span(28, 33))]
+        );
+        assert_eq!(unreachable(source), []);
+    }
+
+    #[test]
+    fn finds_an_alternative_that_starts_with_an_earlier_one_when_greedy() {
+        assert_eq!(
+            unreachable_when_greedy("(* first match *) a = 'x' | 'xy';"),
+            [(span(28, 32), span(22, 25))]
+        );
+        assert_eq!(
+            unreachable_when_greedy("(* first match *) a = 'x' | 'x', 'y';"),
+            [(span(28, 36), span(22, 25))]
+        );
+        assert_eq!(unreachable("(* first match *) a = 'x' | 'xy';"), []);
+    }
+
+    #[test]
+    fn finds_an_alternative_written_like_an_earlier_one() {
+        assert_eq!(
+            unreachable("(* first match *) a = 'x' | 'x';"),
+            [(span(28, 31), span(22, 25))]
         );
     }
 
     #[test]
-    fn finds_an_alternative_that_starts_with_an_earlier_one() {
+    fn finds_an_alternative_whose_texts_an_earlier_one_matches() {
         assert_eq!(
-            unreachable("(* first match *) a = 'x' | 'xy';"),
-            [(span(28, 32), span(22, 25))]
-        );
-        assert_eq!(
-            unreachable("(* first match *) a = 'x' | 'x', 'y';"),
-            [(span(28, 36), span(22, 25))]
-        );
-        assert_eq!(
-            unreachable("(* first match *) a = 'x' | 'x';"),
-            [(span(28, 31), span(22, 25))]
+            unreachable("(* first match *) a = ('ab' | 'cd') | 'cd';"),
+            [(span(38, 42), span(22, 35))]
         );
     }
 

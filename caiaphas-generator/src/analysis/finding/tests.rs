@@ -156,7 +156,7 @@ const CASES: &[Case] = &[
                it is",
     },
     Case {
-        source: "(* first match *) a = ['y'] | 'x';",
+        source: "(* first match *) a = 'x' | 'x';",
         code: FindingCode::UnreachableAlternative,
         severity: Severity::Warning,
         message: "an earlier alternative matches wherever this one would, \
