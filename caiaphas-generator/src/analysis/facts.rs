@@ -131,6 +131,20 @@ impl<'a> Facts<'a> {
         )
     }
 
+    /// Returns whether at most one of `alternatives` can match at any place,
+    /// since none can match nothing and no two can start with the same
+    /// character.
+    pub(crate) fn start_apart(&self, alternatives: &[Expression]) -> bool {
+        let mut seen = CharacterSet::default();
+        alternatives.iter().all(|alternative| {
+            let first = self.first(alternative);
+            let apart = !self.is_nullable(alternative)
+                && seen.intersection(&first).is_empty();
+            seen = seen.union(&first);
+            apart
+        })
+    }
+
     /// Returns the characters `expression` can start with when `after` comes
     /// right after it.
     pub(crate) fn first_before(

@@ -7,7 +7,6 @@
 
 use crate::{
     analysis::{
-        character_set::CharacterSet,
         exactness::{general_rules, visit_rule_conflicts},
         facts::Facts,
         finding::{Finding, FindingKind},
@@ -60,16 +59,9 @@ pub(super) fn check(
 fn has_alternatives_that_meet(facts: &Facts<'_>, rule: &Rule) -> bool {
     let mut meet = false;
     rule.expression.visit(&mut |expression| {
-        let ExpressionKind::DefinitionsList(alternatives) = &expression.kind
-        else {
-            return;
-        };
-        let mut seen = CharacterSet::default();
-        for alternative in alternatives {
-            let first = facts.first(alternative);
-            meet |= facts.is_nullable(alternative)
-                || !seen.intersection(&first).is_empty();
-            seen = seen.union(&first);
+        if let ExpressionKind::DefinitionsList(alternatives) = &expression.kind
+        {
+            meet |= !facts.start_apart(alternatives);
         }
     });
     meet

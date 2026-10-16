@@ -14,7 +14,7 @@ use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote};
 
 use crate::{
-    analysis::{CharacterSet, Facts, revisited_rules},
+    analysis::{Facts, revisited_rules},
     generate::{code, exact::ExactWriter, name},
     ir::{Expression, ExpressionKind, Grammar, Rule, RuleId},
 };
@@ -186,7 +186,8 @@ impl FunctionWriter<'_> {
                         })()
                     };
                 }
-                if self.apart(expressions) {
+                // The one alternative that can match is then the longest.
+                if self.facts.start_apart(expressions) {
                     // A parse that only matches stops at the one branch that
                     // matches. One that finds out why an input does not match
                     // tries the rest too, for what they note.
@@ -339,20 +340,6 @@ impl FunctionWriter<'_> {
             }
             ExpressionKind::EmptySequence => quote! { #some(position) },
         }
-    }
-
-    /// Returns whether at most one of `alternatives` can match at any place,
-    /// since none can match nothing and no two can start with the same
-    /// character. The one that matches is then the longest.
-    fn apart(&self, alternatives: &[Expression]) -> bool {
-        let mut seen = CharacterSet::default();
-        alternatives.iter().all(|alternative| {
-            let first = self.facts.first(alternative);
-            let apart = !self.facts.is_nullable(alternative)
-                && seen.intersection(&first).is_empty();
-            seen = seen.union(&first);
-            apart
-        })
     }
 
     /// Returns the code of `expression` as a branch a parser can take or not.
