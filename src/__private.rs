@@ -8,11 +8,11 @@
 //! they can. A rule that a parser can try more than once at the same place
 //! remembers its match there, so trying every branch never matches it twice.
 //!
-//! A parse notes nothing about why an input might not match. Only when it
-//! does not match is it matched again, noting at each failure what could have
-//! been read, to say why.
+//! A parse notes nothing about why an input might not match. Only when it does
+//! not match is it matched again, noting at each failure what could have been
+//! read, to say why.
 
-use std::sync::Arc;
+use std::{ops::Range, sync::Arc};
 
 use rustc_hash::FxHashMap;
 
@@ -56,10 +56,10 @@ pub enum Expression {
     Times(u32, &'static Expression),
     /// Matches what the first matches, unless the second matches all of it.
     Except(&'static Expression, &'static Expression),
-    /// Matches the expression, which can only start with a character in one
-    /// of the ranges, given in order. When the next character is in none of
-    /// them, the expression is not tried at all, unless the parser is finding
-    /// out why an input does not match.
+    /// Matches the expression, which can only start with a character in one of
+    /// the ranges, given in order. When the next character is in none of them,
+    /// the expression is not tried at all, unless the parser is finding out
+    /// why an input does not match.
     StartsWith(&'static [(char, char)], &'static Expression),
     /// Matches what the rule with this number matches.
     Rule(usize),
@@ -81,6 +81,7 @@ pub fn parse(
         Some((end, node)) if end == input.len() => Ok(Tree {
             input: Arc::new(Input::new(input)),
             nodes: parser.nodes,
+            children: parser.children,
             root: node.expect("a start rule is never hidden"),
         }),
         _ => Err(explain(grammar, rule, input)),
@@ -102,6 +103,8 @@ fn explain(grammar: &'static Grammar, rule: usize, input: &str) -> Error {
 pub struct Tree {
     input: Arc<Input>,
     nodes: Vec<NodeData>,
+    /// The children of every node, those of each node next to each other.
+    children: Vec<usize>,
     root: usize,
 }
 
@@ -119,7 +122,8 @@ struct NodeData {
     rule: usize,
     start: usize,
     end: usize,
-    children: Vec<usize>,
+    /// Where the node's children are in the children of its tree.
+    children: Range<usize>,
 }
 
 /// A rule an input matched, in its [`Tree`].
@@ -152,8 +156,7 @@ impl<'t> Node<'t> {
     /// Returns the nodes of the rules matched inside this one, in order.
     pub fn children(&self) -> impl Iterator<Item = Node<'t>> + use<'t> {
         let tree = self.tree;
-        self.data()
-            .children
+        tree.children[self.data().children.clone()]
             .iter()
             .map(move |&index| Node { tree, index })
     }
@@ -201,11 +204,16 @@ impl<T: FromNode> FromNode for Box<T> {
 /// `None` when it does not match.
 type Match = Option<(usize, Option<usize>)>;
 
-/// Matches expressions against an input, remembering every rule's match.
+/// Matches expressions against an input.
 struct Parser<'i> {
     grammar: &'static Grammar,
     input: &'i str,
     nodes: Vec<NodeData>,
+    /// The children of every node, those of each node next to each other.
+    children: Vec<usize>,
+    /// The nodes matched inside the rules being matched, those of each rule
+    /// after those of the rules around it.
+    matched: Vec<usize>,
     /// The match of each rule at each position. The keys are small numbers an
     /// input cannot pick freely, so a fast hasher that does not resist
     /// collisions suits them.
@@ -225,6 +233,8 @@ impl<'i> Parser<'i> {
             grammar,
             input,
             nodes: Vec::new(),
+            children: Vec::new(),
+            matched: Vec::new(),
             matches: FxHashMap::default(),
             furthest: 0,
             expected: Vec::new(),
@@ -262,21 +272,10 @@ impl<'i> Parser<'i> {
         } else {
             0
         };
-        let mut children = Vec::new();
+        let mark = self.matched.len();
         let found = self
-            .expression(&definition.expression, position, &mut children)
-            .map(|end| {
-                let node = (!definition.hidden).then(|| {
-                    self.nodes.push(NodeData {
-                        rule,
-                        start: position,
-                        end,
-                        children,
-                    });
-                    self.nodes.len() - 1
-                });
-                (end, node)
-            });
+            .expression(&definition.expression, position)
+            .map(|end| (end, self.node(rule, position..end, mark)));
         // What the rule could not read where it starts is told as the rule
         // itself, unless it is hidden.
         if self.reports
@@ -294,19 +293,42 @@ impl<'i> Parser<'i> {
         found
     }
 
+    /// Returns the node of the rule numbered `rule` that matched `range`,
+    /// whose children are the nodes matched since `mark`, or drops those nodes
+    /// when the rule is hidden.
+    fn node(
+        &mut self,
+        rule: usize,
+        range: Range<usize>,
+        mark: usize,
+    ) -> Option<usize> {
+        if self.grammar.rules[rule].hidden {
+            self.matched.truncate(mark);
+            return None;
+        }
+        let first = self.children.len();
+        self.children.extend(self.matched.drain(mark..));
+        self.nodes.push(NodeData {
+            rule,
+            start: range.start,
+            end: range.end,
+            children: first..self.children.len(),
+        });
+        Some(self.nodes.len() - 1)
+    }
+
     /// Returns where `expression` matched at `position` ends, adding the nodes
-    /// of the rules it matched to `children`. Adds nothing when it does not
-    /// match.
+    /// of the rules it matched to those matched so far. Adds nothing when it
+    /// does not match.
     fn expression(
         &mut self,
         expression: &'static Expression,
         position: usize,
-        children: &mut Vec<usize>,
     ) -> Option<usize> {
-        let mark = children.len();
-        let end = self.match_expression(expression, position, children);
+        let mark = self.matched.len();
+        let end = self.match_expression(expression, position);
         if end.is_none() {
-            children.truncate(mark);
+            self.matched.truncate(mark);
         }
         end
     }
@@ -315,21 +337,18 @@ impl<'i> Parser<'i> {
         &mut self,
         expression: &'static Expression,
         position: usize,
-        children: &mut Vec<usize>,
     ) -> Option<usize> {
-        let rest = &self.input[position..];
         match *expression {
             Expression::Text(text) => {
-                if rest.starts_with(text) {
+                if self.input[position..].starts_with(text) {
                     return Some(position + text.len());
                 }
                 self.expect(position, Expected::Text(text));
                 None
             }
             Expression::Range(first, last) => {
-                if let Some(c) =
-                    rest.chars().next().filter(|c| (first..=last).contains(c))
-                {
+                let next = self.next_character(position);
+                if let Some(c) = next.filter(|c| (first..=last).contains(c)) {
                     return Some(position + c.len_utf8());
                 }
                 self.expect(position, Expected::Range(first, last));
@@ -338,73 +357,75 @@ impl<'i> Parser<'i> {
             Expression::Empty => Some(position),
             Expression::Rule(rule) => {
                 let (end, node) = self.rule(rule, position)?;
-                children.extend(node);
+                self.matched.extend(node);
                 Some(end)
             }
             Expression::Sequence(expressions) => {
                 expressions.iter().try_fold(position, |end, expression| {
-                    self.expression(expression, end, children)
+                    self.expression(expression, end)
                 })
             }
             Expression::Times(times, expression) => (0..times)
-                .try_fold(position, |end, _| {
-                    self.expression(expression, end, children)
-                }),
+                .try_fold(position, |end, _| self.expression(expression, end)),
             Expression::Choice(expressions) => {
-                let mut longest: Option<(usize, Vec<usize>)> = None;
+                let mark = self.matched.len();
+                let mut longest = None;
                 for expression in expressions {
-                    let mut found = Vec::new();
-                    let Some(end) =
-                        self.expression(expression, position, &mut found)
+                    let start = self.matched.len();
+                    let Some(end) = self.expression(expression, position)
                     else {
                         continue;
                     };
-                    if longest.as_ref().is_none_or(|(most, _)| end > *most) {
-                        longest = Some((end, found));
+                    // Only the nodes of the longest branch so far stay.
+                    if longest.is_none_or(|most| end > most) {
+                        self.matched.drain(mark..start);
+                        longest = Some(end);
+                    } else {
+                        self.matched.truncate(start);
                     }
                 }
-                let (end, found) = longest?;
-                children.extend(found);
-                Some(end)
+                longest
             }
-            Expression::Optional(expression) => Some(
-                self.expression(expression, position, children)
-                    .unwrap_or(position),
-            ),
+            Expression::Optional(expression) => {
+                Some(self.expression(expression, position).unwrap_or(position))
+            }
             Expression::Repeated(expression) => {
                 let mut end = position;
                 loop {
-                    let mark = children.len();
-                    match self.expression(expression, end, children) {
+                    let mark = self.matched.len();
+                    match self.expression(expression, end) {
                         Some(next) if next > end => end = next,
                         _ => {
-                            children.truncate(mark);
+                            self.matched.truncate(mark);
                             return Some(end);
                         }
                     }
                 }
             }
             Expression::StartsWith(ranges, expression) => {
-                let starts = rest.chars().next().is_some_and(|c| {
+                let starts = self.next_character(position).is_some_and(|c| {
                     let index = ranges.partition_point(|&(_, last)| last < c);
                     ranges.get(index).is_some_and(|&(first, _)| first <= c)
                 });
                 if !starts && !self.reports {
                     return None;
                 }
-                self.match_expression(expression, position, children)
+                self.match_expression(expression, position)
             }
             Expression::Except(factor, exception) => {
-                let end = self.expression(factor, position, children)?;
+                let end = self.expression(factor, position)?;
                 // The exception only reads what the factor matched.
                 let mut within =
                     Parser::new(self.grammar, &self.input[..end], false);
                 let excluded =
-                    within.expression(exception, position, &mut Vec::new())
-                        == Some(end);
+                    within.expression(exception, position) == Some(end);
                 (!excluded).then_some(end)
             }
         }
+    }
+
+    fn next_character(&self, position: usize) -> Option<char> {
+        self.input[position..].chars().next()
     }
 }
 
