@@ -23,9 +23,8 @@
 //! ```
 //!
 //! `setting` is the start rule, since no other rule uses it, so its type
-//! parses: with `parse`, or `str::parse` as here. A comment right before a
-//! rule can tell caiaphas more about it: `(* hide *)` leaves `letter` and
-//! `digit` out of the types, and `(* as u16 *)` reads `port` as a `u16`.
+//! parses: with `parse`, or `str::parse` as here. The comments right before
+//! some rules are annotations, and [Types](#types) tells what they do.
 //!
 //! A longer grammar goes in a file, with a path from the root of the crate:
 //!
@@ -166,13 +165,16 @@
 //!
 //! A suggestion, such as where a rule has to try every way, does not stop the
 //! build unless `grammar!(..., suggest)` asks it to. The docs of the generated
-//! module list them, and `grammar!(..., optimize)` rewrites what it safely
-//! can, such as a start that alternatives share, without changing the types.
+//! module list them, and `grammar!(..., optimize)` reads a start that
+//! alternatives share once, without changing the types.
 //!
-//! The `caiaphas` command of the `caiaphas-cli` crate checks grammar files
-//! without building anything, and tells what each finding means:
+//! The [findings] page explains every finding. The `caiaphas` command of the
+//! `caiaphas-cli` crate checks grammar files without building anything, and
+//! tells what each finding means:
 //!
 //! ```text
 //! caiaphas check grammars/json.ebnf
 //! caiaphas explain tied-branches
 //! ```
+//!
+//! [findings]: https://docs.rs/caiaphas-generator/latest/caiaphas_generator/findings/
