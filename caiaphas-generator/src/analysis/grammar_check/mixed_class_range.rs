@@ -86,6 +86,17 @@ mod tests {
     #[test]
     fn finds_a_range_from_digits_to_letters() {
         assert_eq!(ranges("a = ? U+0030..U+007A ?;").len(), 1);
+        let help = findings_with(
+            "a = ? U+0030..U+0046 ?;",
+            FindingCode::MixedClassRange,
+        )[0]
+        .kind
+        .help();
+        assert_eq!(
+            help,
+            "split it into a range for each kind of character, as `? \
+             U+0030..U+0039 ? | ? U+0041..U+0046 ?`"
+        );
     }
 
     #[test]

@@ -186,8 +186,8 @@ const CASES: &[Case] = &[
         severity: Severity::Warning,
         message: "this range from `A` to `z` also takes `[` to `` ` ``, \
                   though they are neither letters nor digits",
-        help: "split it into a range for each kind of character, such as `? \
-               U+0041..U+005A ? | ? U+0061..U+007A ?` for the letters",
+        help: "split it into a range for each kind of character, as `? \
+               U+0041..U+005A ? | ? U+0061..U+007A ?`",
     },
     Case {
         source: "(* greedy *) s = {'x'}, 'y';",

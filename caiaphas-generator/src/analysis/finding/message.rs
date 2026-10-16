@@ -103,10 +103,25 @@ impl FindingKind {
                 meta_identifier.as_str(),
                 other.as_str()
             ),
-            Self::MixedClassRange { .. } => {
-                "split it into a range for each kind of character, such as \
-                 `? U+0041..U+005A ? | ? U+0061..U+007A ?` for the letters"
-                    .to_owned()
+            Self::MixedClassRange { first, last, .. } => {
+                let kinds = [('0', '9'), ('A', 'Z'), ('a', 'z')];
+                let parts: Vec<String> = kinds
+                    .iter()
+                    .map(|&(start, end)| (start.max(*first), end.min(*last)))
+                    .filter(|(start, end)| start <= end)
+                    .map(|(start, end)| {
+                        format!(
+                            "? U+{:04X}..U+{:04X} ?",
+                            u32::from(start),
+                            u32::from(end)
+                        )
+                    })
+                    .collect();
+                format!(
+                    "split it into a range for each kind of character, as \
+                     `{}`",
+                    parts.join(" | ")
+                )
             }
             Self::IneffectiveAnnotation { annotation, .. } => {
                 format!("remove the `(* {annotation} *)`")
