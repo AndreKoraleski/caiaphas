@@ -12,7 +12,7 @@ pub struct Error {
     line: usize,
     column: usize,
     expected: Vec<Expected>,
-    found: Option<char>,
+    found: Option<String>,
 }
 
 /// What a parser could have read where an [`Error`] is.
@@ -31,21 +31,27 @@ pub enum Expected {
 
 impl Error {
     /// Returns the error at `offset` in `input`, where the parser could have
-    /// read any of `expected`.
+    /// read any of `expected`. The text found there is the one character, or
+    /// up to `rejected` when a rule's type did not read that text.
     pub(crate) fn new(
         input: &str,
         offset: usize,
         mut expected: Vec<Expected>,
+        rejected: Option<usize>,
     ) -> Self {
         expected.sort();
         expected.dedup();
         let (line, column) = line_and_column(input, offset);
+        let found = match rejected {
+            Some(end) => Some(input[offset..end].to_owned()),
+            None => input[offset..].chars().next().map(String::from),
+        };
         Self {
             offset,
             line,
             column,
             expected,
-            found: input[offset..].chars().next(),
+            found,
         }
     }
 
@@ -73,11 +79,12 @@ impl Error {
         &self.expected
     }
 
-    /// Returns the character found where the error is, or `None` at the end of
-    /// the input.
+    /// Returns what was found where the error is: the character there, or all
+    /// the text of a rule whose type did not read it. Returns `None` at the
+    /// end of the input.
     #[must_use]
-    pub fn found(&self) -> Option<char> {
-        self.found
+    pub fn found(&self) -> Option<&str> {
+        self.found.as_deref()
     }
 }
 
@@ -134,14 +141,10 @@ impl fmt::Display for Error {
                 write!(f, "{item}")?;
             }
         }
-        match (self.expected.is_empty(), self.found) {
-            (true, Some(c)) => {
-                write!(f, "unexpected `{}`", Shown(&c.to_string()))?;
-            }
+        match (self.expected.is_empty(), &self.found) {
+            (true, Some(found)) => write!(f, "unexpected `{}`", Shown(found))?,
             (true, None) => f.write_str("unexpected end of the input")?,
-            (false, Some(c)) => {
-                write!(f, ", found `{}`", Shown(&c.to_string()))?;
-            }
+            (false, Some(found)) => write!(f, ", found `{}`", Shown(found))?,
             (false, None) => f.write_str(", found the end of the input")?,
         }
         write!(f, " at line {}, column {}", self.line, self.column)
@@ -164,6 +167,7 @@ mod tests {
                 Expected::Text(","),
                 Expected::Text("}"),
             ],
+            None,
         );
         assert_eq!(
             error.to_string(),
@@ -174,7 +178,7 @@ mod tests {
             error.expected(),
             [Expected::Text(","), Expected::Text("}")]
         );
-        assert_eq!(error.found(), Some(']'));
+        assert_eq!(error.found(), Some("]"));
     }
 
     #[test]
@@ -183,6 +187,7 @@ mod tests {
             "x\ny",
             3,
             vec![Expected::Range('0', '9'), Expected::Range('a', 'a')],
+            None,
         );
         assert_eq!(
             error.to_string(),
@@ -190,11 +195,26 @@ mod tests {
              the input at line 2, column 2"
         );
         assert_eq!((error.line(), error.column()), (2, 2));
-        let error = Error::new("ab", 1, vec![Expected::End]);
+        let error = Error::new("ab", 1, vec![Expected::End], None);
         assert_eq!(
             error.to_string(),
             "expected the end of the input, found `b` at line 1, column 2"
         );
+    }
+
+    #[test]
+    fn shows_all_the_text_a_type_did_not_read() {
+        let error = Error::new(
+            "port 99999",
+            5,
+            vec![Expected::Rule("port")],
+            Some(10),
+        );
+        assert_eq!(
+            error.to_string(),
+            "expected a port, found `99999` at line 1, column 6"
+        );
+        assert_eq!(error.found(), Some("99999"));
     }
 
     #[test]
@@ -207,6 +227,7 @@ mod tests {
                 Expected::Rule("object"),
                 Expected::Rule("Element"),
             ],
+            None,
         );
         assert_eq!(
             error.to_string(),
@@ -217,7 +238,7 @@ mod tests {
 
     #[test]
     fn escapes_control_characters() {
-        let error = Error::new("\t", 0, vec![Expected::Text("\n")]);
+        let error = Error::new("\t", 0, vec![Expected::Text("\n")], None);
         assert_eq!(
             error.to_string(),
             "expected `\\n`, found `\\t` at line 1, column 1"
@@ -226,9 +247,9 @@ mod tests {
 
     #[test]
     fn says_what_it_found_when_nothing_in_particular_was_expected() {
-        let error = Error::new("x", 0, Vec::new());
+        let error = Error::new("x", 0, Vec::new(), None);
         assert_eq!(error.to_string(), "unexpected `x` at line 1, column 1");
-        let error = Error::new("", 0, Vec::new());
+        let error = Error::new("", 0, Vec::new(), None);
         assert_eq!(
             error.to_string(),
             "unexpected end of the input at line 1, column 1"

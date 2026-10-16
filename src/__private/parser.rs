@@ -2,7 +2,7 @@
 
 mod ends;
 
-use std::ops::Range;
+use std::{ops::Range, str::FromStr};
 
 use rustc_hash::FxHashMap;
 
@@ -37,6 +37,9 @@ pub struct Parser<'i, const REPORTS: bool> {
     furthest: usize,
     /// What could have been read at the furthest position.
     expected: Vec<Expected>,
+    /// Where the text ends that a rule matched at the furthest position, when
+    /// its type did not read it.
+    rejected: Option<usize>,
 }
 
 /// What a rule matched at a position, and whether the rule was noted as
@@ -68,12 +71,13 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
             remembered: FxHashMap::default(),
             remembered_ends: FxHashMap::default(),
             furthest: 0,
+            rejected: None,
             expected: Vec::new(),
         }
     }
 
     pub(super) fn error(self) -> Error {
-        Error::new(self.input, self.furthest, self.expected)
+        Error::new(self.input, self.furthest, self.expected, self.rejected)
     }
 
     /// Returns the tree of the nodes built, from the node `root`.
@@ -182,9 +186,30 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         }
         if position > self.furthest {
             self.furthest = position;
+            self.rejected = None;
             self.expected.clear();
         }
         self.expected.extend_from_slice(expected);
+    }
+
+    /// Returns whether `T` reads the text `rule` matched from `position` to
+    /// `end`. When it does not, notes the rule there as expected, with that
+    /// text as what was found.
+    pub fn accepts<T: FromStr>(
+        &mut self,
+        rule: &Rule,
+        position: usize,
+        end: usize,
+    ) -> bool {
+        if self.input[position..end].parse::<T>().is_ok() {
+            return true;
+        }
+        if REPORTS && position >= self.furthest {
+            self.fail(position, &[Expected::Rule(rule.name)]);
+            self.rejected =
+                Some(self.rejected.map_or(end, |most| most.max(end)));
+        }
+        false
     }
 
     /// Returns how many nodes have been matched, to go back to with

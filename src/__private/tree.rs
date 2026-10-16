@@ -1,6 +1,6 @@
 //! Generated code turns the tree a parser builds into its own types.
 
-use std::{ops::Range, sync::Arc};
+use std::{ops::Range, str::FromStr, sync::Arc};
 
 use crate::span::{Input, Span};
 
@@ -132,6 +132,20 @@ impl<'t> Node<'t> {
 /// Builds the type of a rule from the node of its match.
 pub trait FromNode {
     fn from_node(node: Node<'_>) -> Self;
+}
+
+/// The value that the type of a rule reads from the text the rule matched. The
+/// parser made sure it reads it.
+#[derive(Debug)]
+pub struct Converted<T>(pub T);
+
+impl<T: FromStr> FromNode for Converted<T> {
+    fn from_node(node: Node<'_>) -> Self {
+        match node.text().parse() {
+            Ok(value) => Self(value),
+            Err(_) => unreachable!("the parser made sure the type reads it"),
+        }
+    }
 }
 
 impl<T: FromNode> FromNode for Box<T> {

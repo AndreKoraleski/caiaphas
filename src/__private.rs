@@ -27,7 +27,7 @@ mod parser;
 mod tree;
 
 pub use parser::{Ends, Parser, RuleStart};
-pub use tree::{FromNode, Node, Tree};
+pub use tree::{Converted, FromNode, Node, Tree};
 
 use crate::error::Error;
 pub use crate::error::Expected;
