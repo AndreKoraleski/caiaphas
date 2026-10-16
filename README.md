@@ -175,8 +175,8 @@ A comment right before a rule can tell caiaphas more about it.
 
 `(* as T *)` takes any type with `FromStr`, `Debug`, `Clone` and `PartialEq`,
 named as where `grammar!` is called, such as `String`, `f64`,
-`std::net::Ipv4Addr` or a type of your own. Text the type does not read fails
-to match there, as `300` does for a `u8`.
+`std::net::Ipv4Addr` or a type of your own, generic or not. Text the type does
+not read fails to match there, as `300` does for a `u8`.
 
 ## Matching
 

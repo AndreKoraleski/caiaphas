@@ -119,7 +119,8 @@
 //!   it no type, with each rule that holds it holding what it holds instead.
 //! - `(* as T *)` makes a rule's type the Rust type `T`, read from its text
 //!   with `FromStr`. `T` is named as where `grammar!` is called, so it can be
-//!   a type of your own. Text `T` does not read fails to match.
+//!   a type of your own, generic or not. Text `T` does not read fails to
+//!   match.
 //!
 //! # Errors
 //!
