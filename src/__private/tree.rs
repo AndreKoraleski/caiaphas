@@ -115,8 +115,14 @@ impl<'t> Node<'t> {
     /// in order. The grammar makes sure there are that many.
     #[must_use]
     pub fn array<T: FromNode, const N: usize>(&self, rule: usize) -> [T; N] {
-        self.many(rule).try_into().unwrap_or_else(|_| {
-            panic!("the grammar always matches this rule {N} times here")
+        let mut found = self
+            .children()
+            .filter(|child| child.rule() == rule)
+            .map(T::from_node);
+        std::array::from_fn(|_| {
+            found.next().unwrap_or_else(|| {
+                panic!("the grammar always matches this rule {N} times here")
+            })
         })
     }
 
