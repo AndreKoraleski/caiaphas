@@ -22,9 +22,9 @@
 //! }
 //! ```
 //!
-//! `setting` is the start rule, since no other rule uses it, so its type
-//! parses: with `parse`, or `str::parse` as here. The comments right before
-//! some rules are annotations, and [Types](#types) tells what they do.
+//! The type of every rule parses: with `parse`, or `str::parse` as here. The
+//! comments right before some rules are annotations, and [Types](#types) tells
+//! what they do.
 //!
 //! A longer grammar goes in a file, with a path from the root of the crate:
 //!

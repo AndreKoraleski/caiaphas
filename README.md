@@ -138,9 +138,9 @@ pub struct Square { pub size: [u32; 2] }
   ever matches one character also has `char()`.
 * Two matches are equal, and hash alike, when they matched the same text,
   wherever they matched it.
-* The type of a start rule has `parse` and implements `FromStr`. A start rule
-  is one that no other rule uses, so a grammar whose top rule recurs needs
-  one more above it, such as `calculation = expression;`.
+* Every type has `parse` and implements `FromStr`, so a part of a grammar can
+  be read and tested alone. A start rule is one that no other rule uses, or
+  the first rule when every rule is used, as when the top rule recurs.
 
 ## Annotations
 

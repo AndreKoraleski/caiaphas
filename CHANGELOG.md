@@ -33,7 +33,8 @@ adhere to [Semantic Versioning][semver].
 - Fields of `[T; N]` for a rule held the same number of times on every way, and
   `char()` on the type of a rule that only ever matches one character.
 - `Display` that writes the text of every type with `text()`.
-- `FromStr` for the type of each start rule.
+- `parse` and `FromStr` on the type of every rule, so a part of a grammar can
+  be read and tested alone.
 - `Span` for where a rule matched in its input, and `Error` for where an input
   stops matching and what could have come there. `Error::expected` and
   `Error::found` give the same as values, with `Expected` at the root of the
