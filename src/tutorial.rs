@@ -111,6 +111,8 @@
 //! - Every struct has `text()` and `span()`, and a rule that only ever matches
 //!   one character also has `char()`. A type with `text()` displays as that
 //!   text.
+//! - A comment right before a rule, with no empty line between, begins the
+//!   docs of its type, unless it is an annotation.
 //! - `(* hide *)` gives a rule no type and no field, and `(* inline *)` gives
 //!   it no type, with each rule that holds it holding what it holds instead.
 //! - `(* as T *)` makes a rule's type the Rust type `T`, read from its text

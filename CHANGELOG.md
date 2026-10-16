@@ -34,6 +34,8 @@ adhere to [Semantic Versioning][semver].
     its parser stays fast.
 - Fields of `[T; N]` for a rule held the same number of times on every way, and
   `char()` on the type of a rule that only ever matches one character.
+- Docs on each type that quote its rule, and begin with the comments right
+  before it.
 - `Display` that writes the text of every type with `text()`.
 - `parse` and `FromStr` on the type of every rule, so a part of a grammar can
   be read and tested alone.

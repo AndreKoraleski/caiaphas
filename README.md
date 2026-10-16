@@ -149,6 +149,9 @@ pub struct Square { pub size: [u32; 2] }
   `span()`. An enum has `text()` too, unless a variant holds an `(* as T *)`
   value. A type with `text()` displays as that text, and a rule that only
   ever matches one character also has `char()`.
+* A comment right before a rule, with no empty line between, begins the docs
+  of its type, unless it is an [annotation](#annotations). The docs then
+  quote the rule.
 * Two matches are equal, and hash alike, when they matched the same text,
   wherever they matched it.
 * Every type has `parse` and implements `FromStr`, so a part of a grammar can
