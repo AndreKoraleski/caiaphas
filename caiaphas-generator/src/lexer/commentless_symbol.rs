@@ -49,12 +49,12 @@ impl CommentlessSymbol {
             ParseCommentlessSymbolError::InvalidCharacter,
         )?;
         Ok(match character {
-            TerminalCharacter::Letter(_) => {
+            TerminalCharacter::Letter => {
                 let (identifier, length) = MetaIdentifier::read(input)
                     .expect("text starting with a letter is a rule name");
                 (Self::MetaIdentifier(identifier), length)
             }
-            TerminalCharacter::DecimalDigit(_) => {
+            TerminalCharacter::DecimalDigit => {
                 let (integer, length) = Integer::read(input)
                     .map_err(ParseCommentlessSymbolError::Integer)?;
                 (Self::Integer(integer), length)
@@ -77,7 +77,7 @@ impl CommentlessSymbol {
                 );
             }
             TerminalCharacter::Symbol(Symbol::StartComment)
-            | TerminalCharacter::OtherCharacter(_) => {
+            | TerminalCharacter::OtherCharacter => {
                 let first = input
                     .chars()
                     .next()

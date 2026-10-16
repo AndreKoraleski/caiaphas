@@ -57,7 +57,7 @@ impl Eq for MetaIdentifier {}
 fn is_letter(c: char) -> bool {
     matches!(
         TerminalCharacter::read(c, None),
-        Some((TerminalCharacter::Letter(_), _))
+        Some((TerminalCharacter::Letter, _))
     )
 }
 
@@ -66,7 +66,7 @@ fn is_meta_identifier_character(c: char) -> bool {
     matches!(
         TerminalCharacter::read(c, None),
         Some((
-            TerminalCharacter::Letter(_) | TerminalCharacter::DecimalDigit(_),
+            TerminalCharacter::Letter | TerminalCharacter::DecimalDigit,
             _
         ))
     )

@@ -1,13 +1,7 @@
 //! Terminal characters of ISO/IEC 14977 EBNF.
 
-mod decimal_digit;
-mod letter;
-mod other_character;
 mod symbol;
 
-use decimal_digit::DecimalDigit;
-use letter::Letter;
-use other_character::OtherCharacter;
 pub(crate) use symbol::Symbol;
 
 /// A terminal character is a letter, a decimal digit, a symbol or an other
@@ -17,10 +11,13 @@ pub(crate) use symbol::Symbol;
 /// terminal character.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TerminalCharacter {
-    Letter(Letter),
-    DecimalDigit(DecimalDigit),
+    /// An ASCII letter.
+    Letter,
+    /// A digit from `0` to `9`.
+    DecimalDigit,
     Symbol(Symbol),
-    OtherCharacter(OtherCharacter),
+    /// One of the few other characters the standard lists, such as `_`.
+    OtherCharacter,
 }
 
 impl TerminalCharacter {
@@ -33,19 +30,36 @@ impl TerminalCharacter {
         first: char,
         second: Option<char>,
     ) -> Option<(Self, usize)> {
-        if let Some(letter) = Letter::from_char(first) {
-            return Some((Self::Letter(letter), 1));
+        if first.is_ascii_alphabetic() {
+            return Some((Self::Letter, 1));
         }
-        if let Some(digit) = DecimalDigit::from_char(first) {
-            return Some((Self::DecimalDigit(digit), 1));
+        if first.is_ascii_digit() {
+            return Some((Self::DecimalDigit, 1));
         }
         // `:` alone is an other character, but `:)` is a symbol, so the longer
         // symbol is tried first.
         if let Some((symbol, length)) = Symbol::read(first, second) {
             return Some((Self::Symbol(symbol), length));
         }
-        OtherCharacter::from_char(first)
-            .map(|other| (Self::OtherCharacter(other), 1))
+        // In the order ISO/IEC 14977 lists them.
+        matches!(
+            first,
+            ' ' | ':'
+                | '+'
+                | '_'
+                | '%'
+                | '@'
+                | '&'
+                | '#'
+                | '$'
+                | '<'
+                | '>'
+                | '\\'
+                | '^'
+                | '`'
+                | '~'
+        )
+        .then_some((Self::OtherCharacter, 1))
     }
 
     /// Returns the terminal character at the start of `input`, and how many
@@ -130,33 +144,22 @@ mod tests {
 
     #[test]
     fn reads_letters() {
-        assert_eq!(
-            TerminalCharacter::read('a', None),
-            Some((
-                TerminalCharacter::Letter(Letter::from_char('a').unwrap()),
-                1
-            ))
-        );
-        assert_eq!(
-            TerminalCharacter::read('Z', Some('*')),
-            Some((
-                TerminalCharacter::Letter(Letter::from_char('Z').unwrap()),
-                1
-            ))
-        );
+        for (first, second) in [('a', None), ('Z', Some('*'))] {
+            assert_eq!(
+                TerminalCharacter::read(first, second),
+                Some((TerminalCharacter::Letter, 1))
+            );
+        }
     }
 
     #[test]
     fn reads_digits() {
-        assert_eq!(
-            TerminalCharacter::read('7', Some(')')),
-            Some((
-                TerminalCharacter::DecimalDigit(
-                    DecimalDigit::from_char('7').unwrap()
-                ),
-                1
-            ))
-        );
+        for c in '0'..='9' {
+            assert_eq!(
+                TerminalCharacter::read(c, Some(')')),
+                Some((TerminalCharacter::DecimalDigit, 1))
+            );
+        }
     }
 
     #[test]
@@ -180,10 +183,7 @@ mod tests {
         for second in [None, Some(' '), Some(':'), Some('a')] {
             assert_eq!(
                 TerminalCharacter::read(':', second),
-                Some((
-                    TerminalCharacter::OtherCharacter(OtherCharacter::Colon),
-                    1
-                )),
+                Some((TerminalCharacter::OtherCharacter, 1)),
                 "{second:?}"
             );
         }
@@ -207,20 +207,13 @@ mod tests {
 
     #[test]
     fn reads_other_characters() {
-        assert_eq!(
-            TerminalCharacter::read(' ', None),
-            Some((
-                TerminalCharacter::OtherCharacter(OtherCharacter::Space),
-                1
-            ))
-        );
-        assert_eq!(
-            TerminalCharacter::read('~', None),
-            Some((
-                TerminalCharacter::OtherCharacter(OtherCharacter::Tilde),
-                1
-            ))
-        );
+        for c in " :+_%@&#$<>\\^`~".chars() {
+            assert_eq!(
+                TerminalCharacter::read(c, None),
+                Some((TerminalCharacter::OtherCharacter, 1)),
+                "{c:?}"
+            );
+        }
     }
 
     #[test]
