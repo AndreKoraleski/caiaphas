@@ -19,6 +19,8 @@ adhere to [Semantic Versioning][semver].
 - Checks for problems in a grammar, each with a code and a way to fix it.
   Errors and warnings stop the build, unless an `(* expect code: reason *)`
   comment marks a warning as intended, and suggestions stop it with `suggest`.
+- Special sequences that hold a code point, a range of them, or a regular
+  expression between two `/`, such as `? /[a-z_]+/ ?`.
 - `optimize` reads each start that alternatives share once, without changing
   the types.
 - Annotations:

@@ -49,12 +49,30 @@
 //! | `a - b`           | what `a` matches but `b` does not            |
 //! | `? U+00E9 ?`      | the character `é`                            |
 //! | `? U+0061..U+007A ?` | any character from `a` to `z`             |
+//! | `? /[a-z_]+/ ?`   | what the regular expression matches          |
 //! | `(* note *)`      | nothing, as a comment                        |
 //!
 //! ISO 14977 leaves the meaning of a special sequence, written between `?`, to
-//! each tool. caiaphas gives it one: a code point, or a range of them. It is
-//! the supported way to write a character that no terminal string holds, such
-//! as `é` or a tab.
+//! each tool. caiaphas gives it one: a code point, a range of them, or a
+//! regular expression between two `/`. It is the supported way to write a
+//! character that no terminal string holds, such as `é` or a tab.
+//!
+//! A regular expression holds characters, classes such as `[a-z_]`, `[^"]`,
+//! `.`, `\d`, `\w` and `\s`, choices with `|`, groups, and repetitions with
+//! `*`, `+`, `{n}`, `{n,}` and `{n,m}`. `U+XXXX` stands for a code point, and
+//! `{0,1}` for an optional part, since a `?` would end the special sequence.
+//! It matches as the grammar it stands for would:
+//!
+//! ```
+//! caiaphas::grammar!(mod assignment {
+//!     r"assignment = name, ' = ', number;
+//!       name = ? /[a-z_][a-z0-9_]*/ ?;
+//!       number = ? /\d+(\.\d+){0,1}/ ?;"
+//! });
+//!
+//! let parsed = assignment::Assignment::parse("pi = 3.14").unwrap();
+//! assert_eq!((parsed.name.text(), parsed.number.text()), ("pi", "3.14"));
+//! ```
 //!
 //! # Types
 //!
