@@ -190,12 +190,13 @@ pub(super) fn enumeration(
     let mut by_text = Vec::new();
     for variant in variants {
         match variant {
-            Variant::Rule { rule, boxed } => {
+            Variant::Rule { rule, named, boxed } => {
                 let RuleId(held) = *rule;
-                let variant = &names.types[held];
+                let RuleId(name_giver) = *named;
+                let variant = &names.types[name_giver];
                 let documentation = format!(
                     " Matched `{}`.",
-                    name::spaced(&grammar.syntax_rules[held])
+                    name::spaced(&grammar.syntax_rules[name_giver])
                 );
                 let ty = held_type(names, *rule, *boxed);
                 let index = Literal::usize_unsuffixed(held);

@@ -51,8 +51,13 @@ const MANY: u8 = 16;
 /// A variant of an enum, for one alternative of its rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Variant {
-    /// Holds the type of another rule, in a box when `boxed` holds.
-    Rule { rule: RuleId, boxed: bool },
+    /// Holds the type of another rule, in a box when `boxed` holds. It is
+    /// named after `named`, the rule itself or an inline rule that holds it.
+    Rule {
+        rule: RuleId,
+        named: RuleId,
+        boxed: bool,
+    },
     /// Stands for a terminal string that is a word.
     Word(String),
 }
@@ -87,7 +92,8 @@ fn shape(grammar: &Grammar, expression: &Expression) -> Shape {
 }
 
 /// Returns a variant for each alternative of `expression`, when each is a rule
-/// with a type or a word, and no two variants would share a name.
+/// with a type, an inline rule that holds one such rule once, or a word, and
+/// no two variants would share a name or the rule they hold.
 fn variants(
     grammar: &Grammar,
     expression: &Expression,
@@ -97,6 +103,7 @@ fn variants(
         return None;
     };
     let mut names = HashSet::new();
+    let mut held = HashSet::new();
     alternatives
         .iter()
         .map(|alternative| {
@@ -104,13 +111,29 @@ fn variants(
                 ExpressionKind::MetaIdentifier(rule_id) => {
                     let RuleId(position) = *rule_id;
                     let rule = &grammar.syntax_rules[position];
-                    if rule.hidden || rule.inline {
+                    if rule.hidden {
+                        return None;
+                    }
+                    let holds = if rule.inline {
+                        // The node of an inline rule stands for its children,
+                        // so a variant can only take the one rule it holds.
+                        match occurrences(grammar, &rule.expression)[..] {
+                            [(inner, Occurrences { least: 1, most: 1 })] => {
+                                inner
+                            }
+                            _ => return None,
+                        }
+                    } else {
+                        *rule_id
+                    };
+                    if !held.insert(holds.0) {
                         return None;
                     }
                     let name = name::type_name(rule.meta_identifier.written());
                     (
                         Variant::Rule {
-                            rule: *rule_id,
+                            rule: holds,
+                            named: *rule_id,
                             boxed: false,
                         },
                         name,
@@ -302,7 +325,7 @@ fn box_cycles(shapes: &mut [Shape]) {
             }
             Shape::Enum(variants) => {
                 for variant in variants {
-                    if let Variant::Rule { rule, boxed } = variant {
+                    if let Variant::Rule { rule, boxed, .. } = variant {
                         *boxed = contains_this(*rule);
                     }
                 }
@@ -369,10 +392,18 @@ mod tests {
                         let variants: Vec<String> = variants
                             .into_iter()
                             .map(|variant| match variant {
-                                Variant::Rule { rule, boxed } => {
+                                Variant::Rule { rule, named, boxed } => {
                                     let boxed =
                                         if boxed { " boxed" } else { "" };
-                                    format!("{}{boxed}", name(rule))
+                                    if named == rule {
+                                        format!("{}{boxed}", name(rule))
+                                    } else {
+                                        format!(
+                                            "{}({}){boxed}",
+                                            name(named),
+                                            name(rule)
+                                        )
+                                    }
                                 }
                                 Variant::Word(word) => format!("{word:?}"),
                             })

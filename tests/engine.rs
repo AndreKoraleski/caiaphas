@@ -303,6 +303,23 @@ fn gives_a_rule_that_holds_an_inline_rule_what_it_holds() {
     assert_eq!((pair.a.text(), pair.b.text()), ("a", "b"));
 }
 
+caiaphas::grammar!(mod parenthesized {
+    "sum = primary, {'+', primary};
+     primary = number | group;
+     (* inline *) group = '(', sum, ')';
+     number = ? /[0-9]+/ ?;"
+});
+
+#[test]
+fn names_a_variant_after_an_inline_rule_that_holds_one_rule() {
+    let sum = parenthesized::Sum::parse("1+(2+3)").unwrap();
+    let parenthesized::Primary::Group(inner) = &sum.primary[1] else {
+        panic!("the second primary is a group");
+    };
+    assert_eq!(inner.text(), "2+3");
+    assert_eq!(sum.primary[1].text(), "2+3");
+}
+
 #[test]
 fn parses_a_start_rule_from_a_str() {
     let parsed: list::Numbers = "1,2".parse().unwrap();
