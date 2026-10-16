@@ -10,7 +10,7 @@ use std::collections::HashSet;
 
 use crate::{
     generate::name,
-    ir::{Expression, ExpressionKind, Grammar, RuleId},
+    ir::{Expression, ExpressionKind, Grammar, RuleId, reachable},
 };
 
 /// The type a rule becomes.
@@ -284,31 +284,19 @@ fn box_cycles(shapes: &mut [Shape]) {
 /// Returns whether the type of `from` contains the type of `to`, by itself or
 /// through other types, without a list in between.
 fn reaches(contained: &[Vec<RuleId>], from: RuleId, to: RuleId) -> bool {
-    let mut seen = vec![false; contained.len()];
-    let mut pending = vec![from];
-    while let Some(rule) = pending.pop() {
-        if rule == to {
-            return true;
-        }
-        let RuleId(position) = rule;
-        if !std::mem::replace(&mut seen[position], true) {
-            pending.extend(contained[position].iter().copied());
-        }
-    }
-    false
+    let RuleId(position) = to;
+    reachable(contained.len(), [from], |RuleId(rule), pending| {
+        pending.extend(&contained[rule]);
+    })[position]
 }
 
 /// Returns which rules get a type, which are the start rules and the rules
 /// their types hold.
 fn reached(grammar: &Grammar, shapes: &[Shape]) -> Vec<bool> {
-    let mut reached = vec![false; shapes.len()];
-    let mut pending = grammar.start_syntax_rules.clone();
-    while let Some(RuleId(position)) = pending.pop() {
-        if !std::mem::replace(&mut reached[position], true) {
-            pending.extend(held(&shapes[position]));
-        }
-    }
-    reached
+    let starts = grammar.start_syntax_rules.iter().copied();
+    reachable(shapes.len(), starts, |RuleId(position), pending| {
+        pending.extend(held(&shapes[position]));
+    })
 }
 
 #[cfg(test)]

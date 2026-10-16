@@ -11,7 +11,7 @@ use crate::{
         finding::{Finding, FindingKind},
     },
     diagnostic::Label,
-    ir::{Grammar, RuleId},
+    ir::{Grammar, RuleId, reachable},
     span::Span,
 };
 
@@ -58,22 +58,15 @@ fn reaches(
     from: RuleId,
     to: RuleId,
 ) -> bool {
-    let mut visited = vec![false; first_meta_identifiers.len()];
-    let mut pending = vec![from];
-    while let Some(RuleId(position)) = pending.pop() {
-        if RuleId(position) == to {
-            return true;
-        }
-        if !visited[position] {
-            visited[position] = true;
-            pending.extend(
-                first_meta_identifiers[position]
-                    .iter()
-                    .map(|&(target, _)| target),
-            );
-        }
-    }
-    false
+    let RuleId(position) = to;
+    let count = first_meta_identifiers.len();
+    reachable(count, [from], |RuleId(rule), pending| {
+        pending.extend(
+            first_meta_identifiers[rule]
+                .iter()
+                .map(|&(target, _)| target),
+        );
+    })[position]
 }
 
 #[cfg(test)]

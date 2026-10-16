@@ -8,6 +8,24 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct RuleId(pub(crate) usize);
 
+/// Returns which of `count` rules can be reached from `starts`, where `next`
+/// adds the rules a rule leads to onto the list of those still to visit.
+pub(crate) fn reachable(
+    count: usize,
+    starts: impl IntoIterator<Item = RuleId>,
+    mut next: impl FnMut(RuleId, &mut Vec<RuleId>),
+) -> Vec<bool> {
+    let mut reached = vec![false; count];
+    let mut pending: Vec<RuleId> = starts.into_iter().collect();
+    while let Some(rule) = pending.pop() {
+        let RuleId(position) = rule;
+        if !std::mem::replace(&mut reached[position], true) {
+            next(rule, &mut pending);
+        }
+    }
+    reached
+}
+
 /// A rule gives a meta identifier the expression it matches.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Rule {
