@@ -299,3 +299,10 @@ fn gives_a_rule_that_holds_an_inline_rule_what_it_holds() {
     let pair = remembered::Pair::parse("aby").unwrap();
     assert_eq!((pair.a.text(), pair.b.text()), ("a", "b"));
 }
+
+#[test]
+fn parses_a_start_rule_from_a_str() {
+    let parsed: list::Numbers = "1,2".parse().unwrap();
+    assert_eq!(parsed.list.item.len(), 2);
+    assert!("1,".parse::<list::Numbers>().is_err());
+}

@@ -46,16 +46,16 @@ pub(crate) fn module(
     let types = shapes.iter().enumerate().filter_map(|(position, shape)| {
         let shape = shape.as_ref()?;
         let rule = &grammar.syntax_rules[position];
-        let parse = grammar
-            .start_syntax_rules
-            .contains(&RuleId(position))
-            .then(|| parse(rule, RuleId(position), general[position]));
+        let start = grammar.start_syntax_rules.contains(&RuleId(position));
+        let parse =
+            start.then(|| parse(rule, RuleId(position), general[position]));
+        let from_str = start.then(|| from_str(&names.types[position]));
         let documentation = format!(
             " The type of the `{}` rule:\n\n```text\n{}\n```",
             name::spaced(rule),
             &source[rule.span.range()],
         );
-        Some(match shape {
+        let type_code = match shape {
             Shape::Struct(fields) => {
                 let character = written
                     .single_characters(&rule.expression)
@@ -78,7 +78,8 @@ pub(crate) fn module(
                 parse,
                 &documentation,
             ),
-        })
+        };
+        Some(quote! { #type_code #from_str })
     });
     quote! {
         use ::caiaphas::__private as __caiaphas;
@@ -92,10 +93,11 @@ pub(crate) fn module(
 /// Returns the `parse` function of the start rule `rule_id`, written `rule`.
 /// With `general`, it tries every way through the rule.
 fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
+    let name = name::spaced(rule);
     let documentation = format!(
-        " Returns the `{}` that all of `input` matches, or where `input` \
-         stops matching it.",
-        name::spaced(rule)
+        " Returns the `{name}` that all of `input` matches.\n\n # Errors\n\n \
+         Returns where `input` stops matching a `{name}`, and what could \
+         have come there instead."
     );
     let parse = if general {
         let (ends, build) =
@@ -136,6 +138,22 @@ fn character() -> TokenStream {
             match self.span.as_str().chars().next() {
                 ::core::option::Option::Some(character) => character,
                 ::core::option::Option::None => ::core::unreachable!(),
+            }
+        }
+    }
+}
+
+/// Returns the implementation that lets `str::parse` read the type `name` of a
+/// start rule, as its `parse` does.
+fn from_str(name: &Ident) -> TokenStream {
+    quote! {
+        impl ::core::str::FromStr for #name {
+            type Err = ::caiaphas::Error;
+
+            fn from_str(
+                input: &str,
+            ) -> ::core::result::Result<Self, ::caiaphas::Error> {
+                Self::parse(input)
             }
         }
     }

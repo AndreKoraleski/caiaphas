@@ -22,7 +22,8 @@
 //! # Types
 //!
 //! Each rule becomes a type named after it, so `syntax rule` becomes
-//! `SyntaxRule`.
+//! `SyntaxRule`. The type of a start rule also has `parse`, and implements
+//! `FromStr`, so `input.parse::<Json>()` reads it too.
 //!
 //! - A rule whose alternatives are each another rule or a word becomes an enum
 //!   with a variant for each, such as `Value::Object` and `Value::True`.
