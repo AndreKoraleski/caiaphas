@@ -110,6 +110,7 @@ impl FunctionWriter<'_> {
                     number: #number,
                     name: #name,
                     hidden: #hidden,
+                    inline: false,
                     remembers: #remembers,
                 };
                 #recall

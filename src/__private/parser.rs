@@ -292,10 +292,20 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
             self.matched.truncate(mark);
             return None;
         }
+        // A child of an inline rule stands where its node would.
         let first = self.children.len();
-        self.children.extend(self.matched.drain(mark..));
+        for child in self.matched.drain(mark..) {
+            let data = &self.nodes[child];
+            if data.inline {
+                self.children.extend_from_within(data.children.clone());
+            } else {
+                self.children.push(child);
+            }
+        }
         self.nodes.push(NodeData {
-            rule: rule.number,
+            rule: u32::try_from(rule.number)
+                .expect("a grammar has fewer rules than `u32` holds"),
+            inline: rule.inline,
             start: range.start,
             end: range.end,
             children: first..self.children.len(),

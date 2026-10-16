@@ -42,7 +42,9 @@ impl Tree {
 /// The rule a node matched, where, and where its children are.
 #[derive(Debug)]
 pub(super) struct NodeData {
-    pub(super) rule: usize,
+    pub(super) rule: u32,
+    /// Whether the node stands for its children in the node around it.
+    pub(super) inline: bool,
     pub(super) start: usize,
     pub(super) end: usize,
     /// Where the node's children are in the children of its tree.
@@ -63,7 +65,7 @@ impl<'t> Node<'t> {
 
     /// Returns the number of the rule this node matched.
     pub fn rule(&self) -> usize {
-        self.data().rule
+        self.data().rule as usize
     }
 
     pub fn span(&self) -> Span {

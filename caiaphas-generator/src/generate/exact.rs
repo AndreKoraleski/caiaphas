@@ -57,6 +57,7 @@ impl ExactWriter<'_> {
                 number: #number,
                 name: #name,
                 hidden: #hidden,
+                inline: false,
                 remembers: true,
             };
         };

@@ -45,6 +45,9 @@ pub struct Rule {
     /// Whether the rule is left out of the tree and of errors, along with what
     /// it matches.
     pub hidden: bool,
+    /// Whether the rule's node stands for its children in the tree, so the
+    /// rule around it holds them instead.
+    pub inline: bool,
     /// Whether the rule remembers its match at each position.
     pub remembers: bool,
 }
