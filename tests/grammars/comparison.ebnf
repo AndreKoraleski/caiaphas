@@ -1,8 +1,0 @@
-(* Comparisons of numbers, whose operator is the first spelling that
-   matches. *)
-comparison = number, operator, number;
-number = digit, {digit};
-(* first match *)
-operator = '<=' | '<' | '=';
-(* hide *)
-digit = ? U+0030..U+0039 ?;

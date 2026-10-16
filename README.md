@@ -75,11 +75,12 @@ such as `? U+00E9 ?`, or a range of them, such as `? U+0041..U+005A ?`.
 Where a choice has more than one way to go, a parser takes the alternative
 that matches the most text, and optional and repeated sequences take as much
 as they can. The choices of a rule marked `(* first match *)` take the first
-alternative that matches instead, in the order written, as in a PEG:
+alternative that matches instead, in the order written, as in a PEG, so here
+`nullable` starts with `null`, where the longest match would read a `name`:
 
 ```ebnf
 (* first match *)
-operator = '<=' | '<' | '=';
+value = 'null' | name;
 ```
 
 ## Problems
