@@ -105,16 +105,26 @@ impl<'a> Facts<'a> {
         found
     }
 
-    /// Calls `visit` with every expression of every rule, and what can come
-    /// right after it.
-    pub(crate) fn walk(
+    /// Calls `visit` with every expression of the rule `rule_id`, and what can
+    /// come right after it.
+    pub(crate) fn walk_rule(
         &self,
+        rule_id: RuleId,
         visit: &mut impl FnMut(&'a Expression, &Follow),
     ) {
-        for (position, rule) in self.grammar.syntax_rules.iter().enumerate() {
-            let after = &self.follow_rules()[position];
-            self.walk_expression(&rule.expression, after, visit);
-        }
+        let RuleId(position) = rule_id;
+        let grammar = self.grammar;
+        let after = &self.follow_rules()[position];
+        self.walk_expression(
+            &grammar.syntax_rules[position].expression,
+            after,
+            visit,
+        );
+    }
+
+    /// Returns the grammar the facts are about.
+    pub(crate) fn grammar(&self) -> &'a Grammar {
+        self.grammar
     }
 
     fn walk_expression(
@@ -631,7 +641,7 @@ mod tests {
         let grammar = build_valid("a = 'x' - 'u', {'y'}, 'z', {'w'};");
         let facts = Facts::new(&grammar);
         let mut seen = Vec::new();
-        facts.walk(&mut |expression, after| {
+        facts.walk_rule(RuleId(0), &mut |expression, after| {
             if let ExpressionKind::TerminalString(string) = &expression.kind {
                 let end = if after.end_of_input { " end" } else { "" };
                 seen.push(format!("{string}:{}{end}", after.characters));

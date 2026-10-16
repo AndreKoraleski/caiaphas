@@ -14,7 +14,10 @@ use crate::{
 /// it could repeat forever.
 ///
 /// Only the alternatives of a definitions list get labels, since the finding
-/// already points at the only body of an optional or repeated sequence.
+/// already points at the only body of an optional or repeated sequence. The
+/// alternatives of a rule that takes the first match are left to the
+/// unreachable alternative check, since the first that can match nothing
+/// always matches.
 pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
     let nullable: Vec<Label> = choice_point
         .branches
@@ -38,6 +41,7 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
         ChoicePointKind::RepeatedSequence => {
             (FindingKind::NullableRepeatedSequence, Vec::new())
         }
+        ChoicePointKind::FirstMatchDefinitionsList => return,
     };
     findings.push(Finding {
         kind,
@@ -101,6 +105,11 @@ mod tests {
                 0
             )]
         );
+    }
+
+    #[test]
+    fn leaves_the_alternatives_of_a_first_match_to_another_check() {
+        assert_eq!(empty("(* first match *) a = ['x'] | ['y'];"), []);
     }
 
     #[test]

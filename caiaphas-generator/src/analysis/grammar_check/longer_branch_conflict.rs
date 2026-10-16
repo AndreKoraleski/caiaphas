@@ -5,7 +5,8 @@
 //! A parser takes the alternative that matches the most, so it takes the
 //! longer one whenever it can, even when what comes after the choice needed
 //! the shorter one. It is the follow conflict of an optional sequence, since
-//! `a | a, b` matches like `a, [b]`.
+//! `a | a, b` matches like `a, [b]`. Rules that take the first match are left
+//! alone, since there the first written alternative is meant to win.
 
 use crate::{
     analysis::{
@@ -14,36 +15,41 @@ use crate::{
         finding::{Finding, FindingKind},
     },
     diagnostic::Label,
-    ir::{Expression, ExpressionKind, Grammar},
+    ir::{Expression, ExpressionKind, Grammar, RuleId},
 };
 
 /// Reports every alternative that goes on from where another alternative of
 /// the same definitions list ends, with characters that can come after the
 /// list.
 pub(super) fn check(
-    _grammar: &Grammar,
+    grammar: &Grammar,
     facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
-    facts.walk(&mut |expression, after| {
-        let ExpressionKind::DefinitionsList(alternatives) = &expression.kind
-        else {
-            return;
-        };
-        for longer in alternatives {
-            let conflict = alternatives.iter().find_map(|shorter| {
-                let rest = rest_after(shorter, longer)?;
-                let characters = rest
-                    .iter()
-                    .rev()
-                    .fold(CharacterSet::default(), |after, expression| {
-                        facts.first_before(expression, &after)
-                    })
-                    .intersection(&after.characters);
-                (!characters.is_empty()).then_some((shorter, characters))
-            });
-            if let Some((shorter, characters)) = conflict {
-                findings.push(Finding {
+    for (position, rule) in grammar.syntax_rules.iter().enumerate() {
+        if rule.first_match {
+            continue;
+        }
+        facts.walk_rule(RuleId(position), &mut |expression, after| {
+            let ExpressionKind::DefinitionsList(alternatives) =
+                &expression.kind
+            else {
+                return;
+            };
+            for longer in alternatives {
+                let conflict = alternatives.iter().find_map(|shorter| {
+                    let rest = rest_after(shorter, longer)?;
+                    let characters = rest
+                        .iter()
+                        .rev()
+                        .fold(CharacterSet::default(), |after, expression| {
+                            facts.first_before(expression, &after)
+                        })
+                        .intersection(&after.characters);
+                    (!characters.is_empty()).then_some((shorter, characters))
+                });
+                if let Some((shorter, characters)) = conflict {
+                    findings.push(Finding {
                     kind: FindingKind::LongerBranchConflict { characters },
                     span: longer.span,
                     labels: vec![Label {
@@ -52,9 +58,10 @@ pub(super) fn check(
                                   on",
                     }],
                 });
+                }
             }
-        }
-    });
+        });
+    }
 }
 
 /// Returns what `longer` goes on with after `shorter`, when `longer` starts

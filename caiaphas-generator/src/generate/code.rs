@@ -38,7 +38,7 @@ pub(crate) fn module(
         fields: written_names.map(name::field_name).collect(),
     };
     let facts = Facts::new(grammar);
-    let revisited = revisited_rules(grammar, &facts);
+    let revisited = revisited_rules(&facts);
     let rules = grammar
         .syntax_rules
         .iter()

@@ -7,7 +7,8 @@
 //! them matches single characters or a few fixed texts, so other alternatives
 //! are left alone. Alternatives written the same way are left to the duplicate
 //! alternative check, and those that can both match nothing to the nullable
-//! branches check.
+//! branches check. Rules that take the first match are left alone, since there
+//! the first written alternative is meant to win.
 
 use crate::{
     analysis::{
@@ -26,28 +27,33 @@ pub(super) fn check(
     facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
-    grammar.visit(&mut |expression| {
-        let ExpressionKind::DefinitionsList(alternatives) = &expression.kind
-        else {
-            return;
-        };
-        for (index, later) in alternatives.iter().enumerate() {
-            let tie = alternatives[..index].iter().find_map(|earlier| {
-                shared(grammar, facts, earlier, later)
-                    .map(|matched| (earlier, matched))
-            });
-            if let Some((earlier, matched)) = tie {
-                findings.push(Finding {
-                    kind: FindingKind::TiedBranches { matched },
-                    span: later.span,
-                    labels: vec![Label {
-                        span: earlier.span,
-                        message: "this branch can match it too",
-                    }],
+    let longest_match =
+        grammar.syntax_rules.iter().filter(|rule| !rule.first_match);
+    for rule in longest_match {
+        rule.expression.visit(&mut |expression| {
+            let ExpressionKind::DefinitionsList(alternatives) =
+                &expression.kind
+            else {
+                return;
+            };
+            for (index, later) in alternatives.iter().enumerate() {
+                let tie = alternatives[..index].iter().find_map(|earlier| {
+                    shared(grammar, facts, earlier, later)
+                        .map(|matched| (earlier, matched))
                 });
+                if let Some((earlier, matched)) = tie {
+                    findings.push(Finding {
+                        kind: FindingKind::TiedBranches { matched },
+                        span: later.span,
+                        labels: vec![Label {
+                            span: earlier.span,
+                            message: "this branch can match it too",
+                        }],
+                    });
+                }
             }
-        }
-    });
+        });
+    }
 }
 
 /// Returns what both `earlier` and `later` can match, written as it would

@@ -44,8 +44,8 @@ pub(crate) enum Annotation {
     Expectation(Expectation),
     /// Leaves the rule out of the types generated for the grammar.
     Hide,
-    /// Makes the choices written in the rule take their first alternative
-    /// that matches.
+    /// Makes the choices written in the rule take their first alternative that
+    /// matches.
     FirstMatch,
 }
 

@@ -21,7 +21,11 @@ use crate::analysis::{
 /// come right after it. A sequence that can match nothing is left to the
 /// nullable branches check.
 pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
-    if choice_point.kind == ChoicePointKind::DefinitionsList {
+    if matches!(
+        choice_point.kind,
+        ChoicePointKind::DefinitionsList
+            | ChoicePointKind::FirstMatchDefinitionsList
+    ) {
         return;
     }
     let [sequence, end] = choice_point.branches.as_slice() else {
@@ -52,7 +56,11 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
         (ChoicePointKind::RepeatedSequence, true) => {
             FindingKind::DeadEndRepeatedSequence
         }
-        (ChoicePointKind::DefinitionsList, _) => return,
+        (
+            ChoicePointKind::DefinitionsList
+            | ChoicePointKind::FirstMatchDefinitionsList,
+            _,
+        ) => return,
     };
     findings.push(Finding {
         kind,

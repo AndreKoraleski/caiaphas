@@ -3,7 +3,7 @@
 
 use crate::{
     analysis::{character_set::CharacterSet, facts::Facts},
-    ir::{Expression, ExpressionKind, Grammar},
+    ir::{Expression, ExpressionKind, RuleId},
     span::Span,
 };
 
@@ -22,6 +22,9 @@ pub(crate) struct ChoicePoint {
 pub(crate) enum ChoicePointKind {
     /// The branches are the alternatives.
     DefinitionsList,
+    /// The branches are the alternatives of a rule that takes the first match,
+    /// so the first written of those that match wins.
+    FirstMatchDefinitionsList,
     /// The branches are taking the sequence and skipping it.
     OptionalSequence,
     /// The branches are repeating the sequence again and stopping.
@@ -63,14 +66,11 @@ pub(crate) fn choice_points(facts: &Facts<'_>) -> Vec<ChoicePoint> {
     choice_points
 }
 
-/// Returns which rules of `grammar`, which `facts` answers about, a parser can
-/// try more than once at the same place. Those are the rules that the
-/// branches of a choice point reach when two of them can start with the same
-/// character, and only they have to remember their matches.
-pub(crate) fn revisited_rules(
-    grammar: &Grammar,
-    facts: &Facts<'_>,
-) -> Vec<bool> {
+/// Returns which rules of the grammar `facts` answers about a parser can try
+/// more than once at the same place. Those are the rules that the branches of
+/// a choice point reach when two of them can start with the same character,
+/// and only they have to remember their matches.
+pub(crate) fn revisited_rules(facts: &Facts<'_>) -> Vec<bool> {
     let mut starts = Vec::new();
     visit_choice_points(facts, &mut |expression, choice_point| {
         if choice_point.overlaps() {
@@ -79,7 +79,7 @@ pub(crate) fn revisited_rules(
             });
         }
     });
-    grammar.reached_from(starts)
+    facts.grammar().reached_from(starts)
 }
 
 /// Calls `visit` with every choice point of the grammar `facts` answers about,
@@ -88,45 +88,51 @@ fn visit_choice_points<'a>(
     facts: &Facts<'a>,
     visit: &mut impl FnMut(&'a Expression, ChoicePoint),
 ) {
-    facts.walk(&mut |expression, after| {
-        let branch = |branch: &Expression| Branch {
-            span: branch.span,
-            lookahead: facts.first_before(branch, &after.characters),
-            nullable: facts.is_nullable(branch),
-            single_characters: facts.single_characters(branch),
-        };
-        let end = || Branch {
-            span: Span {
-                start: expression.span.end,
-                end: expression.span.end,
-            },
-            lookahead: after.characters.clone(),
-            nullable: true,
-            single_characters: None,
-        };
-        let (kind, branches) = match &expression.kind {
-            ExpressionKind::DefinitionsList(expressions) => (
-                ChoicePointKind::DefinitionsList,
-                expressions.iter().map(branch).collect(),
-            ),
-            ExpressionKind::OptionalSequence(expression) => (
-                ChoicePointKind::OptionalSequence,
-                vec![branch(expression), end()],
-            ),
-            ExpressionKind::RepeatedSequence(expression) => (
-                ChoicePointKind::RepeatedSequence,
-                vec![branch(expression), end()],
-            ),
-            _ => return,
-        };
-        let choice_point = ChoicePoint {
-            kind,
-            span: expression.span,
-            branches,
-            end_of_input: after.end_of_input,
-        };
-        visit(expression, choice_point);
-    });
+    for (position, rule) in facts.grammar().syntax_rules.iter().enumerate() {
+        facts.walk_rule(RuleId(position), &mut |expression, after| {
+            let branch = |branch: &Expression| Branch {
+                span: branch.span,
+                lookahead: facts.first_before(branch, &after.characters),
+                nullable: facts.is_nullable(branch),
+                single_characters: facts.single_characters(branch),
+            };
+            let end = || Branch {
+                span: Span {
+                    start: expression.span.end,
+                    end: expression.span.end,
+                },
+                lookahead: after.characters.clone(),
+                nullable: true,
+                single_characters: None,
+            };
+            let (kind, branches) = match &expression.kind {
+                ExpressionKind::DefinitionsList(expressions) => (
+                    if rule.first_match {
+                        ChoicePointKind::FirstMatchDefinitionsList
+                    } else {
+                        ChoicePointKind::DefinitionsList
+                    },
+                    expressions.iter().map(branch).collect(),
+                ),
+                ExpressionKind::OptionalSequence(expression) => (
+                    ChoicePointKind::OptionalSequence,
+                    vec![branch(expression), end()],
+                ),
+                ExpressionKind::RepeatedSequence(expression) => (
+                    ChoicePointKind::RepeatedSequence,
+                    vec![branch(expression), end()],
+                ),
+                _ => return,
+            };
+            let choice_point = ChoicePoint {
+                kind,
+                span: expression.span,
+                branches,
+                end_of_input: after.end_of_input,
+            };
+            visit(expression, choice_point);
+        });
+    }
 }
 
 #[cfg(test)]
@@ -156,6 +162,12 @@ mod tests {
     }
 
     #[test]
+    fn finds_the_alternatives_of_a_rule_that_takes_the_first_match() {
+        let points = choice_points_of("(* first match *) a = 'x' | 'xy';");
+        assert_eq!(points[0].kind, ChoicePointKind::FirstMatchDefinitionsList);
+    }
+
+    #[test]
     fn finds_taking_or_skipping_an_optional_sequence() {
         let points = choice_points_of("a = ['x'], 'y';");
         assert_eq!(points[0].kind, ChoicePointKind::OptionalSequence);
@@ -173,7 +185,7 @@ mod tests {
 
     fn revisited(source: &str) -> Vec<bool> {
         let grammar = build_valid(source);
-        revisited_rules(&grammar, &Facts::new(&grammar))
+        revisited_rules(&Facts::new(&grammar))
     }
 
     #[test]

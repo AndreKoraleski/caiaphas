@@ -56,6 +56,9 @@ pub(crate) enum FindingKind {
     AmbiguousNullableBranches,
     /// No start rule can reach a rule, so no parser uses it.
     UnreachableRule { meta_identifier: MetaIdentifier },
+    /// An alternative of a rule that takes the first match comes after one
+    /// that can match nothing, so a parser never tries it.
+    UnreachableAlternative,
     /// An alternative is written the same way as an earlier alternative of the
     /// same choice.
     DuplicateAlternative,
@@ -118,6 +121,7 @@ finding_codes! {
     DeadEndRepeatedSequence => "dead-end-repeated-sequence",
     AmbiguousNullableBranches => "ambiguous-nullable-branches",
     UnreachableRule => "unreachable-rule",
+    UnreachableAlternative => "unreachable-alternative",
     DuplicateAlternative => "duplicate-alternative",
     IneffectiveException => "ineffective-exception",
     EmptyRule => "empty-rule",
@@ -150,6 +154,7 @@ impl FindingCode {
             | Self::DeadEndRepeatedSequence
             | Self::AmbiguousNullableBranches
             | Self::UnreachableRule
+            | Self::UnreachableAlternative
             | Self::DuplicateAlternative
             | Self::IneffectiveException
             | Self::EmptyRule
@@ -189,6 +194,7 @@ impl FindingCode {
             Self::RequiredOptionalSequence
             | Self::DeadEndRepeatedSequence
             | Self::UnreachableRule
+            | Self::UnreachableAlternative
             | Self::IneffectiveException
             | Self::EmptyRule
             | Self::ExhaustiveException
@@ -235,6 +241,9 @@ impl FindingKind {
                 FindingCode::AmbiguousNullableBranches
             }
             Self::UnreachableRule { .. } => FindingCode::UnreachableRule,
+            Self::UnreachableAlternative => {
+                FindingCode::UnreachableAlternative
+            }
             Self::DuplicateAlternative => FindingCode::DuplicateAlternative,
             Self::IneffectiveException => FindingCode::IneffectiveException,
             Self::EmptyRule { .. } => FindingCode::EmptyRule,
@@ -337,6 +346,11 @@ impl FindingKind {
                 "remove `{}`, or reference it from a rule a parser uses",
                 meta_identifier.as_str()
             ),
+            Self::UnreachableAlternative => {
+                "move it before the alternative that can match nothing, or \
+                 make that one read something"
+                    .to_owned()
+            }
             Self::DuplicateAlternative => "remove this alternative".to_owned(),
             Self::IneffectiveException => {
                 "remove the exception, or write the one that was meant"
@@ -447,6 +461,10 @@ impl fmt::Display for FindingKind {
                 "`{}` cannot be reached from any start rule, so no parser \
                  uses it",
                 meta_identifier.as_str()
+            ),
+            Self::UnreachableAlternative => f.write_str(
+                "this alternative comes after one that can match nothing, so \
+                 a parser that takes the first match never tries it",
             ),
             Self::DuplicateAlternative => f.write_str(
                 "this alternative is written the same way as an earlier one, \
@@ -662,6 +680,18 @@ mod tests {
                    this is intended, write `(* expect unreachable-rule: \
                    reason *)` right before the rule, and the grammar stays as \
                    it is",
+        },
+        Case {
+            source: "(* first match *) a = ['y'] | 'x';",
+            code: FindingCode::UnreachableAlternative,
+            severity: Severity::Warning,
+            message: "this alternative comes after one that can match \
+                      nothing, so a parser that takes the first match never \
+                      tries it",
+            help: "move it before the alternative that can match nothing, or \
+                   make that one read something; if this is intended, write \
+                   `(* expect unreachable-alternative: reason *)` right \
+                   before the rule, and the grammar stays as it is",
         },
         Case {
             source: "a = 'x' | 'x';",
