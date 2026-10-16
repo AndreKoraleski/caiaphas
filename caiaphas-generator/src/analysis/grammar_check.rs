@@ -9,6 +9,7 @@ mod indirect_left_recursion;
 mod ineffective_exception;
 mod left_recursion;
 mod longer_branch_conflict;
+mod nondeterministic_choice;
 mod shared_start;
 mod single_character_rule;
 mod tied_branches;
@@ -40,4 +41,5 @@ pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     unreachable_alternative::check,
     single_character_rule::check,
     shared_start::check,
+    nondeterministic_choice::check,
 ];

@@ -85,6 +85,12 @@ pub(crate) enum FindingKind {
     /// An alternative starts the same way as an earlier one of the same
     /// choice, so a parser reads that start twice.
     SharedStart,
+    /// A parser cannot tell from what comes next which way a choice takes, so
+    /// its rule tries every way.
+    NondeterministicChoice {
+        meta_identifier: MetaIdentifier,
+        characters: CharacterSet,
+    },
     /// An expectation names no kind of finding.
     UnknownExpectation { code: String },
     /// An expectation names a kind of finding that cannot be intended, such as
@@ -228,6 +234,14 @@ impl FindingKind {
                  it, so `a, x | a, y` becomes `a, (x | y)`"
                     .to_owned()
             }
+            Self::NondeterministicChoice {
+                meta_identifier, ..
+            } => format!(
+                "write `(* greedy *)` right before `{}` if it should take \
+                 each way as it comes, which keeps its parser fast, or make \
+                 what comes after the choice start differently",
+                meta_identifier.as_str()
+            ),
             Self::UnknownExpectation { .. } => {
                 "write the code a finding reports, such as \
                  `repeated-follow-conflict`"
@@ -356,6 +370,15 @@ impl fmt::Display for FindingKind {
             Self::SharedStart => f.write_str(
                 "this alternative starts the same way as an earlier one, so a \
                  parser reads that start twice",
+            ),
+            Self::NondeterministicChoice {
+                meta_identifier,
+                characters,
+            } => write!(
+                f,
+                "a parser cannot tell from {characters} which way to take \
+                 here, so `{}` and the rules that reach it try every way",
+                meta_identifier.as_str()
             ),
             Self::UnknownExpectation { code } => {
                 write!(f, "`{code}` is not the code of any finding")

@@ -57,6 +57,7 @@ finding_codes! {
     CaseOnlyNames => "case-only-names",
     SingleCharacterRule => "single-character-rule",
     SharedStart => "shared-start",
+    NondeterministicChoice => "nondeterministic-choice",
     UnknownExpectation => "unknown-expectation",
     UnexpectableFinding => "unexpectable-finding",
     UnfulfilledExpectation => "unfulfilled-expectation",
@@ -91,9 +92,9 @@ impl FindingCode {
             | Self::ExhaustiveException
             | Self::CaseOnlyNames
             | Self::UnfulfilledExpectation => Severity::Warning,
-            Self::SingleCharacterRule | Self::SharedStart => {
-                Severity::Suggestion
-            }
+            Self::SingleCharacterRule
+            | Self::SharedStart
+            | Self::NondeterministicChoice => Severity::Suggestion,
         }
     }
 
@@ -134,6 +135,9 @@ impl FindingCode {
             | Self::CaseOnlyNames
             | Self::SingleCharacterRule
             | Self::SharedStart => Some("the grammar stays as it is"),
+            Self::NondeterministicChoice => {
+                Some("the parser still tries every way")
+            }
             Self::LeftRecursion
             | Self::IndirectLeftRecursion
             | Self::UnproductiveRule

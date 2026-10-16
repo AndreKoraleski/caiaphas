@@ -1,14 +1,11 @@
 //! Exactness tells where a parser that takes one way through each choice as it
-//! comes to it still matches every input the grammar does.
+//! comes to it can miss a match.
 //!
-//! Such a parser takes the alternative that matches the most, or the first
-//! that matches in a rule that takes the first match, and takes or repeats a
-//! sequence whenever it can. It leaves out a way that the rest of the input
-//! needs only where that way ends sooner, and the rest goes on from there with
-//! a character the way it took matched instead. In a rule that takes the first
-//! match, it also leaves out a later alternative that goes on from where an
-//! earlier one ends. Where neither can happen, no way it leaves out could have
-//! matched the input.
+//! Such a parser takes the alternative that matches the most, or the first in
+//! a rule that takes the first match, and takes or repeats a sequence whenever
+//! it can. It misses a match only where a way it leaves out ends sooner and
+//! the rest goes on from there, or where a first match leaves out a later
+//! alternative that goes on from where an earlier one ends.
 
 use crate::{
     analysis::{
@@ -16,72 +13,117 @@ use crate::{
         facts::{Facts, Follow},
     },
     ir::{Expression, ExpressionKind, RuleId, reachable},
+    span::Span,
 };
 
-/// Returns which rules of the grammar `facts` answers about need code that
-/// tries every way through them. Those are the rules with a choice that a
-/// parser taking one way as it comes can get wrong, and every rule that
-/// reaches one, since only what comes after a rule tells which way the rest of
-/// the input needs. A greedy rule takes each way as it comes anyway, so it is
-/// never one, and a rule is not one for what it reaches only through greedy
-/// rules.
-pub(crate) fn general_rules(facts: &Facts<'_>) -> Vec<bool> {
-    let rules = &facts.grammar().syntax_rules;
-    let mut inexact = Vec::new();
-    let mut callers = vec![Vec::new(); rules.len()];
-    for (position, rule) in rules.iter().enumerate() {
+/// A choice that a parser taking one way as it comes can get wrong.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Conflict {
+    pub(crate) rule_id: RuleId,
+    /// The optional or repeated sequence, or the alternative that goes on from
+    /// where another ends.
+    pub(crate) span: Span,
+    /// The alternative that ends where the other goes on.
+    pub(crate) shorter: Option<Span>,
+    /// The characters the way that goes on can read next.
+    pub(crate) characters: CharacterSet,
+}
+
+/// Calls `visit` with each conflict of the rules that are not greedy in the
+/// grammar `facts` answers about.
+pub(crate) fn visit_conflicts(
+    facts: &Facts<'_>,
+    visit: &mut impl FnMut(Conflict),
+) {
+    for (position, rule) in facts.grammar().syntax_rules.iter().enumerate() {
         if rule.greedy {
             continue;
         }
-        let mut exact = true;
-        facts.walk_rule(RuleId(position), &mut |expression, after| {
-            exact &= is_exact(facts, rule.first_match, expression, after);
+        let rule_id = RuleId(position);
+        facts.walk_rule(rule_id, &mut |expression, after| {
+            let first_match = rule.first_match;
+            if let Some(conflict) =
+                conflict(facts, rule_id, first_match, expression, after)
+            {
+                visit(conflict);
+            }
         });
-        if !exact {
-            inexact.push(RuleId(position));
+    }
+}
+
+/// Returns which rules of the grammar `facts` answers about try every way
+/// through them: those with a conflict, and every rule that reaches one other
+/// than through a greedy rule, since only what comes after a rule tells which
+/// way the input needs.
+pub(crate) fn general_rules(facts: &Facts<'_>) -> Vec<bool> {
+    let rules = &facts.grammar().syntax_rules;
+    let mut inexact = Vec::new();
+    visit_conflicts(facts, &mut |conflict| inexact.push(conflict.rule_id));
+    let mut callers = vec![Vec::new(); rules.len()];
+    for (position, rule) in rules.iter().enumerate() {
+        if !rule.greedy {
+            rule.expression
+                .visit_meta_identifiers(&mut |RuleId(read), _| {
+                    callers[read].push(RuleId(position));
+                });
         }
-        rule.expression
-            .visit_meta_identifiers(&mut |RuleId(target), _| {
-                callers[target].push(RuleId(position));
-            });
     }
     reachable(rules.len(), inexact, |RuleId(position), pending| {
         pending.extend(&callers[position]);
     })
 }
 
-/// Returns whether a parser that takes one way through `expression` as it
-/// comes to it never leaves out one the rest of the input needs, when what can
-/// come right after it is `after`.
-fn is_exact(
+/// Returns how a parser that takes one way through `expression` as it comes to
+/// it can miss a match, when `after` can come right after it.
+fn conflict(
     facts: &Facts<'_>,
+    rule_id: RuleId,
     first_match: bool,
     expression: &Expression,
     after: &Follow,
-) -> bool {
-    let follows = |characters: CharacterSet| {
-        !characters.intersection(&after.characters).is_empty()
+) -> Option<Conflict> {
+    let conflict = |span, shorter, characters: CharacterSet| {
+        (!characters.is_empty()).then_some(Conflict {
+            rule_id,
+            span,
+            shorter,
+            characters,
+        })
     };
+    let following =
+        |characters: CharacterSet| characters.intersection(&after.characters);
     match &expression.kind {
         ExpressionKind::OptionalSequence(sequence)
         | ExpressionKind::RepeatedSequence(sequence) => {
-            !follows(facts.first(sequence))
+            conflict(expression.span, None, following(facts.first(sequence)))
         }
         ExpressionKind::DefinitionsList(alternatives) => {
-            alternatives.iter().enumerate().all(|(index, earlier)| {
-                alternatives[index + 1..].iter().all(|later| {
-                    let past_earlier = goes_on(facts, earlier, later);
-                    let past_later = goes_on(facts, later, earlier);
-                    let takes_later = if first_match {
-                        past_earlier.is_empty()
-                    } else {
-                        !follows(past_earlier)
-                    };
-                    takes_later && !follows(past_later)
+            alternatives
+                .iter()
+                .enumerate()
+                .find_map(|(index, earlier)| {
+                    alternatives[index + 1..].iter().find_map(|later| {
+                        // A first match never takes a later alternative that
+                        // goes on from where an earlier one ends.
+                        let mut past_earlier = goes_on(facts, earlier, later);
+                        if !first_match {
+                            past_earlier = following(past_earlier);
+                        }
+                        conflict(later.span, Some(earlier.span), past_earlier)
+                            .or_else(|| {
+                                let past_later =
+                                    goes_on(facts, later, earlier);
+                                let characters = following(past_later);
+                                conflict(
+                                    earlier.span,
+                                    Some(later.span),
+                                    characters,
+                                )
+                            })
+                    })
                 })
-            })
         }
-        _ => true,
+        _ => None,
     }
 }
 

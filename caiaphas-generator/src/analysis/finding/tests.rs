@@ -240,6 +240,19 @@ const CASES: &[Case] = &[
                before the rule, and the grammar stays as it is",
     },
     Case {
+        source: "s = {'x'}, 'x';",
+        code: FindingCode::NondeterministicChoice,
+        severity: Severity::Suggestion,
+        message: "a parser cannot tell from 'x' which way to take here, so \
+                  `s` and the rules that reach it try every way",
+        help: "write `(* greedy *)` right before `s` if it should take each \
+               way as it comes, which keeps its parser fast, or make what \
+               comes after the choice start differently; if this is \
+               intended, write `(* expect nondeterministic-choice: reason \
+               *)` right before the rule, and the parser still tries every \
+               way",
+    },
+    Case {
         source: "(* expect no-such-finding: none *) a = 'x';",
         code: FindingCode::UnknownExpectation,
         severity: Severity::Error,

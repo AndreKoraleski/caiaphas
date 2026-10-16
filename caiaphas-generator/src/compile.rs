@@ -101,7 +101,7 @@ mod tests {
         assert!(grammar.is_none());
         assert_eq!(
             severities(&diagnostics),
-            [Severity::Error, Severity::Warning]
+            [Severity::Error, Severity::Suggestion, Severity::Warning]
         );
     }
 }
