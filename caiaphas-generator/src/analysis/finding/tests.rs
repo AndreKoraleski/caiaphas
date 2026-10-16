@@ -47,8 +47,8 @@ const CASES: &[Case] = &[
         severity: Severity::Error,
         message: "this repeated sequence can match nothing, so it could \
                   repeat forever",
-        help: "make what repeats read something, such as by removing \
-               `[...]` inside the `{...}`",
+        help: "make what repeats always read something, as `{'x'}` does \
+               where `{['x']}` does not",
     },
     Case {
         source: "a = ? U+0061..U+0063 ? | ? U+0062..U+0064 ?;",

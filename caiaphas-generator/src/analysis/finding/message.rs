@@ -31,8 +31,8 @@ impl FindingKind {
                 meta_identifier.as_str()
             ),
             Self::NullableRepeatedSequence => {
-                "make what repeats read something, such as by removing \
-                 `[...]` inside the `{...}`"
+                "make what repeats always read something, as `{'x'}` does \
+                 where `{['x']}` does not"
                     .to_owned()
             }
             Self::TiedBranches { .. } => {
@@ -131,9 +131,16 @@ impl FindingKind {
                  `caiaphas explain` lists every code"
                     .to_owned()
             }
-            Self::UnexpectableFinding { .. } => {
+            Self::UnexpectableFinding { code }
+                if code.severity() == Severity::Error =>
+            {
                 "fix the grammar instead, since no parser can work with an \
                  error in it"
+                    .to_owned()
+            }
+            Self::UnexpectableFinding { .. } => {
+                "remove the expectation, since a finding about expectations \
+                 only goes away with the expectation that has it"
                     .to_owned()
             }
             Self::UnfulfilledExpectation { .. } => {
