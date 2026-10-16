@@ -85,6 +85,11 @@ fn texts_within(
             integer,
             syntactic_primary,
         } => {
+            // Only a lone text repeats that often without passing `TEXTS`, and
+            // it would be too long to be worth listing.
+            if usize::try_from(*integer).ok()? > TEXTS {
+                return None;
+            }
             let once = texts(syntactic_primary)?;
             let mut found = vec![String::new()];
             for _ in 0..*integer {
@@ -203,8 +208,25 @@ impl Matcher<'_> {
                 integer,
                 syntactic_primary,
             } => {
-                let times = (0..*integer).map(|_| &**syntactic_primary);
-                return self.sequence(times, position);
+                let mut ends = vec![position];
+                for _ in 0..*integer {
+                    let mut next = Vec::new();
+                    for &start in &ends {
+                        add_all(
+                            &mut next,
+                            self.ends(syntactic_primary, start)?,
+                        );
+                    }
+                    next.sort_unstable();
+                    // Once a round ends where the one before it did, so does
+                    // every later round, and once none matches, none will.
+                    let done = next == ends || next.is_empty();
+                    ends = next;
+                    if done {
+                        break;
+                    }
+                }
+                return Some(ends);
             }
             ExpressionKind::DefinitionsList(expressions) => {
                 let mut ends = Vec::new();
@@ -333,6 +355,15 @@ mod tests {
         assert_eq!(first_rule_matches(source, "if"), Some(true));
         assert_eq!(first_rule_matches(source, "if2"), Some(false));
         assert_eq!(first_rule_matches(source, ""), Some(false));
+    }
+
+    #[test]
+    fn repeats_a_count_only_while_it_changes_where_matches_end() {
+        let most = "s = 4294967295 * ['x'];";
+        assert_eq!(first_rule_matches(most, "xx"), Some(true));
+        let every = "s = 4294967295 * 'x';";
+        assert_eq!(first_rule_matches(every, "xx"), Some(false));
+        assert_eq!(first_rule_texts("s = 4294967295 * 'x';"), None);
     }
 
     #[test]
