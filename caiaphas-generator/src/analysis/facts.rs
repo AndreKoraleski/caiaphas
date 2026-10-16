@@ -98,18 +98,7 @@ impl<'a> Facts<'a> {
         expression: &Expression,
     ) -> Vec<(RuleId, Span)> {
         let mut found = Vec::new();
-        self.edge_meta_identifiers(expression, Edge::Start, &mut found);
-        found
-    }
-
-    /// Returns the meta identifiers `expression` can read after its last
-    /// character.
-    pub(crate) fn last_meta_identifiers(
-        &self,
-        expression: &Expression,
-    ) -> Vec<(RuleId, Span)> {
-        let mut found = Vec::new();
-        self.edge_meta_identifiers(expression, Edge::End, &mut found);
+        self.add_first_meta_identifiers(expression, &mut found);
         found
     }
 
@@ -187,24 +176,25 @@ impl<'a> Facts<'a> {
         }
     }
 
-    fn edge_meta_identifiers(
+    fn add_first_meta_identifiers(
         &self,
         expression: &Expression,
-        edge: Edge,
         found: &mut Vec<(RuleId, Span)>,
     ) {
         match &expression.kind {
-            ExpressionKind::SingleDefinition(expressions) => match edge {
-                Edge::Start => {
-                    self.sequence_edge(expressions.iter(), edge, found);
+            ExpressionKind::SingleDefinition(expressions) => {
+                // The start of a sequence reaches past every expression that
+                // can match nothing.
+                for expression in expressions {
+                    self.add_first_meta_identifiers(expression, found);
+                    if !self.is_nullable(expression) {
+                        break;
+                    }
                 }
-                Edge::End => {
-                    self.sequence_edge(expressions.iter().rev(), edge, found);
-                }
-            },
+            }
             ExpressionKind::DefinitionsList(expressions) => {
                 for expression in expressions {
-                    self.edge_meta_identifiers(expression, edge, found);
+                    self.add_first_meta_identifiers(expression, found);
                 }
             }
             ExpressionKind::OptionalSequence(expression)
@@ -216,30 +206,13 @@ impl<'a> Facts<'a> {
             | ExpressionKind::SyntacticTerm {
                 syntactic_factor: expression,
                 ..
-            } => self.edge_meta_identifiers(expression, edge, found),
+            } => self.add_first_meta_identifiers(expression, found),
             ExpressionKind::MetaIdentifier(rule_id) => {
                 found.push((*rule_id, expression.span));
             }
             ExpressionKind::TerminalString(_)
             | ExpressionKind::SpecialSequence(_)
             | ExpressionKind::EmptySequence => {}
-        }
-    }
-
-    /// Adds the meta identifiers at `edge` of a sequence, whose `expressions`
-    /// come from that edge inward. The edge reaches past every expression that
-    /// can match nothing.
-    fn sequence_edge<'e>(
-        &self,
-        expressions: impl Iterator<Item = &'e Expression>,
-        edge: Edge,
-        found: &mut Vec<(RuleId, Span)>,
-    ) {
-        for expression in expressions {
-            self.edge_meta_identifiers(expression, edge, found);
-            if !self.is_nullable(expression) {
-                break;
-            }
         }
     }
 
@@ -352,13 +325,6 @@ impl Follow {
             end_of_input: self.end_of_input || other.end_of_input,
         }
     }
-}
-
-/// Which end of an expression to look at.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Edge {
-    Start,
-    End,
 }
 
 fn is_nullable(expression: &Expression, rules: &[bool]) -> bool {
@@ -641,7 +607,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_meta_identifiers_at_either_edge() {
+    fn finds_the_meta_identifiers_a_rule_starts_with() {
         let grammar =
             build_valid("a = [b], c, 'x', [b], c; b = 'y'; c = 'z';");
         let facts = Facts::new(&grammar);
@@ -655,7 +621,6 @@ mod tests {
             names(facts.first_meta_identifiers(rule(&grammar, 0))),
             [1, 2]
         );
-        assert_eq!(names(facts.last_meta_identifiers(rule(&grammar, 0))), [2]);
     }
 
     #[test]
