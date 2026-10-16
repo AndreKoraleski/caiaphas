@@ -77,8 +77,8 @@ if let Value::Object(object) = &document.value {
 
 ## Grammar syntax
 
-A grammar works on characters, so it describes its whitespace too. Each rule
-ends with `;` or `.`.
+Each rule ends with `;` or `.`, and whitespace is text like any other. A hidden
+rule, such as `ws` in the [overview](#overview), keeps it out of the types.
 
 | Written              | Matches                                 |
 |----------------------|-----------------------------------------|
@@ -93,6 +93,9 @@ ends with `;` or `.`.
 | `? U+00E9 ?`         | the character `é`                       |
 | `? U+0061..U+007A ?` | any character from `a` to `z`           |
 | `(* note *)`         | nothing, as a comment                   |
+
+The standard's other spellings work too: `/` or `!` for `|`, `(/ /)` for
+`[ ]` and `(: :)` for `{ }`.
 
 ISO 14977 leaves the meaning of a special sequence, written between `?`, to
 each tool. caiaphas gives it one: a code point, or a range of them. It is the
