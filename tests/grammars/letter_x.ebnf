@@ -1,0 +1,2 @@
+(* A small letter other than q, then an x. *)
+letter x = ? U+0061..U+007A ? - 'q', 'x';

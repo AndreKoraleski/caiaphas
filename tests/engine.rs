@@ -9,6 +9,7 @@ caiaphas::grammar!(mod items = "tests/grammars/items.ebnf");
 caiaphas::grammar!(mod hidden = "tests/grammars/hidden.ebnf");
 caiaphas::grammar!(mod going_back = "tests/grammars/going_back.ebnf");
 caiaphas::grammar!(mod shared = "tests/grammars/shared.ebnf");
+caiaphas::grammar!(mod letter_x = "tests/grammars/letter_x.ebnf");
 
 #[test]
 fn builds_the_tree_of_an_input() {
@@ -105,5 +106,19 @@ fn reports_every_rule_that_starts_with_a_remembered_one() {
     assert_eq!(
         error.to_string(),
         "expected an a or a b, found `w` at line 1, column 2"
+    );
+}
+
+#[test]
+fn takes_out_a_character_without_expecting_anything_else() {
+    let parse = letter_x::LetterX::parse;
+    assert!(parse("ax").is_ok());
+    assert_eq!(
+        parse("qx").unwrap_err().to_string(),
+        "unexpected `q` at line 1, column 1"
+    );
+    assert_eq!(
+        parse("bq").unwrap_err().to_string(),
+        "expected `x`, found `q` at line 1, column 2"
     );
 }

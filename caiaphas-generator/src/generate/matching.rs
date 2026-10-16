@@ -208,6 +208,22 @@ impl FunctionWriter<'_> {
                 syntactic_factor,
                 syntactic_exception,
             } => {
+                let excluded =
+                    self.facts.single_characters(syntactic_exception);
+                if let (Some((characters, expected)), Some(excluded)) =
+                    (self.characters(syntactic_factor), excluded)
+                {
+                    let excludes = contains(&excluded);
+                    let includes = contains(&characters);
+                    return quote! {
+                        parser.set_except(
+                            position,
+                            #includes,
+                            #excludes,
+                            &[#(#expected),*],
+                        )
+                    };
+                }
                 let factor = self.expression(syntactic_factor);
                 let exception = self.expression(syntactic_exception);
                 quote! {
@@ -394,13 +410,16 @@ fn set_code(
     characters: &CharacterSet,
     expected: &[TokenStream],
 ) -> TokenStream {
-    let pattern = pattern(characters).unwrap_or_else(|| quote! { _ });
-    let contains = if characters.is_empty() {
-        quote! { |_| false }
-    } else {
-        quote! { |c| ::core::matches!(c, #pattern) }
-    };
+    let contains = contains(characters);
     quote! { parser.set(position, #contains, &[#(#expected),*]) }
+}
+
+/// Returns the closure that tells whether a character is one of `characters`.
+fn contains(characters: &CharacterSet) -> TokenStream {
+    match pattern(characters) {
+        Some(pattern) => quote! { |c| ::core::matches!(c, #pattern) },
+        None => quote! { |_| false },
+    }
 }
 
 /// Returns the pattern that matches every character of `characters`, if any.

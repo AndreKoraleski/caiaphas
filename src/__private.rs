@@ -290,6 +290,29 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         None
     }
 
+    /// Returns where the character at `position` ends when `contains` holds
+    /// for it and `excludes` does not, as for an exception of single
+    /// characters. A character `contains` does not hold for notes each of
+    /// `expected`. One the exception takes out notes nothing, since an
+    /// exception tells nothing about why the input does not match.
+    pub fn set_except(
+        &mut self,
+        position: usize,
+        contains: impl Fn(char) -> bool,
+        excludes: impl Fn(char) -> bool,
+        expected: &[Expected],
+    ) -> Option<usize> {
+        match self.character(position) {
+            Some(c) if contains(c) => {
+                (!excludes(c)).then(|| position + c.len_utf8())
+            }
+            _ => {
+                self.fail(position, expected);
+                None
+            }
+        }
+    }
+
     /// Returns where the characters from `position` on that `contains` holds
     /// for end, and notes each of `expected`, which the set is made of, there.
     pub fn span(
