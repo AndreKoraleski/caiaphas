@@ -158,10 +158,10 @@
 //! word = keyword | name;
 //! ```
 //!
-//! A suggestion, such as where a rule has to try every way, never stops the
-//! build. The docs of the generated module list them, `grammar!(..., suggest)`
-//! stops at them, and `grammar!(..., optimize)` rewrites what it safely can,
-//! such as a start that alternatives share, without changing the types.
+//! A suggestion, such as where a rule has to try every way, does not stop the
+//! build unless `grammar!(..., suggest)` asks it to. The docs of the generated
+//! module list them, and `grammar!(..., optimize)` rewrites what it safely
+//! can, such as a start that alternatives share, without changing the types.
 //!
 //! The `caiaphas` command of the `caiaphas-cli` crate checks grammar files
 //! without building anything, and tells what each finding means:
