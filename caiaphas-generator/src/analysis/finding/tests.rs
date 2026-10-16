@@ -231,8 +231,8 @@ const CASES: &[Case] = &[
         code: FindingCode::UnknownExpectation,
         severity: Severity::Error,
         message: "`no-such-finding` is not the code of any finding",
-        help: "write the code a finding reports, such as \
-               `repeated-follow-conflict`",
+        help: "write the code a finding reports, such as `tied-branches`; \
+               `caiaphas explain` lists every code",
     },
     Case {
         source: "(* expect left-recursion: wanted *) a = a, 'x' | 'y';",

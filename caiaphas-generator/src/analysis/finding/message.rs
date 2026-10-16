@@ -122,9 +122,13 @@ impl FindingKind {
                 meta_identifier.as_str(),
                 start_differently("the choice")
             ),
-            Self::UnknownExpectation { .. } => {
-                "write the code a finding reports, such as \
-                 `repeated-follow-conflict`"
+            Self::UnknownExpectation {
+                similar: Some(similar),
+                ..
+            } => format!("correct its spelling to `{}`", similar.name()),
+            Self::UnknownExpectation { similar: None, .. } => {
+                "write the code a finding reports, such as `tied-branches`; \
+                 `caiaphas explain` lists every code"
                     .to_owned()
             }
             Self::UnexpectableFinding { .. } => {
@@ -286,7 +290,7 @@ impl fmt::Display for FindingKind {
                  here, so `{}` and the rules that reach it try every way",
                 meta_identifier.as_str()
             ),
-            Self::UnknownExpectation { code } => {
+            Self::UnknownExpectation { code, .. } => {
                 write!(f, "`{code}` is not the code of any finding")
             }
             Self::UnexpectableFinding { code } => {

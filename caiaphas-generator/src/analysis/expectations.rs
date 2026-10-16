@@ -5,6 +5,7 @@ use crate::{
     analysis::finding::{Finding, FindingCode, FindingKind},
     diagnostic::Label,
     ir::Grammar,
+    spelling,
 };
 
 /// Removes every finding a rule expects, and reports every expectation that
@@ -18,6 +19,11 @@ pub(super) fn apply(grammar: &Grammar, findings: &mut Vec<Finding>) {
                 reported.push(Finding {
                     kind: FindingKind::UnknownExpectation {
                         code: expectation.code.clone(),
+                        similar: spelling::closest(
+                            &expectation.code,
+                            FindingCode::ALL.iter().map(|code| code.name()),
+                        )
+                        .and_then(FindingCode::from_name),
                     },
                     span: expectation.span,
                     labels: Vec::new(),
@@ -166,6 +172,14 @@ mod tests {
             codes("(* expect no-such-finding: none *) a = 'x';"),
             ["unknown-expectation"]
         );
+    }
+
+    #[test]
+    fn suggests_the_code_a_misspelled_one_was_meant_to_be() {
+        let help = findings("(* expect tied-branch: none *) a = 'x';")[0]
+            .kind
+            .help();
+        assert_eq!(help, "correct its spelling to `tied-branches`");
     }
 
     #[test]

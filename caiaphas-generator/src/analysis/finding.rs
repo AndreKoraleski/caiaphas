@@ -103,8 +103,12 @@ pub(crate) enum FindingKind {
         meta_identifier: MetaIdentifier,
         characters: CharacterSet,
     },
-    /// An expectation names no kind of finding.
-    UnknownExpectation { code: String },
+    /// An expectation names no kind of finding, though maybe a misspelling of
+    /// the `similar` one.
+    UnknownExpectation {
+        code: String,
+        similar: Option<FindingCode>,
+    },
     /// An expectation names a kind of finding that cannot be intended, such as
     /// an error.
     UnexpectableFinding { code: FindingCode },
