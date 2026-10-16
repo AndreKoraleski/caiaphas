@@ -86,7 +86,7 @@ mod tests {
                 "(* expect optional-follow-conflict: wanted *) \
                  a = ['xy'], 'x' | 'x';"
             ),
-            ["shadowed-branch"]
+            ["tied-branches"]
         );
     }
 
@@ -140,7 +140,7 @@ mod tests {
         assert_eq!(
             codes(
                 "(* expect optional-follow-conflict: wanted *) \
-                 (* expect shadowed-branch: also wanted *) \
+                 (* expect tied-branches: also wanted *) \
                  a = ['xy'], 'x' | 'x';"
             ),
             Vec::<&str>::new()
@@ -176,7 +176,7 @@ mod tests {
     fn reports_an_expected_error_and_keeps_the_error() {
         assert_eq!(
             codes("(* expect left-recursion: wanted *) a = a, 'x' | 'y';"),
-            ["unexpectable-finding", "left-recursion", "shadowed-branch"]
+            ["unexpectable-finding", "left-recursion"]
         );
     }
 

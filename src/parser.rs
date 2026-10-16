@@ -631,7 +631,7 @@ pub(crate) mod tests {
     fn attaches_expectations_to_the_rule_after_them() {
         let source = "(* expect empty-rule: kept for later *) a = ; \
                       (* a note *) b = 'x'; \
-                      (* expect shadowed-branch: first *) \
+                      (* expect tied-branches: first *) \
                       (* expect unreachable-rule: second *) c = 'y';";
         let syntax = parse_valid(source);
         assert_eq!(
@@ -639,7 +639,7 @@ pub(crate) mod tests {
             [
                 vec!["empty-rule"],
                 vec![],
-                vec!["shadowed-branch", "unreachable-rule"]
+                vec!["tied-branches", "unreachable-rule"]
             ]
         );
         let expectation = &syntax.syntax_rules[0].expectations[0];

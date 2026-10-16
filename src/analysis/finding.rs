@@ -34,8 +34,9 @@ pub(crate) enum FindingKind {
     UnproductiveRule { meta_identifier: MetaIdentifier },
     /// A repeated sequence can match nothing, so it could repeat forever.
     NullableRepeatedSequence,
-    /// Two branches of a choice can start with some of the same characters.
-    OverlappingBranches { characters: CharacterSet },
+    /// Two alternatives can match the same text, so a parser can only take the
+    /// one written first.
+    TiedBranches { matched: String },
     /// An optional sequence can start with characters that can also come right
     /// after it, so a parser cannot tell whether to take it.
     OptionalFollowConflict { characters: CharacterSet },
@@ -48,9 +49,6 @@ pub(crate) enum FindingKind {
     /// A repeated sequence takes every character that can come after it, so
     /// nothing after it can ever match.
     DeadEndRepeatedSequence,
-    /// Every character a branch can start with, another branch of the same
-    /// choice can start with too.
-    ShadowedBranch,
     /// More than one branch of a choice can match nothing.
     AmbiguousNullableBranches,
     /// No start rule can reach a rule, so no parser uses it.
@@ -88,12 +86,11 @@ pub(crate) enum FindingCode {
     IndirectLeftRecursion,
     UnproductiveRule,
     NullableRepeatedSequence,
-    OverlappingBranches,
+    TiedBranches,
     OptionalFollowConflict,
     RepeatedFollowConflict,
     RequiredOptionalSequence,
     DeadEndRepeatedSequence,
-    ShadowedBranch,
     AmbiguousNullableBranches,
     UnreachableRule,
     DuplicateAlternative,
@@ -108,17 +105,16 @@ pub(crate) enum FindingCode {
 
 impl FindingCode {
     /// Every code, so a name can be looked up.
-    pub(crate) const ALL: [Self; 20] = [
+    pub(crate) const ALL: [Self; 19] = [
         Self::LeftRecursion,
         Self::IndirectLeftRecursion,
         Self::UnproductiveRule,
         Self::NullableRepeatedSequence,
-        Self::OverlappingBranches,
+        Self::TiedBranches,
         Self::OptionalFollowConflict,
         Self::RepeatedFollowConflict,
         Self::RequiredOptionalSequence,
         Self::DeadEndRepeatedSequence,
-        Self::ShadowedBranch,
         Self::AmbiguousNullableBranches,
         Self::UnreachableRule,
         Self::DuplicateAlternative,
@@ -137,12 +133,11 @@ impl FindingCode {
             Self::IndirectLeftRecursion => "indirect-left-recursion",
             Self::UnproductiveRule => "unproductive-rule",
             Self::NullableRepeatedSequence => "nullable-repeated-sequence",
-            Self::OverlappingBranches => "overlapping-branches",
+            Self::TiedBranches => "tied-branches",
             Self::OptionalFollowConflict => "optional-follow-conflict",
             Self::RepeatedFollowConflict => "repeated-follow-conflict",
             Self::RequiredOptionalSequence => "required-optional-sequence",
             Self::DeadEndRepeatedSequence => "dead-end-repeated-sequence",
-            Self::ShadowedBranch => "shadowed-branch",
             Self::AmbiguousNullableBranches => "ambiguous-nullable-branches",
             Self::UnreachableRule => "unreachable-rule",
             Self::DuplicateAlternative => "duplicate-alternative",
@@ -169,12 +164,11 @@ impl FindingCode {
             | Self::NullableRepeatedSequence
             | Self::UnknownExpectation
             | Self::UnexpectableFinding => Severity::Error,
-            Self::OverlappingBranches
+            Self::TiedBranches
             | Self::OptionalFollowConflict
             | Self::RepeatedFollowConflict
             | Self::RequiredOptionalSequence
             | Self::DeadEndRepeatedSequence
-            | Self::ShadowedBranch
             | Self::AmbiguousNullableBranches
             | Self::UnreachableRule
             | Self::DuplicateAlternative
@@ -196,19 +190,19 @@ impl FindingCode {
     /// as intended, if one can.
     fn intended_behaviour(self) -> Option<&'static str> {
         match self {
-            Self::OverlappingBranches
-            | Self::ShadowedBranch
+            Self::TiedBranches
             | Self::DuplicateAlternative
-            | Self::AmbiguousNullableBranches => {
-                Some("the parser takes the first branch that matches")
-            }
+            | Self::AmbiguousNullableBranches => Some(
+                "the parser takes the branch that matches the most, and the \
+                 first written of those that tie",
+            ),
             Self::OptionalFollowConflict => Some(
-                "the parser takes the sequence whenever the next character \
-                 can start it, as usual for a dangling else",
+                "the parser takes the sequence whenever it matches, as usual \
+                 for a dangling else",
             ),
             Self::RepeatedFollowConflict => Some(
-                "the parser repeats the sequence whenever the next character \
-                 can start it, so it extends as far as it can",
+                "the parser repeats the sequence as long as it matches, so it \
+                 extends as far as it can",
             ),
             Self::RequiredOptionalSequence
             | Self::DeadEndRepeatedSequence
@@ -239,9 +233,7 @@ impl FindingKind {
             Self::NullableRepeatedSequence => {
                 FindingCode::NullableRepeatedSequence
             }
-            Self::OverlappingBranches { .. } => {
-                FindingCode::OverlappingBranches
-            }
+            Self::TiedBranches { .. } => FindingCode::TiedBranches,
             Self::OptionalFollowConflict { .. } => {
                 FindingCode::OptionalFollowConflict
             }
@@ -254,7 +246,6 @@ impl FindingKind {
             Self::DeadEndRepeatedSequence => {
                 FindingCode::DeadEndRepeatedSequence
             }
-            Self::ShadowedBranch => FindingCode::ShadowedBranch,
             Self::AmbiguousNullableBranches => {
                 FindingCode::AmbiguousNullableBranches
             }
@@ -299,8 +290,8 @@ impl FindingKind {
             Self::LeftRecursion { meta_identifier } => {
                 let name = meta_identifier.as_str();
                 format!(
-                    "rewrite the recursion as a repetition, so \
-                     `{name} = {name}, x | y;` becomes `{name} = y, {{x}};`"
+                    "rewrite the recursion as a repetition, so `{name} = \
+                     {name}, x | y;` becomes `{name} = y, {{x}};`"
                 )
             }
             Self::IndirectLeftRecursion {
@@ -322,9 +313,9 @@ impl FindingKind {
                  `[...]` inside the `{...}`"
                     .to_owned()
             }
-            Self::OverlappingBranches { .. } => {
-                "move what the branches start with in common before the \
-                 choice, or exclude it from one with `-`"
+            Self::TiedBranches { .. } => {
+                "exclude what they share from one of them with `-`, such as \
+                 `identifier - keyword`"
                     .to_owned()
             }
             Self::OptionalFollowConflict { .. } => {
@@ -345,11 +336,6 @@ impl FindingKind {
                 "move what comes after the repetition before it, so `{'x'}, \
                  'x'` becomes `'x', {'x'}`, or make what comes after it start \
                  with a character it cannot take"
-                    .to_owned()
-            }
-            Self::ShadowedBranch => {
-                "remove this branch if the other already matches what it \
-                 does, or exclude it from the other with `-`"
                     .to_owned()
             }
             Self::AmbiguousNullableBranches => {
@@ -432,9 +418,11 @@ impl fmt::Display for Finding {
                 "this repeated sequence can match nothing, so it could repeat \
                  forever",
             ),
-            FindingKind::OverlappingBranches { characters } => {
-                write!(f, "these branches can both start with {characters}")
-            }
+            FindingKind::TiedBranches { matched } => write!(
+                f,
+                "these branches can both match {matched}, so the parser takes \
+                 the one written first"
+            ),
             FindingKind::OptionalFollowConflict { characters } => write!(
                 f,
                 "this optional sequence and what comes after it can both \
@@ -454,9 +442,6 @@ impl fmt::Display for Finding {
             FindingKind::DeadEndRepeatedSequence => f.write_str(
                 "this repeated sequence takes every character that can come \
                  after it, so nothing after it can ever match",
-            ),
-            FindingKind::ShadowedBranch => f.write_str(
-                "another branch can start with every character this one can",
             ),
             FindingKind::AmbiguousNullableBranches => {
                 f.write_str("more than one branch can match nothing")
@@ -585,14 +570,15 @@ mod tests {
         },
         Case {
             source: "a = ? U+0061..U+0063 ? | ? U+0062..U+0064 ?;",
-            code: FindingCode::OverlappingBranches,
+            code: FindingCode::TiedBranches,
             severity: Severity::Warning,
-            message: "these branches can both start with 'b'..='c'",
-            help: "move what the branches start with in common before the \
-                   choice, or exclude it from one with `-`; if this is \
-                   intended, write `(* expect overlapping-branches: reason \
-                   *)` right before the rule, and the parser takes the first \
-                   branch that matches",
+            message: "these branches can both match 'b'..='c', so the parser \
+                      takes the one written first",
+            help: "exclude what they share from one of them with `-`, such as \
+                   `identifier - keyword`; if this is intended, write `(* \
+                   expect tied-branches: reason *)` right before the rule, \
+                   and the parser takes the branch that matches the most, and \
+                   the first written of those that tie",
         },
         Case {
             source: "a = ['xy'], 'x';",
@@ -604,8 +590,8 @@ mod tests {
             help: "make what comes after the sequence start differently; if \
                    this is intended, write `(* expect \
                    optional-follow-conflict: reason *)` right before the \
-                   rule, and the parser takes the sequence whenever the next \
-                   character can start it, as usual for a dangling else",
+                   rule, and the parser takes the sequence whenever it \
+                   matches, as usual for a dangling else",
         },
         Case {
             source: "a = {'xy'}, 'x';",
@@ -618,8 +604,8 @@ mod tests {
                    make what comes after it start differently; if this is \
                    intended, write `(* expect repeated-follow-conflict: \
                    reason *)` right before the rule, and the parser repeats \
-                   the sequence whenever the next character can start it, so \
-                   it extends as far as it can",
+                   the sequence as long as it matches, so it extends as far \
+                   as it can",
         },
         Case {
             source: "a = ['x'], 'x';",
@@ -647,18 +633,6 @@ mod tests {
                    it is",
         },
         Case {
-            source: "a = ? U+0061..U+007A ? | 'x';",
-            code: FindingCode::ShadowedBranch,
-            severity: Severity::Warning,
-            message: "another branch can start with every character this one \
-                      can",
-            help: "remove this branch if the other already matches what it \
-                   does, or exclude it from the other with `-`; if this is \
-                   intended, write `(* expect shadowed-branch: reason *)` \
-                   right before the rule, and the parser takes the first \
-                   branch that matches",
-        },
-        Case {
             source: "a = ['x'] | ['y'];",
             code: FindingCode::AmbiguousNullableBranches,
             severity: Severity::Warning,
@@ -667,7 +641,8 @@ mod tests {
                    by removing `[...]` around one of them; if this is \
                    intended, write `(* expect ambiguous-nullable-branches: \
                    reason *)` right before the rule, and the parser takes the \
-                   first branch that matches",
+                   branch that matches the most, and the first written of \
+                   those that tie",
         },
         Case {
             source: "s = 'x'; a = 'y', [b]; b = 'z', a;",
@@ -688,7 +663,8 @@ mod tests {
                       one, so both always match the same input",
             help: "remove this alternative; if this is intended, write `(* \
                    expect duplicate-alternative: reason *)` right before the \
-                   rule, and the parser takes the first branch that matches",
+                   rule, and the parser takes the branch that matches the \
+                   most, and the first written of those that tie",
         },
         Case {
             source: "a = 'x' - 'y';",
@@ -831,7 +807,8 @@ mod tests {
                      as by removing `[...]` around one of them; if this is \
                      intended, write `(* expect ambiguous-nullable-branches: \
                      reason *)` right before the rule, and the parser takes \
-                     the first branch that matches"
+                     the branch that matches the most, and the first written \
+                     of those that tie"
                         .to_owned()
                 ),
             }

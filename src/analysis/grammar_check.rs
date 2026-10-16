@@ -8,6 +8,7 @@ mod exhaustive_exception;
 mod indirect_left_recursion;
 mod ineffective_exception;
 mod left_recursion;
+mod tied_branches;
 mod unproductive_rule;
 mod unreachable_rule;
 
@@ -26,6 +27,7 @@ pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     unreachable_rule::check,
     indirect_left_recursion::check,
     duplicate_alternative::check,
+    tied_branches::check,
     ineffective_exception::check,
     empty_rule::check,
     exhaustive_exception::check,

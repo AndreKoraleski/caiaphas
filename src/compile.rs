@@ -88,13 +88,13 @@ mod tests {
 
     #[test]
     fn keeps_no_grammar_with_an_error_in_the_analysis() {
-        let (grammar, diagnostics) = compile("a = a, 'x' | 'y';");
+        let (grammar, diagnostics) = compile("a = a, 'x' | 'y' | 'y';");
         assert!(grammar.is_none());
         assert_eq!(
             codes(&diagnostics),
             [
                 (Severity::Error, Some("left-recursion")),
-                (Severity::Warning, Some("shadowed-branch")),
+                (Severity::Warning, Some("duplicate-alternative")),
             ]
         );
     }

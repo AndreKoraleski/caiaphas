@@ -135,10 +135,10 @@ mod tests {
 
     #[test]
     fn reads_an_expectation() {
-        let text = "(* expect shadowed-branch: the first is meant *)";
+        let text = "(* expect tied-branches: the first is meant *)";
         assert_eq!(
             read(text),
-            expectation("shadowed-branch", "the first is meant", text.len())
+            expectation("tied-branches", "the first is meant", text.len())
         );
     }
 
@@ -197,14 +197,14 @@ mod tests {
     fn rejects_an_expectation_written_wrongly() {
         for text in [
             "(* expect *)",
-            "(* expect shadowed-branch *)",
-            "(* expect shadowed-branch: *)",
+            "(* expect tied-branches *)",
+            "(* expect tied-branches: *)",
             "(* expect : no code *)",
             "(* expect: no code *)",
-            "(* expect Shadowed-Branch: case *)",
-            "(* expect shadowed_branch: underscore *)",
-            "(* expect shadowed--branch: empty word *)",
-            "(* expect shadowed branch: space *)",
+            "(* expect Tied-Branches: case *)",
+            "(* expect tied_branches: underscore *)",
+            "(* expect tied--branches: empty word *)",
+            "(* expect tied branches: space *)",
         ] {
             assert_eq!(read(text), Comment::MalformedExpectation, "{text:?}");
         }

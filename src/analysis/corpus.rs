@@ -111,7 +111,7 @@ fn finds_whitespace_that_two_rules_can_both_read() {
 }
 
 #[test]
-fn finds_every_problem_with_an_ambiguous_expression_grammar() {
+fn finds_left_recursion_in_each_alternative_of_an_expression_grammar() {
     let source = "
         grammar = expression;
         expression = expression, '+', expression
@@ -125,19 +125,7 @@ fn finds_every_problem_with_an_ambiguous_expression_grammar() {
         "expression: `expression` can reach itself before reading anything, \
          so its parser would never end [{rule:?}]"
     );
-    assert_eq!(
-        summary(source),
-        [
-            left_recursion.clone(),
-            left_recursion,
-            "expression, '*', expression: another branch can start with every \
-             character this one can [\"expression, '+', expression\"]"
-                .to_owned(),
-            "'n': another branch can start with every character this one can \
-             [\"expression, '+', expression\"]"
-                .to_owned(),
-        ]
-    );
+    assert_eq!(summary(source), [left_recursion.clone(), left_recursion]);
 }
 
 #[test]
@@ -149,12 +137,33 @@ fn finds_left_recursion_in_a_textbook_expression_grammar() {
     ";
     assert_eq!(
         summary(source),
-        [
-            "expression: `expression` can reach itself before reading \
+        ["expression: `expression` can reach itself before reading \
              anything, so its parser would never end \
-             [\"expression = expression, '+', term | term;\"]",
-            "term: another branch can start with every character this one can \
-             [\"expression, '+', term\"]",
+             [\"expression = expression, '+', term | term;\"]"]
+    );
+}
+
+#[test]
+fn finds_keywords_that_identifiers_also_match() {
+    let source = "
+        token = keyword | identifier;
+        keyword = 'if' | 'else';
+        identifier = letter, {letter};
+        letter = ? U+0061..U+007A ?;
+    ";
+    assert_eq!(
+        summary(source),
+        [
+            "identifier: these branches can both match \"if\", so the parser \
+             takes the one written first [\"keyword\"]"
         ]
     );
+    let expected = "
+        (* expect tied-branches: a keyword is never an identifier *)
+        token = keyword | identifier;
+        keyword = 'if' | 'else';
+        identifier = letter, {letter};
+        letter = ? U+0061..U+007A ?;
+    ";
+    assert_eq!(summary(expected), Vec::<String>::new());
 }
