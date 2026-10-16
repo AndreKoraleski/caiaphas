@@ -1,9 +1,9 @@
 # caiaphas-cli
 
 The `caiaphas` command checks ISO/IEC 14977 EBNF grammars as the `grammar!`
-macro of [caiaphas] does, without building anything, and also prints every
-suggestion that would make their parsers faster. It also tells what each kind
-of finding means, with an example and the usual fix.
+macro of [caiaphas] does, without building anything. It prints every finding,
+suggestions included, and explains each one by its code, with an example and
+the usual fix. `caiaphas explain` without a code lists every code.
 
 ```sh
 cargo install caiaphas-cli

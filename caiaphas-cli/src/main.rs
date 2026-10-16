@@ -1,21 +1,21 @@
 //! The `caiaphas` command checks ISO/IEC 14977 EBNF grammars as the `grammar!`
-//! macro does, without building anything, and also prints the suggestions that
-//! would make their parsers faster. It also explains each kind of finding.
+//! macro does, without building anything, and prints the suggestions that
+//! would make their parsers faster too. It also explains each kind of finding.
 
 use std::{env, fs, process::ExitCode};
 
 const USAGE: &str = "\
 usage: caiaphas check <grammar>...
-       caiaphas explain <code>";
+       caiaphas explain [<code>]";
 
 const HELP: &str = "\
-caiaphas checks ISO/IEC 14977 EBNF grammars as the grammar! macro does, and
-prints every problem and every suggestion that would make a parser faster.
-caiaphas explain tells what a kind of finding means, by the code a finding
-gives, such as tied-branches.
+caiaphas check prints every finding the grammar! macro would report about each
+ISO/IEC 14977 EBNF grammar, suggestions included. caiaphas explain tells what a
+finding means, given its code, such as tied-branches, and lists every code
+without one.
 
 usage: caiaphas check <grammar>...
-       caiaphas explain <code>
+       caiaphas explain [<code>]
 
 It exits with 1 when a grammar cannot be read, has a problem that would stop
 the build, or a code names no finding, and with 2 when it is called wrongly.";
@@ -31,6 +31,7 @@ fn main() -> ExitCode {
             check(&paths)
         }
         Some("explain") => match (arguments.next(), arguments.next()) {
+            (None, _) => list(),
             (Some(code), None) => explain(&code),
             _ => misuse(),
         },
@@ -52,15 +53,30 @@ fn misuse() -> ExitCode {
     ExitCode::from(2)
 }
 
+/// Prints the code of every finding, with how serious it is.
+fn list() -> ExitCode {
+    let width = caiaphas_generator::codes().map(str::len).max().unwrap_or(0);
+    for code in caiaphas_generator::codes() {
+        let explanation =
+            caiaphas_generator::explain(code).unwrap_or_default();
+        let severity = explanation.split('.').next().unwrap_or_default();
+        println!("{code:width$}  {}", severity.to_lowercase());
+    }
+    ExitCode::SUCCESS
+}
+
 /// Prints what the finding with `code` means. Fails when no finding has it.
 fn explain(code: &str) -> ExitCode {
     if let Some(explanation) = caiaphas_generator::explain(code) {
         println!("{explanation}");
-        ExitCode::SUCCESS
-    } else {
-        eprintln!("error: `{code}` is not the code of any finding");
-        ExitCode::FAILURE
+        return ExitCode::SUCCESS;
     }
+    eprintln!("error: `{code}` is not the code of any finding");
+    match caiaphas_generator::similar_code(code) {
+        Some(similar) => eprintln!("help: did you mean `{similar}`?"),
+        None => eprintln!("help: `caiaphas explain` lists every code"),
+    }
+    ExitCode::FAILURE
 }
 
 /// Checks the grammar in each of `paths` and prints what it finds. Fails when

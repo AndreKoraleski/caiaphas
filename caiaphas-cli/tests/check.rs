@@ -97,7 +97,22 @@ fn explains_a_kind_of_finding() {
 
 #[test]
 fn fails_at_a_code_of_no_finding() {
-    let output = caiaphas(&["explain", "no-such-code"]);
+    let output = caiaphas(&["explain", "tied-branch"]);
     assert_eq!(output.status.code(), Some(1));
-    assert_eq!(caiaphas(&["explain"]).status.code(), Some(2));
+    let errors = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        errors.trim_end().ends_with("did you mean `tied-branches`?"),
+        "{errors}"
+    );
+    assert_eq!(caiaphas(&["explain", "a", "b"]).status.code(), Some(2));
+}
+
+#[test]
+fn lists_every_code_with_how_serious_it_is() {
+    let output = caiaphas(&["explain"]);
+    assert!(output.status.success());
+    let printed = printed(&output);
+    assert!(printed.starts_with("left-recursion "), "{printed}");
+    assert!(printed.contains("tied-branches "), "{printed}");
+    assert!(printed.trim_end().ends_with("warning"), "{printed}");
 }
