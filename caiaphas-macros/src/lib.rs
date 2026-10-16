@@ -1,4 +1,4 @@
-//! The `grammar!` macro of caiaphas, which the `caiaphas` crate re-exports.
+//! The `grammar!` macro of caiaphas. The `caiaphas` crate re-exports it.
 
 use std::{env, fs, path::Path};
 
@@ -20,8 +20,8 @@ struct Input {
     /// Whether the suggestions about the grammar stop the build, which
     /// `suggest` after the grammar asks for.
     suggest: bool,
-    /// Whether the parser matches the grammar rearranged, which `optimize`
-    /// after the grammar asks for.
+    /// Whether the parser matches the grammar rearranged, as `optimize` after
+    /// the grammar asks.
     optimize: bool,
 }
 
@@ -125,8 +125,7 @@ pub fn grammar(input: TokenStream) -> TokenStream {
         Source::File(path) => {
             let relative = path.value();
             // A grammar's path is relative to the root of the crate that uses
-            // it, unlike the path of `include_str!`, which is relative to the
-            // file.
+            // it. The path of `include_str!` is relative to the file instead.
             let root = env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
             let file = Path::new(&root).join(&relative);
             let grammar = match fs::read_to_string(&file) {
