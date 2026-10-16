@@ -17,8 +17,18 @@ use crate::{
     ir::Grammar,
 };
 
-/// Returns the items of the module that parses the grammar `source`, or every
-/// problem that stops it, rendered with `path` naming the grammar's file.
+/// The module that parses a grammar.
+#[derive(Debug)]
+pub struct Module {
+    /// The items of the module.
+    pub items: TokenStream,
+    /// Each change to the grammar that would make its parser faster, as text
+    /// that shows where in the grammar it is.
+    pub suggestions: Vec<String>,
+}
+
+/// Returns the module that parses the grammar `source`, or every problem that
+/// stops it, rendered with `path` naming the grammar's file.
 ///
 /// Warnings stop it too unless the grammar expects them, so a generated parser
 /// always does what its grammar means, or what the grammar says it intends.
@@ -27,25 +37,29 @@ use crate::{
 /// # Errors
 ///
 /// Returns each problem as text that shows where in the grammar it is.
-pub fn generate(source: &str, path: &str) -> Result<TokenStream, Vec<String>> {
+pub fn generate(source: &str, path: &str) -> Result<Module, Vec<String>> {
     let render = |diagnostics: Vec<Diagnostic>| {
         diagnostics
             .iter()
             .map(|diagnostic| diagnostic.render(path, source))
             .collect()
     };
-    let (grammar, mut diagnostics) = compile(source);
-    diagnostics
-        .retain(|diagnostic| diagnostic.severity != Severity::Suggestion);
-    let Some(grammar) = grammar.filter(|_| diagnostics.is_empty()) else {
-        return Err(render(diagnostics));
+    let (grammar, diagnostics) = compile(source);
+    let (suggestions, problems): (Vec<_>, Vec<_>) = diagnostics
+        .into_iter()
+        .partition(|diagnostic| diagnostic.severity == Severity::Suggestion);
+    let Some(grammar) = grammar.filter(|_| problems.is_empty()) else {
+        return Err(render(problems));
     };
     let shapes = shape::shapes(&grammar);
     let clashes = clashes(&grammar, &shapes);
     if !clashes.is_empty() {
         return Err(render(clashes));
     }
-    Ok(code::module(&grammar, &shapes, source))
+    Ok(Module {
+        items: code::module(&grammar, &shapes, source),
+        suggestions: render(suggestions),
+    })
 }
 
 /// Returns an error for every rule whose type would have the name of an
@@ -91,7 +105,8 @@ mod tests {
 
     #[test]
     fn generates_the_items_of_a_grammar_without_problems() {
-        let items = generate("s = 'x', [a]; a = 'y';", "g.ebnf").unwrap();
+        let items =
+            generate("s = 'x', [a]; a = 'y';", "g.ebnf").unwrap().items;
         let items = items.to_string();
         assert!(items.contains("pub struct S"), "{items}");
         assert!(items.contains("pub struct A"), "{items}");
@@ -105,6 +120,7 @@ mod tests {
             "g.ebnf",
         )
         .unwrap()
+        .items
         .to_string();
         assert!(items.contains("Some ('x'))"), "{items}");
         assert!(items.contains("Some ('u' ..= 'v'))"), "{items}");
@@ -113,8 +129,9 @@ mod tests {
 
     #[test]
     fn takes_the_longest_match_unless_a_rule_asks_for_the_first() {
-        let items =
-            |source: String| generate(&source, "g.ebnf").unwrap().to_string();
+        let items = |source: String| {
+            generate(&source, "g.ebnf").unwrap().items.to_string()
+        };
         let rules = "a = 'x'; b = 'x', 'y';";
         let longest = items(format!("s = a | b; {rules}"));
         assert!(longest.contains("longest"), "{longest}");
@@ -126,6 +143,7 @@ mod tests {
     fn stops_at_the_one_branch_that_can_match_where_branches_start_apart() {
         let items = generate("s = a | b; a = 'x'; b = 'y';", "g.ebnf")
             .unwrap()
+            .items
             .to_string();
         assert!(items.contains("found"), "{items}");
         assert!(!items.contains("longest"), "{items}");
@@ -134,7 +152,13 @@ mod tests {
     #[test]
     fn generates_a_grammar_that_only_has_suggestions() {
         let source = "number = digit, {digit}; digit = ? U+0030..U+0039 ?;";
-        assert!(generate(source, "g.ebnf").is_ok());
+        let module = generate(source, "g.ebnf").unwrap();
+        assert_eq!(module.suggestions.len(), 1);
+        assert!(
+            module.suggestions[0].starts_with("`digit` only ever matches"),
+            "{:?}",
+            module.suggestions
+        );
     }
 
     #[test]

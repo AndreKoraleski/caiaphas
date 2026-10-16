@@ -70,8 +70,8 @@ pub fn grammar(input: TokenStream) -> TokenStream {
                 .into();
         }
     };
-    let items = match caiaphas_generator::generate(&source, &relative) {
-        Ok(items) => items,
+    let module = match caiaphas_generator::generate(&source, &relative) {
+        Ok(module) => module,
         Err(problems) => {
             return problems
                 .into_iter()
@@ -90,11 +90,21 @@ pub fn grammar(input: TokenStream) -> TokenStream {
             format!(" The parser and types of the grammar in `{relative}`.");
         quote! { #[doc = #documentation] }
     });
+    let suggestions = (!module.suggestions.is_empty()).then(|| {
+        let documentation = format!(
+            "\n # Suggestions\n\n These changes to `{relative}` would make \
+             its parser faster:\n\n```text\n{}\n```",
+            module.suggestions.join("\n")
+        );
+        quote! { #[doc = #documentation] }
+    });
     // Including the grammar's bytes makes Cargo rebuild when it changes.
     let tracked = file.to_string_lossy();
+    let items = module.items;
     quote! {
         #documentation
         #(#attributes)*
+        #suggestions
         #visibility mod #name {
             const _: &[u8] = ::core::include_bytes!(#tracked);
 
