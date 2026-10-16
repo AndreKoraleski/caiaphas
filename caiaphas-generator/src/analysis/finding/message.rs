@@ -81,7 +81,14 @@ impl FindingKind {
                 .to_owned()
             }
             Self::DuplicateAlternative => "remove this alternative".to_owned(),
-            Self::IneffectiveException => {
+            Self::IneffectiveException { longer: true } => {
+                "what comes before the `-` matches one character at a time, \
+                 so it never matches the longer exception; to end a \
+                 repetition at that text, take it out of the whole \
+                 repetition, as in `{c} - ({c}, '*/', {c})`"
+                    .to_owned()
+            }
+            Self::IneffectiveException { longer: false } => {
                 "remove the exception, or write the one that was meant"
                     .to_owned()
             }
@@ -272,7 +279,7 @@ impl fmt::Display for FindingKind {
                 "this alternative is written the same way as an earlier one, \
                  so both always match the same input",
             ),
-            Self::IneffectiveException => f.write_str(
+            Self::IneffectiveException { .. } => f.write_str(
                 "this exception can never apply, since nothing before the `-` \
                  matches the same input",
             ),

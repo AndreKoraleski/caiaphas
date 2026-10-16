@@ -2,15 +2,15 @@
 //! such as `letter` in `a = letter - letter;`, so the syntactic term can never
 //! match.
 //!
-//! It is the opposite of an exception that can never apply. It can only be
-//! told exactly when both sides only ever match one character, such as
-//! terminal strings of one character, special sequences and alternatives of
-//! those, so other terms are left alone.
+//! It is the opposite of an exception that can never apply. It can be told
+//! when both sides only ever match one character, or when the factor matches a
+//! few fixed texts, so other terms are left alone.
 
 use crate::{
     analysis::{
         facts::Facts,
         finding::{Finding, FindingKind},
+        matcher,
     },
     diagnostic::Label,
     ir::{ExpressionKind, Grammar},
@@ -31,13 +31,26 @@ pub(super) fn check(
         else {
             return;
         };
-        let (Some(factor), Some(exception)) = (
+        let characters = match (
             facts.single_characters(syntactic_factor),
             facts.single_characters(syntactic_exception),
-        ) else {
-            return;
+        ) {
+            (Some(factor), Some(exception)) => factor.is_subset(&exception),
+            _ => false,
         };
-        if factor.is_subset(&exception) {
+        let texts =
+            matcher::texts(grammar, syntactic_factor).is_some_and(|texts| {
+                !texts.is_empty()
+                    && texts.iter().all(|text| {
+                        matcher::matches_all(
+                            grammar,
+                            syntactic_exception,
+                            text,
+                            false,
+                        ) == Some(true)
+                    })
+            });
+        if characters || texts {
             findings.push(Finding {
                 kind: FindingKind::ExhaustiveException,
                 span: expression.span,
@@ -87,8 +100,14 @@ mod tests {
     }
 
     #[test]
-    fn leaves_terms_that_match_more_than_one_character() {
-        assert_eq!(exhaustive("a = 'xy' - 'xy';"), []);
-        assert_eq!(exhaustive("a = 'x' - ['x'];"), []);
+    fn finds_an_exception_that_matches_every_text_of_its_factor() {
+        assert_eq!(exhaustive("a = 'xy' - 'xy';").len(), 1);
+        assert_eq!(exhaustive("a = 'x' - {'x'};").len(), 1);
+        assert_eq!(exhaustive("a = 'ab' - ('a', 'b');").len(), 1);
+    }
+
+    #[test]
+    fn leaves_a_factor_of_texts_without_end_alone() {
+        assert_eq!(exhaustive("a = {'x'} - 'x';"), []);
     }
 }

@@ -72,7 +72,11 @@ pub(crate) enum FindingKind {
     DuplicateAlternative,
     /// A syntactic exception can never apply, since nothing its factor matches
     /// is also matched by the exception.
-    IneffectiveException,
+    IneffectiveException {
+        /// Whether the factor only matches single characters and the exception
+        /// only longer texts.
+        longer: bool,
+    },
     /// A rule can match nothing and nothing else, so it never reads input.
     EmptyRule { meta_identifier: MetaIdentifier },
     /// A syntactic exception matches everything its factor matches, so the

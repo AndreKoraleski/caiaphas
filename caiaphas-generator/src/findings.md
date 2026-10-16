@@ -110,9 +110,14 @@ choice, as in `a = 'x' | 'x';`. Remove one of them.
 
 ## ineffective-exception
 
-Warning. An exception can never apply, since nothing its factor matches starts
-like it, as `'y'` in `a = 'x' - 'y';`. Remove it, or write the one that was
-meant.
+Warning. An exception can never apply, since nothing its factor matches is
+also matched by it, as `'y'` in `a = 'x' - 'y';`. Remove it, or write the one
+that was meant.
+
+A common case is a comment that should end at `*/`, written
+`'/*', {character - '*/'}, '*/'`. A character is never the two of `*/`, so
+the repetition goes past it. Take the text out of the whole repetition
+instead: `'/*', ({character} - ({character}, '*/', {character})), '*/'`.
 
 ## empty-rule
 
