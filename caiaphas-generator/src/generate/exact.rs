@@ -16,7 +16,7 @@ use crate::{
         code,
         matching::{self, FunctionWriter},
     },
-    ir::{Expression, ExpressionKind, Rule, RuleId},
+    ir::{Expression, ExpressionKind, Grammar, Rule, RuleId},
 };
 
 /// Returns the name of the function that tells where the matches of the rule
@@ -38,6 +38,40 @@ pub(super) struct ExactWriter<'a> {
     pub(super) writer: FunctionWriter<'a>,
     /// Which rules try every way through them.
     pub(super) general: &'a [bool],
+    /// Which rules keep the order a rule that takes the first match gives its
+    /// ends, as [`ordered_rules`] tells.
+    pub(super) ordered: &'a [bool],
+}
+
+/// Returns which rules keep the order a rule that takes the first match gives
+/// its ends: the rules that try every way and take the first match, and those
+/// that read one of them. A rule takes its first match wherever it is read.
+pub(super) fn ordered_rules(grammar: &Grammar, general: &[bool]) -> Vec<bool> {
+    let rules = &grammar.syntax_rules;
+    let mut ordered: Vec<bool> = rules
+        .iter()
+        .zip(general)
+        .map(|(rule, &general)| general && rule.first_match)
+        .collect();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for (position, rule) in rules.iter().enumerate() {
+            if ordered[position] || !general[position] {
+                continue;
+            }
+            let mut reads = false;
+            rule.expression
+                .visit_meta_identifiers(&mut |RuleId(read), _| {
+                    reads |= ordered[read];
+                });
+            if reads {
+                ordered[position] = true;
+                changed = true;
+            }
+        }
+    }
+    ordered
 }
 
 impl ExactWriter<'_> {
@@ -129,12 +163,16 @@ impl ExactWriter<'_> {
     /// The ends of a rule that takes the first match come in the order of the
     /// ways that end there, by the first branch each takes, then by what comes
     /// after. Those of any other rule come with the end of the most text
-    /// first.
+    /// first, unless they come through a rule that takes the first match. Its
+    /// order then holds, and of alternatives, the one that goes furthest still
+    /// comes first.
     fn ends(&self, expression: &Expression) -> TokenStream {
         let ends = quote! { __caiaphas::Ends };
         if let Some(single) = self.writer.single(expression) {
             return quote! { #ends::of(#single) };
         }
+        let keeps_order =
+            !self.writer.first_match && self.keeps_order(expression);
         let ways = match &expression.kind {
             ExpressionKind::SingleDefinition(steps) => {
                 let steps = steps.iter().map(|step| self.part(step));
@@ -150,10 +188,15 @@ impl ExactWriter<'_> {
                 let alternatives = alternatives
                     .iter()
                     .map(|alternative| self.branch(alternative));
+                let add = if keeps_order {
+                    quote! { merge }
+                } else {
+                    quote! { extend }
+                };
                 quote! {
                     {
                         let mut ends = #ends::none();
-                        #(ends.extend(#alternatives);)*
+                        #(ends.#add(#alternatives);)*
                         ends
                     }
                 }
@@ -249,11 +292,21 @@ impl ExactWriter<'_> {
                 return quote! { #ends::one(position) };
             }
         };
-        if self.writer.first_match {
+        if self.writer.first_match || keeps_order {
             ways
         } else {
             quote! { #ways.longest_first() }
         }
+    }
+
+    /// Returns whether the ends of `expression` keep the order of a rule that
+    /// takes the first match, since it reads one.
+    fn keeps_order(&self, expression: &Expression) -> bool {
+        let mut keeps = false;
+        expression.visit_meta_identifiers(&mut |RuleId(read), _| {
+            keeps |= self.ordered[read];
+        });
+        keeps
     }
 
     /// Returns the closure that tells where `expression` can end from the

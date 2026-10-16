@@ -136,6 +136,31 @@ impl Ends {
         }
     }
 
+    /// Adds the ends of `other` among these, each going before the first of
+    /// these that ends less far. Each keeps its own order, so two that each
+    /// come longest first come longest first together.
+    pub fn merge(&mut self, other: Self) {
+        if self.as_slice().is_empty() {
+            *self = other;
+            return;
+        }
+        let mut merged = Self::none();
+        let mut ours = self.as_slice().iter().copied().peekable();
+        let mut theirs = other.as_slice().iter().copied().peekable();
+        loop {
+            let next = match (ours.peek(), theirs.peek()) {
+                (Some(&our), Some(&their)) if their > our => theirs.next(),
+                (Some(_), _) => ours.next(),
+                (None, _) => theirs.next(),
+            };
+            let Some(end) = next else {
+                break;
+            };
+            merged.add(end);
+        }
+        *self = merged;
+    }
+
     /// Keeps only the ends `keep` holds for.
     pub fn retain(&mut self, mut keep: impl FnMut(usize) -> bool) {
         match &mut self.0 {

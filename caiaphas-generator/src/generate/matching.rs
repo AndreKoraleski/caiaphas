@@ -16,7 +16,11 @@ use quote::{format_ident, quote};
 
 use crate::{
     analysis::{Facts, revisited_rules},
-    generate::{code, exact::ExactWriter, name},
+    generate::{
+        code,
+        exact::{self, ExactWriter},
+        name,
+    },
     ir::{Expression, ExpressionKind, Grammar, Rule, RuleId},
 };
 
@@ -41,6 +45,7 @@ pub(crate) fn functions(facts: &Facts<'_>, general: &[bool]) -> TokenStream {
                 }
             });
     }
+    let ordered = exact::ordered_rules(grammar, general);
     let functions =
         grammar
             .syntax_rules
@@ -59,7 +64,11 @@ pub(crate) fn functions(facts: &Facts<'_>, general: &[bool]) -> TokenStream {
                         remembers[position],
                     );
                 }
-                let writer = ExactWriter { writer, general };
+                let writer = ExactWriter {
+                    writer,
+                    general,
+                    ordered: &ordered,
+                };
                 let committing = committed[position]
                     .then(|| ExactWriter::committed(rule_id, rule));
                 let functions = writer.functions(rule_id, rule);
