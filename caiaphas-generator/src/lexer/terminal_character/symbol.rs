@@ -130,8 +130,8 @@ mod tests {
     #[test]
     fn reads_every_spelling() {
         for (text, symbol) in SPELLINGS {
-            let len = text.chars().count();
-            assert_eq!(read(text), Some((symbol, len)), "{text:?}");
+            let length = text.chars().count();
+            assert_eq!(read(text), Some((symbol, length)), "{text:?}");
         }
     }
 
@@ -169,7 +169,11 @@ mod tests {
     #[test]
     fn gaps_split_two_character_symbols() {
         for text in ["( *", "( /", "( :", "* )", "/ )"] {
-            assert_eq!(read(text).map(|(_, len)| len), Some(1), "{text:?}");
+            assert_eq!(
+                read(text).map(|(_, length)| length),
+                Some(1),
+                "{text:?}"
+            );
         }
     }
 
@@ -193,14 +197,14 @@ mod tests {
     fn rejects_non_ascii_look_alikes() {
         // Characters that look like symbols, not in EBNF.
         for c in [
-            '，', // fullwidth comma
-            '；', // fullwidth semicolon
-            '（', // fullwidth left parenthesis
-            '‘',  // left single quotation mark
-            '“',  // left double quotation mark
-            '−',  // minus sign
-            '∗',  // asterisk operator
-            '\u{10FFFF}',
+            '，',         // fullwidth comma
+            '；',         // fullwidth semicolon
+            '（',         // fullwidth left parenthesis
+            '‘',          // left single quotation mark
+            '“',          // left double quotation mark
+            '−',          // minus sign
+            '∗',          // asterisk operator
+            '\u{10FFFF}', // the last code point
         ] {
             assert_eq!(Symbol::read(c, None), None, "{c:?}");
         }

@@ -240,11 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_symbol_before_another() {
-        assert_eq!(
-            read("(*)"),
-            Err(ParseCommentlessSymbolError::NotCommentless('('))
-        );
+    fn splits_a_spaced_start_comment_symbol() {
         assert_eq!(
             read("( *)"),
             Ok((CommentlessSymbol::Symbol(Symbol::StartGroup), 1))

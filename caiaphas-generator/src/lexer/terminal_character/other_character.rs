@@ -88,15 +88,15 @@ mod tests {
     fn rejects_non_ascii_look_alikes() {
         // Characters that look like other characters, not in EBNF.
         for c in [
-            '\u{00A0}', // no-break space
-            '\u{3000}', // ideographic space
-            '：',       // fullwidth colon
-            '＋',       // fullwidth plus sign
-            '﹫',       // small commercial at
-            '＼',       // fullwidth reverse solidus
-            '˜',        // small tilde
-            '∼',        // tilde operator
-            '\u{10FFFF}',
+            '\u{00A0}',   // no-break space
+            '\u{3000}',   // ideographic space
+            '：',         // fullwidth colon
+            '＋',         // fullwidth plus sign
+            '﹫',         // small commercial at
+            '＼',         // fullwidth reverse solidus
+            '˜',          // small tilde
+            '∼',          // tilde operator
+            '\u{10FFFF}', // the last code point
         ] {
             assert_eq!(OtherCharacter::from_char(c), None, "{c:?}");
         }

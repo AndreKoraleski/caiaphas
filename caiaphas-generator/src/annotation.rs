@@ -97,6 +97,9 @@ fn after_word<'a>(content: &'a str, word: &str) -> Option<&'a str> {
         .then_some(rest)
 }
 
+/// Returns whether `c` can be part of a gap. A lexer only lets a carriage
+/// return into a comment as part of a new line, so taking one on its own here
+/// changes nothing.
 fn is_gap(c: char) -> bool {
     matches!(c, ' ' | '\t' | '\n' | '\r' | '\x0B' | '\x0C')
 }

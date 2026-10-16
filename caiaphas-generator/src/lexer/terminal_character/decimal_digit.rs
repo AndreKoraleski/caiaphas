@@ -71,14 +71,14 @@ mod tests {
     fn rejects_non_ascii_digits() {
         // Characters counted as numeric, but not in EBNF.
         for c in [
-            '٣',  // Arabic-Indic digit three
-            '०',  // Devanagari digit zero
-            '０', // fullwidth digit zero
-            '𝟙',  // mathematical double-struck digit one
-            '²',  // superscript two
-            '½',  // vulgar fraction one half
-            'Ⅳ',  // Roman numeral four
-            '\u{10FFFF}',
+            '٣',          // Arabic-Indic digit three
+            '०',          // Devanagari digit zero
+            '０',         // fullwidth digit zero
+            '𝟙',          // mathematical double-struck digit one
+            '²',          // superscript two
+            '½',          // vulgar fraction one half
+            'Ⅳ',          // Roman numeral four
+            '\u{10FFFF}', // the last code point
         ] {
             assert_eq!(DecimalDigit::from_char(c), None, "{c:?}");
         }

@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn rejects_non_ascii_characters() {
-        // Letters outside ASCII.
+        // Characters outside ASCII.
         for c in [
             'é',        // Latin small letter e with acute
             'ß',        // uppercases to "SS"
@@ -155,8 +155,8 @@ mod tests {
             'Ａ',       // fullwidth A
             'А',        // Cyrillic A
             'Σ',
-            '\u{00A0}', // no-break space
-            '\u{10FFFF}',
+            '\u{00A0}',   // no-break space
+            '\u{10FFFF}', // the last code point
         ] {
             assert_eq!(Letter::from_char(c), None, "{c:?}");
         }

@@ -49,7 +49,8 @@ impl TerminalCharacter {
     }
 
     /// Returns the terminal character at the start of `input`, and how many
-    /// characters it takes, 1 or 2.
+    /// bytes it takes, 1 or 2. Every terminal character is ASCII, so that is
+    /// as many characters.
     ///
     /// Returns `end` when `input` is empty, and `invalid` with the first
     /// character when it is not a terminal character, so each caller reports
