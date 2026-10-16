@@ -508,3 +508,15 @@ fn calls_a_hidden_rule_of_character_ranges_by_its_name() {
         "expected a single or a tail, found `?` at line 1, column 2"
     );
 }
+
+caiaphas::grammar!(mod comment {
+    "comment = '/*', body, '*/';
+     (* as String *) body = {character} - ({character}, '*/', {character});
+     (* hide *) character = ? U+0020..U+007E ?;"
+});
+
+#[test]
+fn ends_a_comment_at_the_first_end_its_exception_names() {
+    assert_eq!(comment::Comment::parse("/* a */").unwrap().body, " a ");
+    assert!(comment::Comment::parse("/* a */ b */").is_err());
+}
