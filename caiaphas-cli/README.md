@@ -2,15 +2,17 @@
 
 The `caiaphas` command checks ISO/IEC 14977 EBNF grammars as the `grammar!`
 macro of [caiaphas] does, without building anything, and also prints every
-suggestion that would make their parsers faster.
+suggestion that would make their parsers faster. It also tells what each kind
+of finding means, with an example and the usual fix.
 
 ```sh
 cargo install caiaphas-cli
 caiaphas check grammars/json.ebnf
+caiaphas explain tied-branches
 ```
 
-It exits with 1 when a grammar cannot be read or has a problem that would stop
-the build, so it suits a CI step.
+It exits with 1 when a grammar cannot be read, has a problem that would stop
+the build, or a code names no finding, so `caiaphas check` suits a CI step.
 
 ## License
 
