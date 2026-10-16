@@ -18,6 +18,7 @@ use crate::{
     lexer::MetaIdentifier,
     parser::{Syntax, SyntaxRule},
     span::Span,
+    spelling,
 };
 
 /// Returns the grammar `syntax` defines, and every error found while resolving
@@ -96,39 +97,17 @@ impl<'a> Index<'a> {
         &self,
         meta_identifier: &MetaIdentifier,
     ) -> Option<MetaIdentifier> {
-        let name = meta_identifier.as_str();
-        // At least one character has to stay, so `a` is not close to `b`.
-        let length = name.chars().count();
-        let most = (length.max(3) / 3).min(length - 1);
+        let names = self
+            .syntax_rules
+            .iter()
+            .map(|rule| rule.meta_identifier.as_str());
+        let similar = spelling::closest(meta_identifier.as_str(), names)?;
         self.syntax_rules
             .iter()
-            .map(|rule| {
-                let other = rule.meta_identifier.as_str();
-                let distance =
-                    edits(&name.to_lowercase(), &other.to_lowercase());
-                (distance, &rule.meta_identifier)
-            })
-            .filter(|&(distance, _)| distance <= most)
-            .min_by_key(|&(distance, _)| distance)
-            .map(|(_, similar)| similar.clone())
+            .map(|rule| &rule.meta_identifier)
+            .find(|other| other.as_str() == similar)
+            .cloned()
     }
-}
-
-/// Returns how many characters have to be added, removed or replaced to make
-/// `from` into `to`.
-fn edits(from: &str, to: &str) -> usize {
-    let to: Vec<char> = to.chars().collect();
-    let mut row: Vec<usize> = (0..=to.len()).collect();
-    for (index, from) in from.chars().enumerate() {
-        let mut diagonal = row[0];
-        row[0] = index + 1;
-        for (column, &to) in to.iter().enumerate() {
-            let replaced = diagonal + usize::from(from != to);
-            diagonal = row[column + 1];
-            row[column + 1] = replaced.min(row[column] + 1).min(diagonal + 1);
-        }
-    }
-    row[to.len()]
 }
 
 /// Error returned when the syntax rules of a grammar do not resolve into its

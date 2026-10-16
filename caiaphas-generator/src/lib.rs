@@ -15,6 +15,7 @@ mod ir;
 mod lexer;
 mod parser;
 mod span;
+mod spelling;
 
 pub use explain::{explain, findings};
 pub use generate::{Module, Options, Report, check, generate};
