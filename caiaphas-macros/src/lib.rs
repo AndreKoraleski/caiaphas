@@ -117,7 +117,15 @@ pub fn grammar(input: TokenStream) -> TokenStream {
             let grammar = match fs::read_to_string(&file) {
                 Ok(grammar) => grammar,
                 Err(error) => {
-                    let message = format!("cannot read `{relative}`: {error}");
+                    let message = if file.is_dir() {
+                        format!("`{relative}` is a directory, not a grammar")
+                    } else {
+                        format!(
+                            "cannot read `{}`: {error}; the path of a \
+                             grammar starts where the crate's Cargo.toml is",
+                            file.display()
+                        )
+                    };
                     return syn::Error::new(path.span(), message)
                         .into_compile_error()
                         .into();
