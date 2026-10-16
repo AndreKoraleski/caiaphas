@@ -1,18 +1,15 @@
 //! A follow conflict is an optional or repeated sequence that can start with a
 //! character that can also come right after it, such as the dangling else in
 //! `s = 'if', c, s, ['else', s] | 'x';`, where an `else` after the inner `s`
-//! could belong to either `if`.
+//! could belong to either `if`. LL(1) parsing calls this a FIRST/FOLLOW
+//! conflict.
 //!
-//! LL(1) parsing calls this a FIRST/FOLLOW conflict. A parser that sees one of
-//! those characters cannot tell from it alone whether to take the sequence, or
-//! whether to repeat it again. A greedy rule takes the sequence whenever it
-//! matches, so only a greedy rule reports it, since every other rule tries
-//! both ways.
-//!
-//! When the sequence only ever matches one character, it can take every
-//! character that can come after it, and the input cannot end there, the
-//! finding is a required optional sequence or a dead-end repeated sequence
-//! instead, as in `s = {'x'}, 'x';`.
+//! Only a greedy rule reports it, since a greedy rule takes the sequence
+//! whenever it matches and every other rule tries both ways. When the sequence
+//! only ever matches one character, it can take every character that can come
+//! after it, and the input cannot end there, the finding is a required
+//! optional sequence or a dead-end repeated sequence instead, as in
+//! `s = {'x'}, 'x';`.
 
 use crate::analysis::{
     character_set::CharacterSet,
