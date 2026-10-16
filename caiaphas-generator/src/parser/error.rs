@@ -43,6 +43,8 @@ pub(crate) enum Expected {
     TerminatorSymbol,
     /// What can come between two items of a rule, or after its last.
     Separator,
+    /// The same, where a `*` follows an item as in a regular expression.
+    SeparatorNotRepetition,
     RepetitionSymbol,
     EndGroupSymbol,
     EndOptionSymbol,
@@ -55,7 +57,9 @@ impl fmt::Display for Expected {
             Self::MetaIdentifier => "a rule name",
             Self::DefiningSymbol => "`=`",
             Self::TerminatorSymbol => "`;` or `.`",
-            Self::Separator => "`,`, `|`, `;` or `.`",
+            Self::Separator | Self::SeparatorNotRepetition => {
+                "`,`, `|`, `;` or `.`"
+            }
             Self::RepetitionSymbol => "`*` after the repetition count",
             Self::EndGroupSymbol => "`)`",
             Self::EndOptionSymbol => "`]` or `/)`",
@@ -111,6 +115,13 @@ impl From<ParseError> for Diagnostic {
             ParseErrorKind::Malformed(malformed) => Some(malformed.help()),
             ParseErrorKind::UnexpectedToken(Expected::Separator) => Some(
                 "separate the items of a sequence with `,`, as in `'x', 'y'`"
+                    .to_owned(),
+            ),
+            ParseErrorKind::UnexpectedToken(
+                Expected::SeparatorNotRepetition,
+            ) => Some(
+                "a `*` only repeats a count, as in `3 * 'x'`; write `{'x'}` \
+                 for any number of times, or `'x', {'x'}` for one or more"
                     .to_owned(),
             ),
             ParseErrorKind::UnexpectedToken(Expected::TerminatorSymbol) => {

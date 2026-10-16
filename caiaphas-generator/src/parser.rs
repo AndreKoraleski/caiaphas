@@ -206,6 +206,9 @@ impl<'a> Parser<'a> {
             }
         } else if starts_item {
             self.unexpected(Expected::Separator)
+        } else if token.symbol == CommentlessSymbol::Symbol(Symbol::Repetition)
+        {
+            self.unexpected(Expected::SeparatorNotRepetition)
         } else {
             self.unexpected(Expected::TerminatorSymbol)
         }
@@ -435,6 +438,12 @@ pub(crate) mod tests {
         assert_eq!(
             kinds("a = b 'c';"),
             [ParseErrorKind::UnexpectedToken(Expected::Separator)]
+        );
+        assert_eq!(
+            kinds("a = 'x'*;"),
+            [ParseErrorKind::UnexpectedToken(
+                Expected::SeparatorNotRepetition
+            )]
         );
     }
 

@@ -143,6 +143,9 @@ pub(crate) enum DictionaryErrorKind {
         similar: Option<MetaIdentifier>,
         /// Whether each of its words names a rule.
         separate: bool,
+        /// Whether it is one letter of a term such as `a - z`, as a class of
+        /// characters is written in a regular expression.
+        class: bool,
     },
     /// Every syntax rule is referenced by another, so none can start a parser.
     NoStartSyntaxRule,
@@ -254,6 +257,15 @@ impl DictionaryError {
                 "correct its spelling to `{}`, or define `{}` with a syntax \
                  rule",
                 similar.as_str(),
+                meta_identifier.as_str()
+            ),
+            DictionaryErrorKind::UndefinedMetaIdentifier {
+                meta_identifier,
+                class: true,
+                ..
+            } => format!(
+                "define `{}` with a syntax rule; for a class of characters, \
+                 as `[a-z]` is in a regular expression, write `? /[a-z]/ ?`",
                 meta_identifier.as_str()
             ),
             DictionaryErrorKind::UndefinedMetaIdentifier {

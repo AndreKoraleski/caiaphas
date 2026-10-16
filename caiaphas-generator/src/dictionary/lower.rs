@@ -86,16 +86,34 @@ impl Lowering<'_, '_> {
         &mut self,
         syntactic_term: &SyntacticTerm,
     ) -> Expression {
+        let reported = self.errors.len();
         let factor = self.syntactic_factor(&syntactic_term.syntactic_factor);
         let Some(exception) = &syntactic_term.syntactic_exception else {
             return factor;
         };
+        let exception = self.syntactic_factor(exception);
+        // `[a-z]` reads as an option of `a - z`, so names of one letter on
+        // both sides were likely meant as a class of characters.
+        let class = one_letter(&syntactic_term.syntactic_factor)
+            && syntactic_term
+                .syntactic_exception
+                .as_ref()
+                .is_some_and(one_letter);
+        if class {
+            for error in &mut self.errors[reported..] {
+                if let DictionaryErrorKind::UndefinedMetaIdentifier {
+                    class,
+                    ..
+                } = &mut error.kind
+                {
+                    *class = true;
+                }
+            }
+        }
         Expression {
             kind: ExpressionKind::SyntacticTerm {
                 syntactic_factor: Box::new(factor),
-                syntactic_exception: Box::new(
-                    self.syntactic_factor(exception),
-                ),
+                syntactic_exception: Box::new(exception),
             },
             span: syntactic_term.span,
         }
@@ -153,6 +171,7 @@ impl Lowering<'_, '_> {
                             meta_identifier: meta_identifier.clone(),
                             similar: self.index.similar(meta_identifier),
                             separate: self.index.separate(meta_identifier),
+                            class: false,
                         },
                         span: syntactic_primary.span,
                     });
@@ -179,6 +198,16 @@ impl Lowering<'_, '_> {
             span: syntactic_primary.span,
         }
     }
+}
+
+/// Returns whether `factor` is only a name of one letter.
+fn one_letter(factor: &SyntacticFactor) -> bool {
+    factor.integer.is_none()
+        && matches!(
+            &factor.syntactic_primary.kind,
+            SyntacticPrimaryKind::MetaIdentifier(name)
+                if name.as_str().len() == 1
+        )
 }
 
 #[cfg(test)]
@@ -337,5 +366,12 @@ mod tests {
             "the gaps join `word space word` into one name; to read each rule \
              in turn, write `word, space, word`"
         );
+    }
+
+    #[test]
+    fn tells_how_to_write_a_class_written_as_in_a_regular_expression() {
+        let (_, errors) = grammar("s = [a-z]; t = b;");
+        assert!(!errors[2].help().contains("regular expression"));
+        assert!(errors[0].help().ends_with("write `? /[a-z]/ ?`"));
     }
 }
