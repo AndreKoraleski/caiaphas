@@ -10,6 +10,19 @@
 //! same place remembers its match there, so trying every branch never matches
 //! it twice.
 //!
+//! Taking one way through each choice as it comes can leave out the way the
+//! rest of the input needs. A rule where it could gets two functions that try
+//! every way instead. One tells every place where the rule's matches at a
+//! position can end, in the order the rule prefers them, and remembers them
+//! there. The other builds the node of the match that ends where the rule
+//! around it picks. Each part of a match takes the first end it prefers that
+//! the rest of the match can go on from, and the start rule takes the end of
+//! the input. A rule prefers the end of the most text, unless it takes the
+//! first match, when it prefers each way by the first branch it takes, then by
+//! what comes after. The analysis tells which rules need this. Every other
+//! rule has at most one end the rest of an input can go on from, and its
+//! function finds it.
+//!
 //! A parse notes nothing about why an input might not match, and skips the
 //! branches that cannot start with the next character. Only when the input
 //! does not match is it matched again, trying every branch and noting at each
@@ -20,7 +33,7 @@
 mod parser;
 mod tree;
 
-pub use parser::{Parser, RuleStart};
+pub use parser::{Ends, Parser, RuleStart};
 pub use tree::{FromNode, Node, Tree};
 
 use crate::error::Error;
@@ -69,4 +82,35 @@ pub fn parse(
             Err(parser.error())
         }
     }
+}
+
+/// The function of a rule that tells where its matches at a position can end.
+pub type EndsFunction<const REPORTS: bool> =
+    fn(&mut Parser<'_, REPORTS>, usize) -> Ends;
+
+/// The function of a rule that builds the node of its match from a position to
+/// an end it can have there. A hidden rule has no node.
+pub type BuildFunction =
+    fn(&mut Parser<'_, false>, usize, usize) -> Option<usize>;
+
+/// Returns the tree of `input` matched in full by the rule whose functions are
+/// `ends` and `build`, or where and why it does not match. `explain` tells
+/// that as `ends` does.
+pub fn parse_by_ends(
+    input: &str,
+    ends: EndsFunction<false>,
+    build: BuildFunction,
+    explain: EndsFunction<true>,
+) -> Result<Tree, Error> {
+    let mut parser = Parser::new(input);
+    if ends(&mut parser, 0).contains(input.len()) {
+        let root = build(&mut parser, 0, input.len());
+        return Ok(parser.tree(root.expect("a start rule is never hidden")));
+    }
+    let mut parser = Parser::new(input);
+    for end in explain(&mut parser, 0).iter() {
+        debug_assert!(end < input.len(), "both parses match alike");
+        parser.note(end, Expected::End);
+    }
+    Err(parser.error())
 }

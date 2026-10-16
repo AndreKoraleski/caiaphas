@@ -1,5 +1,7 @@
 //! The parser and the steps that the function of each rule is made of.
 
+mod ends;
+
 use std::ops::Range;
 
 use rustc_hash::FxHashMap;
@@ -8,6 +10,9 @@ use super::{
     Expected, Match, Rule,
     tree::{NodeData, Tree},
 };
+pub use ends::Ends;
+use ends::RememberedEnds;
+
 use crate::error::Error;
 
 /// Matches the rules of a grammar against an input and builds the tree of the
@@ -26,6 +31,8 @@ pub struct Parser<'i, const REPORTS: bool> {
     /// keys are small numbers an input cannot pick freely, so a fast hasher
     /// that does not resist collisions suits them.
     remembered: FxHashMap<(usize, usize), Remembered>,
+    /// The same for the ends of each rule that tries every way through it.
+    remembered_ends: FxHashMap<(usize, usize), RememberedEnds>,
     /// The furthest position where something failed to match.
     furthest: usize,
     /// What could have been read at the furthest position.
@@ -59,6 +66,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
             children: Vec::new(),
             matched: Vec::new(),
             remembered: FxHashMap::default(),
+            remembered_ends: FxHashMap::default(),
             furthest: 0,
             expected: Vec::new(),
         }
@@ -199,8 +207,14 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     /// far, and returns where the match ends.
     pub fn matched(&mut self, found: Match) -> Option<usize> {
         let (end, node) = found?;
-        self.matched.extend(node);
+        self.add_node(node);
         Some(end)
+    }
+
+    /// Adds `node`, which a rule built, to the nodes matched so far. A hidden
+    /// rule has none.
+    pub fn add_node(&mut self, node: Option<usize>) {
+        self.matched.extend(node);
     }
 
     /// Returns what `rule` matched at `position`, when it remembers that. When
@@ -239,25 +253,30 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         let found = end.map(|end| {
             (end, self.node(rule, start.position..end, start.mark))
         });
-        // What the rule could not read where it starts is told as the rule
-        // itself, unless it is hidden.
-        let mut noted = false;
-        if REPORTS
-            && self.furthest == start.position
-            && self.expected.len() > start.noted_before
-        {
-            self.expected.truncate(start.noted_before);
-            if !rule.hidden {
-                self.expected.push(Expected::Rule(rule.name));
-                noted = true;
-            }
-        }
+        let noted = self.note_rule(rule, start);
         if rule.remembers {
             let remembered = Remembered { found, noted };
             self.remembered
                 .insert((rule.number, start.position), remembered);
         }
         found
+    }
+
+    /// Tells what `rule`, started at `start`, could not read where it starts
+    /// as the rule itself, unless it is hidden. Returns whether it did.
+    fn note_rule(&mut self, rule: &Rule, start: RuleStart) -> bool {
+        if !REPORTS
+            || self.furthest != start.position
+            || self.expected.len() <= start.noted_before
+        {
+            return false;
+        }
+        self.expected.truncate(start.noted_before);
+        if rule.hidden {
+            return false;
+        }
+        self.expected.push(Expected::Rule(rule.name));
+        true
     }
 
     /// Returns the node of `rule` that matched `range`, whose children are the
