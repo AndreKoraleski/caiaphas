@@ -208,6 +208,16 @@ impl fmt::Display for LexErrorKind {
     }
 }
 
+impl LexErrorKind {
+    /// Returns how to fix the grammar, when there is a usual way.
+    pub(crate) fn help(&self) -> Option<String> {
+        match self {
+            Self::CommentlessSymbol(error) => error.help(),
+            Self::BracketedTextualComment(_) => None,
+        }
+    }
+}
+
 impl Error for LexErrorKind {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {

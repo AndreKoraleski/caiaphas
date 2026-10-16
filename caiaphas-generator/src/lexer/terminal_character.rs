@@ -82,6 +82,39 @@ impl TerminalCharacter {
     }
 }
 
+/// Returns how to write `c` when it is not a terminal character: as a special
+/// sequence, which can hold any character, or as the plain character it looks
+/// like, when that was meant.
+pub(crate) fn how_to_write(c: char) -> String {
+    let code = u32::from(c);
+    match looks_like(c) {
+        Some(plain) => format!(
+            "write `{plain}` if that was meant, or write the character itself \
+             as `? U+{code:04X} ?`"
+        ),
+        None => format!(
+            "write it as `? U+{code:04X} ?` outside the quotes, since a \
+             special sequence can hold any character"
+        ),
+    }
+}
+
+/// Returns the terminal character that `c` looks like, when it is a space,
+/// dash or quote that is easy to mistake for one.
+fn looks_like(c: char) -> Option<char> {
+    match c {
+        '\u{00A0}'
+        | '\u{2000}'..='\u{200A}'
+        | '\u{202F}'
+        | '\u{205F}'
+        | '\u{3000}' => Some(' '),
+        '\u{2010}'..='\u{2015}' | '\u{2212}' => Some('-'),
+        '\u{2018}' | '\u{2019}' | '\u{2032}' => Some('\''),
+        '\u{201C}' | '\u{201D}' | '\u{2033}' => Some('"'),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

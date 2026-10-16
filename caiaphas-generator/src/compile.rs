@@ -89,6 +89,25 @@ mod tests {
     }
 
     #[test]
+    fn tells_how_to_write_a_character_no_terminal_string_holds() {
+        let help = |source: &str| compile(source, false).1.remove(0).help;
+        assert_eq!(
+            help("a = 'x\u{2013}y';").as_deref(),
+            Some(
+                "write `-` if that was meant, or write the character itself \
+                 as `? U+2013 ?`"
+            )
+        );
+        assert_eq!(
+            help("a = 'caf\u{00E9}';").as_deref(),
+            Some(
+                "write it as `? U+00E9 ?` outside the quotes, since a \
+                 special sequence can hold any character"
+            )
+        );
+    }
+
+    #[test]
     fn stops_after_dictionary_errors() {
         let (grammar, diagnostics) = compile("a = a, 'x' | b;", false);
         assert!(grammar.is_none());

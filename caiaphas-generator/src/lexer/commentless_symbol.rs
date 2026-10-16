@@ -138,6 +138,19 @@ impl fmt::Display for ParseCommentlessSymbolError {
     }
 }
 
+impl ParseCommentlessSymbolError {
+    /// Returns how to fix the symbol, when there is a usual way.
+    pub(crate) fn help(&self) -> Option<String> {
+        match self {
+            Self::InvalidCharacter(c) => {
+                Some(crate::lexer::terminal_character::how_to_write(*c))
+            }
+            Self::TerminalString(error) => error.help(),
+            _ => None,
+        }
+    }
+}
+
 impl Error for ParseCommentlessSymbolError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {

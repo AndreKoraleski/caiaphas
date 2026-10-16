@@ -124,12 +124,16 @@ impl From<ParseError> for Diagnostic {
             message = format!("{message}: {error}");
             cause = error.source();
         }
+        let help = match &error.kind {
+            ParseErrorKind::Lex(kind) => kind.help(),
+            _ => None,
+        };
         Self {
             severity: Severity::Error,
             message,
             span: error.span,
             labels: Vec::new(),
-            help: None,
+            help,
         }
     }
 }

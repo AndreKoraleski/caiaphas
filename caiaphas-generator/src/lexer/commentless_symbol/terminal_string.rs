@@ -90,6 +90,25 @@ impl fmt::Display for ParseTerminalStringError {
 
 impl Error for ParseTerminalStringError {}
 
+impl ParseTerminalStringError {
+    /// Returns how to fix the terminal string, when there is a usual way.
+    pub(crate) fn help(&self) -> Option<String> {
+        match self {
+            Self::InvalidCharacter(c) => {
+                Some(crate::lexer::terminal_character::how_to_write(*c))
+            }
+            Self::NoClosingQuote => {
+                Some("end it with the quote it starts with".to_owned())
+            }
+            Self::Empty => Some(
+                "leave the place empty to match nothing, as in `a = 'x' | ;`"
+                    .to_owned(),
+            ),
+            Self::NoOpeningQuote => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
