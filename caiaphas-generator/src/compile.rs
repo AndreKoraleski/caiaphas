@@ -12,7 +12,8 @@ use crate::{
 
 /// Returns the grammar `source` defines, unless it has an error, and every
 /// diagnostic about it. Those that rearranging takes care of are left out when
-/// the grammar is to be `rearranged`.
+/// the grammar is to be `rearranged`, and suggestions are left out with an
+/// error, since no parser can be made faster before it works.
 pub(crate) fn compile(
     source: &str,
     rearranged: bool,
@@ -27,12 +28,15 @@ pub(crate) fn compile(
     }
     let mut findings = analyse(&grammar);
     findings.retain(|finding| !(rearranged && finding.is_rearranged_away()));
-    let diagnostics = diagnostics(findings);
-    let grammar = diagnostics
+    let mut diagnostics = diagnostics(findings);
+    let works = diagnostics
         .iter()
-        .all(|diagnostic| diagnostic.severity != Severity::Error)
-        .then_some(grammar);
-    (grammar, diagnostics)
+        .all(|diagnostic| diagnostic.severity != Severity::Error);
+    if !works {
+        diagnostics
+            .retain(|diagnostic| diagnostic.severity != Severity::Suggestion);
+    }
+    (works.then_some(grammar), diagnostics)
 }
 
 /// Returns each of `problems` as a diagnostic.
@@ -115,12 +119,12 @@ mod tests {
     }
 
     #[test]
-    fn keeps_no_grammar_with_an_error_in_the_analysis() {
+    fn keeps_no_grammar_nor_suggestions_with_an_error_in_the_analysis() {
         let (grammar, diagnostics) = compile("a = a, 'x' | 'y' | 'y';", false);
         assert!(grammar.is_none());
         assert_eq!(
             severities(&diagnostics),
-            [Severity::Error, Severity::Suggestion, Severity::Warning]
+            [Severity::Error, Severity::Warning]
         );
     }
 }
