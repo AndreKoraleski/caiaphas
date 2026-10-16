@@ -1,10 +1,10 @@
 # Changelog
 
-All notable changes to this crate are documented here, and breaking changes are
-marked **Breaking**.
+All notable changes to caiaphas and its crates are documented here, and
+breaking changes are marked **Breaking**.
 
-The format is based on [Keep a Changelog][keep-a-changelog], and this crate
-adheres to [Semantic Versioning][semver].
+The format is based on [Keep a Changelog][keep-a-changelog], and the crates
+adhere to [Semantic Versioning][semver].
 
 ## [Unreleased]
 
@@ -16,11 +16,11 @@ adheres to [Semantic Versioning][semver].
 - Parsers that match exactly the inputs a grammar describes. Where an input
   reads more than one way, each part takes the most text it can while the rest
   still matches.
-- Checks for problems in a grammar, each with a way to fix it. Errors and
-  warnings stop the build, unless an `(* expect code: reason *)` comment marks
-  a warning as intended, and suggestions stop it with `suggest`.
-- `optimize` rewrites what can be, such as a start that alternatives share,
-  without changing the types.
+- Checks for problems in a grammar, each with a code and a way to fix it.
+  Errors and warnings stop the build, unless an `(* expect code: reason *)`
+  comment marks a warning as intended, and suggestions stop it with `suggest`.
+- `optimize` reads each start that alternatives share once, without changing
+  the types.
 - Annotations:
   - `(* hide *)` leaves a rule out of the generated types.
   - `(* inline *)` gives the rules that hold a rule what it holds instead of
@@ -32,6 +32,7 @@ adheres to [Semantic Versioning][semver].
     its parser stays fast.
 - Fields of `[T; N]` for a rule held the same number of times on every way, and
   `char()` on the type of a rule that only ever matches one character.
+- `Display` that writes the text of every type with `text()`.
 - `FromStr` for the type of each start rule.
 - `Span` for where a rule matched in its input, and `Error` for where an input
   stops matching and what could have come there. `Error::expected` and
@@ -39,7 +40,7 @@ adheres to [Semantic Versioning][semver].
   crate.
 - The `caiaphas` command of the `caiaphas-cli` crate. `caiaphas check` checks
   grammar files without building anything, and `caiaphas explain` tells what a
-  finding means.
+  finding means, or lists every code.
 - A tutorial in the docs, a page that explains every finding, and examples that
   read arithmetic, JSON and INI files.
 
