@@ -12,8 +12,10 @@ repository = "https://github.com/AndreKoraleski/caiaphas"
 
 [workspace.dependencies]
 annotate-snippets = "0.12.16"
-caiaphas-generator = { path = "caiaphas-generator", version = "0.1.0" }
-caiaphas-macros = { path = "caiaphas-macros", version = "0.1.0" }
+# Exact versions, since generated code calls into the internals of caiaphas,
+# so the macros and the generator have to come from the same release.
+caiaphas-generator = { path = "caiaphas-generator", version = "=0.1.0" }
+caiaphas-macros = { path = "caiaphas-macros", version = "=0.1.0" }
 heck = "0.5.0"
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
