@@ -7,6 +7,7 @@ use quote::quote;
 use super::FunctionWriter;
 use crate::{
     analysis::CharacterSet,
+    generate::name,
     ir::{Expression, ExpressionKind, RuleId},
 };
 
@@ -138,7 +139,15 @@ impl FunctionWriter<'_> {
                 if !rule.hidden {
                     return None;
                 }
-                self.characters(&rule.expression)?.1
+                // As its own function would, the rule goes by its name when it
+                // reads a range of characters.
+                let (_, expected) = self.characters(&rule.expression)?;
+                if reads_range(&rule.expression) {
+                    let name = name::spaced(rule);
+                    vec![quote! { __caiaphas::Expected::Rule(#name) }]
+                } else {
+                    expected
+                }
             }
             _ => return None,
         };
@@ -178,4 +187,16 @@ pub(in crate::generate) fn pattern(
         }
     });
     (!characters.is_empty()).then(|| quote! { #(#ranges)|* })
+}
+
+/// Returns whether `expression` itself reads a range of more than one
+/// character, leaving out the rules it references.
+fn reads_range(expression: &Expression) -> bool {
+    match &expression.kind {
+        ExpressionKind::SpecialSequence(range) => range.start() != range.end(),
+        ExpressionKind::DefinitionsList(alternatives) => {
+            alternatives.iter().any(reads_range)
+        }
+        _ => false,
+    }
 }

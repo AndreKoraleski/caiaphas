@@ -300,8 +300,8 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     }
 
     /// Replaces what `rule` noted where it starts with the rule itself, and
-    /// returns whether it did. A start rule and a hidden rule leave what they
-    /// noted as it is, since their name would say less.
+    /// returns whether it did. A start rule and most hidden rules leave what
+    /// they noted as it is, since their name would say less.
     fn note_rule(&mut self, rule: &Rule, start: RuleStart) -> bool {
         if !REPORTS {
             return false;
@@ -328,8 +328,12 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
             return false;
         }
         // A hidden rule leaves what it could not read for the rule around it
-        // to tell.
-        if rule.hidden {
+        // to tell, such as a closing bracket, unless that holds ranges of
+        // characters, which its name tells better.
+        let ranges = self.expected[noted_before..].iter().any(|expected| {
+            matches!(expected, Expected::Range(first, last) if first != last)
+        });
+        if rule.hidden && !ranges {
             return false;
         }
         self.expected.truncate(noted_before);
