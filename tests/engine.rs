@@ -444,3 +444,24 @@ fn leaves_no_node_of_a_rule_that_did_not_match() {
     let parsed = leftover_variant::E::parse("qx").unwrap();
     assert!(matches!(parsed, leftover_variant::E::Head(_)));
 }
+
+caiaphas::grammar!(mod ends_apart {
+    "s = a, 'ab' | a, 'b'; a = {'a'};"
+});
+
+caiaphas::grammar!(mod ends_apart_optimized {
+    "s = a, 'ab' | a, 'b'; a = {'a'};"
+}, optimize);
+
+caiaphas::grammar!(mod duplicates_optimized {
+    "(* expect duplicate-alternative: kept *) s = 'x' | 'x';"
+}, optimize);
+
+#[test]
+fn builds_the_same_nodes_with_the_grammar_rearranged() {
+    let plain = ends_apart::S::parse("aab").unwrap();
+    let optimized = ends_apart_optimized::S::parse("aab").unwrap();
+    assert_eq!(plain.a.text(), "a");
+    assert_eq!(optimized.a.text(), plain.a.text());
+    assert!(duplicates_optimized::S::parse("x").is_ok());
+}

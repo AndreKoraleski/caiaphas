@@ -53,6 +53,36 @@ pub(super) fn always_matches(expression: &Expression, rules: &[bool]) -> bool {
     }
 }
 
+pub(super) fn ends_once(
+    expression: &Expression,
+    rules: &[bool],
+    characters: &[Option<CharacterSet>],
+) -> bool {
+    if single_characters(expression, characters).is_some() {
+        return true;
+    }
+    match &expression.kind {
+        ExpressionKind::SingleDefinition(expressions) => expressions
+            .iter()
+            .all(|expression| ends_once(expression, rules, characters)),
+        ExpressionKind::SyntacticFactor {
+            syntactic_primary: expression,
+            ..
+        }
+        | ExpressionKind::SyntacticTerm {
+            syntactic_factor: expression,
+            ..
+        } => ends_once(expression, rules, characters),
+        ExpressionKind::MetaIdentifier(RuleId(position)) => rules[*position],
+        ExpressionKind::TerminalString(_)
+        | ExpressionKind::SpecialSequence(_)
+        | ExpressionKind::EmptySequence => true,
+        ExpressionKind::DefinitionsList(_)
+        | ExpressionKind::OptionalSequence(_)
+        | ExpressionKind::RepeatedSequence(_) => false,
+    }
+}
+
 pub(super) fn is_productive(expression: &Expression, rules: &[bool]) -> bool {
     match &expression.kind {
         ExpressionKind::SingleDefinition(expressions) => expressions

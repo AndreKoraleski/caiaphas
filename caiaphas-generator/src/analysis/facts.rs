@@ -9,8 +9,8 @@ mod tests;
 use std::cell::OnceCell;
 
 use expression::{
-    SingleCharacterSearch, always_matches, first, inner, is_nullable,
-    is_productive, rule_single_characters, single_characters,
+    SingleCharacterSearch, always_matches, ends_once, first, inner,
+    is_nullable, is_productive, rule_single_characters, single_characters,
 };
 pub(crate) use follow::Follow;
 
@@ -37,6 +37,8 @@ pub(crate) struct Facts<'a> {
     follow: OnceCell<Vec<Follow>>,
     /// The single characters of each rule.
     single_characters: OnceCell<Vec<Option<CharacterSet>>>,
+    /// Whether every match of each rule from a place ends at the same place.
+    ending_once: OnceCell<Vec<bool>>,
 }
 
 impl<'a> Facts<'a> {
@@ -50,6 +52,7 @@ impl<'a> Facts<'a> {
             inner: OnceCell::new(),
             follow: OnceCell::new(),
             single_characters: OnceCell::new(),
+            ending_once: OnceCell::new(),
         }
     }
 
@@ -113,6 +116,19 @@ impl<'a> Facts<'a> {
         expression: &Expression,
     ) -> Option<CharacterSet> {
         single_characters(expression, self.single_character_rules())
+    }
+
+    /// Returns whether every match of `expression` from a place ends at the
+    /// same place, so a parser never has to choose where it ends.
+    ///
+    /// A choice only counts as one when it only ever matches one character, so
+    /// it can tell too few, never too many.
+    pub(crate) fn ends_once(&self, expression: &Expression) -> bool {
+        ends_once(
+            expression,
+            self.ending_once_rules(),
+            self.single_character_rules(),
+        )
     }
 
     /// Returns the characters `expression` can start with when `after` comes
@@ -241,6 +257,15 @@ impl<'a> Facts<'a> {
         self.inner.get_or_init(|| {
             self.fixed_point(CharacterSet::default(), |expression, sets| {
                 inner(expression, self, sets)
+            })
+        })
+    }
+
+    fn ending_once_rules(&self) -> &[bool] {
+        self.ending_once.get_or_init(|| {
+            let characters = self.single_character_rules();
+            self.fixed_point(false, |expression, rules| {
+                ends_once(expression, rules, characters)
             })
         })
     }

@@ -138,3 +138,16 @@ fn walks_every_expression_with_what_follows_it() {
         ]
     );
 }
+
+#[test]
+fn finds_rules_whose_matches_from_a_place_all_end_at_the_same_place() {
+    let grammar = build_valid(
+        "s = a | b | c | d | e; a = 'x', 2 * b; b = 'y' | 'z'; \
+         c = 'x' | 'xy'; d = {'x'}; e = a - 'xyy';",
+    );
+    let facts = Facts::new(&grammar);
+    let once: Vec<bool> = (0..6)
+        .map(|position| facts.ends_once(rule(&grammar, position)))
+        .collect();
+    assert_eq!(once, [false, true, true, false, false, true]);
+}

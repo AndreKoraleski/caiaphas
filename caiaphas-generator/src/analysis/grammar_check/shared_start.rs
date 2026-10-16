@@ -21,7 +21,7 @@ use crate::{
 /// alternative of the same definitions list.
 pub(super) fn check(
     grammar: &Grammar,
-    _facts: &Facts<'_>,
+    facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
     for rule in &grammar.syntax_rules {
@@ -33,7 +33,7 @@ pub(super) fn check(
             };
             for (index, later) in alternatives.iter().enumerate() {
                 let earlier = alternatives[..index].iter().find(|earlier| {
-                    shares_start(earlier, later)
+                    shares_start(earlier, later, facts)
                         // A first match never takes an alternative that starts
                         // with all of an earlier one.
                         && !(rule.first_match
@@ -56,14 +56,21 @@ pub(super) fn check(
 
 /// Returns whether `earlier` and `later` start with the same expression and
 /// are not written the same way. The duplicate alternative check reports those
-/// that are.
-fn shares_start(earlier: &Expression, later: &Expression) -> bool {
+/// that are. A start that can end at more than one place does not count, since
+/// written once it would take the most text before the choice after it.
+fn shares_start(
+    earlier: &Expression,
+    later: &Expression,
+    facts: &Facts<'_>,
+) -> bool {
     let (Some(start), Some(other)) =
         (earlier.steps().first(), later.steps().first())
     else {
         return false;
     };
-    start.is_written_like(other) && !earlier.is_written_like(later)
+    start.is_written_like(other)
+        && !earlier.is_written_like(later)
+        && facts.ends_once(start)
 }
 
 #[cfg(test)]
@@ -107,6 +114,11 @@ mod tests {
             suggested("(* first match *) s = a | a, 'y'; a = 'z';"),
             []
         );
+    }
+
+    #[test]
+    fn leaves_a_start_that_can_end_at_more_than_one_place() {
+        assert_eq!(suggested("s = a, 'ab' | a, 'b'; a = {'a'};"), []);
     }
 
     #[test]

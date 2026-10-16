@@ -73,9 +73,7 @@ pub fn generate(
     if !clashes.is_empty() {
         return Err(render(clashes));
     }
-    let rearranged = options
-        .optimize
-        .then(|| rearrange::rearranged(grammar.clone()));
+    let rearranged = options.optimize.then(|| rearrange::rearranged(&grammar));
     let matched = rearranged.as_ref().unwrap_or(&grammar);
     Ok(Module {
         items: code::module(&grammar, matched, &shapes, source),

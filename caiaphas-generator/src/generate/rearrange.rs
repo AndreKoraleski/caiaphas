@@ -8,42 +8,49 @@
 //! becomes `a, (x | y)`. The start then matches once, and the rules in it no
 //! longer have to remember their matches. Only neighbours are joined, since
 //! moving an alternative past another could change which of two that tie wins.
+//! A start that can end at more than one place stays where it is, since
+//! written once it would take the most text before the choice after it.
 
 use crate::{
-    ir::{Expression, ExpressionKind, Grammar, Rule},
+    analysis::Facts,
+    ir::{Expression, ExpressionKind, Grammar},
     span::Span,
 };
 
 /// Returns `grammar` with its shared starts written once.
-pub(super) fn rearranged(grammar: Grammar) -> Grammar {
-    let syntax_rules = grammar
+pub(super) fn rearranged(grammar: &Grammar) -> Grammar {
+    let facts = Facts::new(grammar);
+    let mut rearranged = grammar.clone();
+    for (rule, written) in rearranged
         .syntax_rules
-        .into_iter()
-        .map(|rule| Rule {
-            expression: expression(rule.expression),
-            ..rule
-        })
-        .collect();
-    Grammar {
-        syntax_rules,
-        ..grammar
+        .iter_mut()
+        .zip(&grammar.syntax_rules)
+    {
+        rule.expression = expression(written.expression.clone(), &facts);
     }
+    rearranged
 }
 
 /// Returns `expression` with its shared starts written once.
-fn expression(expression: Expression) -> Expression {
+fn expression(expression: Expression, facts: &Facts<'_>) -> Expression {
     let span = expression.span;
-    let boxed =
-        |expression: Box<Expression>| Box::new(self::expression(*expression));
+    let boxed = |expression: Box<Expression>| {
+        Box::new(self::expression(*expression, facts))
+    };
     let kind = match expression.kind {
         ExpressionKind::DefinitionsList(alternatives) => {
-            let alternatives =
-                alternatives.into_iter().map(self::expression).collect();
-            return choice(alternatives, span);
+            let alternatives = alternatives
+                .into_iter()
+                .map(|alternative| self::expression(alternative, facts))
+                .collect();
+            return choice(alternatives, span, facts);
         }
         ExpressionKind::SingleDefinition(steps) => {
             ExpressionKind::SingleDefinition(
-                steps.into_iter().map(self::expression).collect(),
+                steps
+                    .into_iter()
+                    .map(|step| self::expression(step, facts))
+                    .collect(),
             )
         }
         ExpressionKind::OptionalSequence(body) => {
@@ -73,20 +80,28 @@ fn expression(expression: Expression) -> Expression {
 
 /// Returns the choice of `alternatives`, written at `span`, with each run of
 /// neighbours that start with the same expression joined.
-fn choice(alternatives: Vec<Expression>, span: Span) -> Expression {
+fn choice(
+    alternatives: Vec<Expression>,
+    span: Span,
+    facts: &Facts<'_>,
+) -> Expression {
     let mut joined = Vec::new();
     let mut alternatives = alternatives.into_iter().peekable();
     while let Some(first) = alternatives.next() {
+        let start = &first.steps()[0];
+        // An empty start would leave empty rests to join again forever.
+        let joins = facts.ends_once(start)
+            && !matches!(start.kind, ExpressionKind::EmptySequence);
         let mut run = vec![first];
         while let Some(next) = alternatives.next_if(|next| {
-            next.steps()[0].is_written_like(&run[0].steps()[0])
+            joins && next.steps()[0].is_written_like(&run[0].steps()[0])
         }) {
             run.push(next);
         }
         joined.push(if run.len() == 1 {
             run.remove(0)
         } else {
-            factored(run)
+            factored(run, facts)
         });
     }
     if joined.len() == 1 {
@@ -100,7 +115,7 @@ fn choice(alternatives: Vec<Expression>, span: Span) -> Expression {
 
 /// Returns the alternatives of `run` as the expression they all start with,
 /// followed by a choice of what each has after it.
-fn factored(run: Vec<Expression>) -> Expression {
+fn factored(run: Vec<Expression>, facts: &Facts<'_>) -> Expression {
     let span = Span {
         start: run[0].span.start,
         end: run[run.len() - 1].span.end,
@@ -116,7 +131,7 @@ fn factored(run: Vec<Expression>) -> Expression {
         })
         .collect();
     let mut steps = vec![start.expect("a run has alternatives")];
-    let rest = choice(rests, span);
+    let rest = choice(rests, span, facts);
     match rest.kind {
         ExpressionKind::SingleDefinition(more) => steps.extend(more),
         _ => steps.push(rest),
@@ -160,7 +175,23 @@ mod tests {
     use crate::dictionary::tests::{build_valid, render};
 
     fn rearranged_rule(source: &str, name: &str) -> String {
-        render(&rearranged(build_valid(source)), name)
+        render(&rearranged(&build_valid(source)), name)
+    }
+
+    #[test]
+    fn leaves_a_start_that_can_end_at_more_than_one_place() {
+        assert_eq!(
+            rearranged_rule("s = a, 'ab' | a, 'b'; a = {'a'};", "s"),
+            "alt(seq(a, 'ab'), seq(a, 'b'))"
+        );
+    }
+
+    #[test]
+    fn joins_duplicate_alternatives_once() {
+        assert_eq!(
+            rearranged_rule("s = 'x' | 'x';", "s"),
+            "seq('x', alt(empty, empty))"
+        );
     }
 
     #[test]
