@@ -15,4 +15,4 @@ mod lexer;
 mod parser;
 mod span;
 
-pub use generate::{Module, generate};
+pub use generate::{Module, Report, check, generate};

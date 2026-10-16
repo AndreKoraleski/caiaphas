@@ -41,7 +41,7 @@ pub fn generate(source: &str, path: &str) -> Result<Module, Vec<String>> {
     let render = |diagnostics: Vec<Diagnostic>| {
         diagnostics
             .iter()
-            .map(|diagnostic| diagnostic.render(path, source))
+            .map(|diagnostic| diagnostic.render(path, source, false))
             .collect()
     };
     let (grammar, diagnostics) = compile(source);
@@ -60,6 +60,34 @@ pub fn generate(source: &str, path: &str) -> Result<Module, Vec<String>> {
         items: code::module(&grammar, &shapes, source),
         suggestions: render(suggestions),
     })
+}
+
+/// What checking a grammar found.
+#[derive(Debug)]
+pub struct Report {
+    /// Every problem and suggestion, as text that starts with how serious it
+    /// is and shows where in the grammar it is.
+    pub findings: Vec<String>,
+    /// Whether any of them would stop the build.
+    pub stops_build: bool,
+}
+
+/// Returns every problem and suggestion about the grammar `source`, rendered
+/// with `path` naming the grammar's file, without generating its module.
+pub fn check(source: &str, path: &str) -> Report {
+    let (grammar, mut diagnostics) = compile(source);
+    if let Some(grammar) = grammar {
+        diagnostics.extend(clashes(&grammar, &shape::shapes(&grammar)));
+    }
+    Report {
+        findings: diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.render(path, source, true))
+            .collect(),
+        stops_build: diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity != Severity::Suggestion),
+    }
 }
 
 /// Returns an error for every rule whose type would have the name of an
@@ -159,6 +187,24 @@ mod tests {
             "{:?}",
             module.suggestions
         );
+    }
+
+    #[test]
+    fn checks_a_grammar_with_how_serious_each_finding_is() {
+        let report = check(
+            "number = digit, {digit}; digit = ? U+0030..U+0039 ?;",
+            "g.ebnf",
+        );
+        assert!(!report.stops_build);
+        assert_eq!(report.findings.len(), 1);
+        assert!(
+            report.findings[0].starts_with("suggestion: `digit`"),
+            "{:?}",
+            report.findings
+        );
+        let report = check("s = a;", "g.ebnf");
+        assert!(report.stops_build);
+        assert!(report.findings[0].starts_with("error: `a` is not defined"));
     }
 
     #[test]

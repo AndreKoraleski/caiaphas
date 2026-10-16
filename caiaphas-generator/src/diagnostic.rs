@@ -38,15 +38,22 @@ impl Diagnostic {
     /// Returns the diagnostic as text, showing each line of `source` it points
     /// at, with `path` naming where the source comes from.
     ///
-    /// The text leaves out whether it is an error or a warning, which whoever
-    /// shows it adds, as rustc does for a compile error.
-    pub(crate) fn render(&self, path: &str, source: &str) -> String {
+    /// The text starts with how serious the diagnostic is when `named`.
+    /// Otherwise whoever shows it adds that, as rustc does for a compile
+    /// error.
+    pub(crate) fn render(
+        &self,
+        path: &str,
+        source: &str,
+        named: bool,
+    ) -> String {
         let level = match self.severity {
             Severity::Error => Level::ERROR,
             Severity::Warning => Level::WARNING,
-            Severity::Suggestion => Level::INFO,
+            Severity::Suggestion => Level::INFO.with_name("suggestion"),
         };
-        let title = level.no_name().primary_title(&self.message);
+        let level = if named { level } else { level.no_name() };
+        let title = level.primary_title(&self.message);
         let snippet = Snippet::source(source)
             .path(path)
             .annotation(AnnotationKind::Primary.span(self.span.range()))
@@ -83,7 +90,7 @@ mod tests {
         found.message = "`b` is not defined".to_owned();
         found.help = Some("define `b` with a syntax rule".to_owned());
         assert_eq!(
-            found.render("grammar.ebnf", "a = 'x', b;\n"),
+            found.render("grammar.ebnf", "a = 'x', b;\n", false),
             "`b` is not defined\n \
              --> grammar.ebnf:1:10\n  \
              |\n\
@@ -91,6 +98,23 @@ mod tests {
              |          ^\n  \
              |\n  \
              = help: define `b` with a syntax rule"
+        );
+    }
+
+    #[test]
+    fn starts_with_how_serious_it_is_when_asked() {
+        let source = "a = 'x';\n";
+        assert!(
+            diagnostic(4, 7)
+                .render("g.ebnf", source, true)
+                .starts_with("error: something is wrong")
+        );
+        let mut found = diagnostic(4, 7);
+        found.severity = Severity::Suggestion;
+        assert!(
+            found
+                .render("g.ebnf", source, true)
+                .starts_with("suggestion: something is wrong")
         );
     }
 
@@ -109,7 +133,7 @@ mod tests {
             },
         ];
         assert_eq!(
-            found.render("g.ebnf", source),
+            found.render("g.ebnf", source, false),
             "something is wrong\n \
              --> g.ebnf:4:1\n  \
              |\n\
@@ -127,7 +151,7 @@ mod tests {
     fn marks_a_span_over_several_lines() {
         let source = "a = 'x'\r\n  | 'y';\r\n";
         assert_eq!(
-            diagnostic(4, 16).render("g.ebnf", source),
+            diagnostic(4, 16).render("g.ebnf", source, false),
             "something is wrong\n \
              --> g.ebnf:1:5\n  \
              |\n\
