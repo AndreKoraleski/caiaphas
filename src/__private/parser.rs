@@ -1,6 +1,7 @@
 //! The parser and the steps that the function of each rule is made of.
 
 mod ends;
+mod exact;
 
 use std::{ops::Range, str::FromStr};
 
@@ -11,7 +12,7 @@ use super::{
     tree::{NodeData, Tree},
 };
 pub use ends::Ends;
-use ends::RememberedEnds;
+use exact::RememberedEnds;
 
 use crate::error::Error;
 
