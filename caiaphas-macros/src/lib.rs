@@ -38,7 +38,16 @@ impl Parse for Input {
 }
 
 /// Generates a module that parses the grammar in a file, with a type for each
-/// of its rules. The `caiaphas` crate documents how to use it.
+/// of its rules.
+///
+/// It takes the module's attributes and visibility, its name and the path of
+/// the grammar from the root of the crate:
+///
+/// ```text
+/// caiaphas::grammar!(pub mod json = "grammars/json.ebnf");
+/// ```
+///
+/// The crate documentation of `caiaphas` tells what the module holds.
 #[proc_macro]
 pub fn grammar(input: TokenStream) -> TokenStream {
     let Input {
