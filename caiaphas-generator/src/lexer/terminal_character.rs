@@ -39,8 +39,8 @@ impl TerminalCharacter {
         if let Some(digit) = DecimalDigit::from_char(first) {
             return Some((Self::DecimalDigit(digit), 1));
         }
-        // `:` alone is an other character, but `:)` is a symbol, so the
-        // longer symbol is tried first.
+        // `:` alone is an other character, but `:)` is a symbol, so the longer
+        // symbol is tried first.
         if let Some((symbol, length)) = Symbol::read(first, second) {
             return Some((Self::Symbol(symbol), length));
         }

@@ -1,5 +1,5 @@
-//! Tied branches are alternatives that can match the same text, such as
-//! `'if'` and `identifier` in `word = 'if' | identifier;`. A parser takes the
+//! Tied branches are alternatives that can match the same text, such as `'if'`
+//! and `identifier` in `word = 'if' | identifier;`. A parser takes the
 //! alternative that matches the most, so it only has to pick between two when
 //! they tie, and then it takes the one written first.
 //!

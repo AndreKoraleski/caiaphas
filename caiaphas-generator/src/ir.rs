@@ -10,8 +10,8 @@ pub(crate) use rule::{Rule, RuleId};
 /// A grammar is its rules, with every reference between them resolved.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Grammar {
-    /// The rules in the order they are written, without the later
-    /// definitions of a meta identifier.
+    /// The rules in the order they are written, without the later definitions
+    /// of a meta identifier.
     pub(crate) syntax_rules: Vec<Rule>,
     /// The rules no other rule references. Each gets its own parser.
     pub(crate) start_syntax_rules: Vec<RuleId>,

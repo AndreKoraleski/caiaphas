@@ -71,8 +71,8 @@ fn shape(grammar: &Grammar, expression: &Expression) -> Shape {
     )
 }
 
-/// Returns a variant for each alternative of `expression`, when each is a
-/// rule with a type or a word, and no two variants would share a name.
+/// Returns a variant for each alternative of `expression`, when each is a rule
+/// with a type or a word, and no two variants would share a name.
 fn variants(
     grammar: &Grammar,
     expression: &Expression,
@@ -195,8 +195,8 @@ fn occurrences(
 }
 
 /// Returns the rules of `first` and `second`, in the order they first appear,
-/// with `merge` giving the count of a rule from both counts, where a rule
-/// that one does not hold counts as held no times.
+/// with `merge` giving the count of a rule from both counts, where a rule that
+/// one does not hold counts as held no times.
 fn combine(
     first: Vec<(RuleId, Occurrences)>,
     second: Vec<(RuleId, Occurrences)>,

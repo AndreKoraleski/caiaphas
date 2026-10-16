@@ -27,8 +27,8 @@ pub struct Rule {
     /// The name of the rule as written, which errors use for it.
     pub name: &'static str,
     pub expression: Expression,
-    /// Whether the rule is left out of the tree and of errors, along with
-    /// what it matches.
+    /// Whether the rule is left out of the tree and of errors, along with what
+    /// it matches.
     pub hidden: bool,
 }
 
@@ -55,8 +55,8 @@ pub enum Expression {
     Empty,
 }
 
-/// Returns the tree of `input` matched in full by the rule numbered `rule`,
-/// or where and why it does not match.
+/// Returns the tree of `input` matched in full by the rule numbered `rule`, or
+/// where and why it does not match.
 pub fn parse(
     grammar: &'static Grammar,
     rule: usize,
