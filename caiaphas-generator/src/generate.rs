@@ -34,9 +34,9 @@ pub struct Module {
 #[derive(Debug, Clone, Copy, Default)]
 #[non_exhaustive]
 pub struct Options {
-    /// Whether the parser matches the grammar rearranged where that keeps its
-    /// types the same, such as with a start that alternatives share written
-    /// once. The suggestions to rearrange it that way are then left out.
+    /// Whether the parser reads each start that alternatives share once,
+    /// without changing the types. The `shared-start` suggestions are then
+    /// left out.
     pub optimize: bool,
 }
 
