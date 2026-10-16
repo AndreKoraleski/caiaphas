@@ -19,7 +19,7 @@ pub(crate) use syntax::Syntax;
 pub(crate) use syntax_rule::SyntaxRule;
 
 use crate::{
-    annotation::Comment,
+    annotation::{Annotation, Comment},
     diagnostic::{Diagnostic, Severity},
     lexer::{CommentlessSymbol, LexErrorKind, Lexer, Symbol, Token},
     span::Span,
@@ -54,12 +54,19 @@ pub(crate) fn parse(source: &str) -> (Syntax, Vec<ParseError>) {
     let mut errors = parser.errors;
     for &span in parser.lexer.comments() {
         let text = &source[span.range()];
-        let expectation = match Comment::read(text, span) {
+        let annotation = match Comment::read(text, span) {
             Comment::Ordinary => continue,
-            Comment::Expectation(expectation) => expectation,
-            Comment::Malformed => {
+            Comment::Annotation(annotation) => annotation,
+            Comment::MalformedExpectation => {
                 errors.push(ParseError {
                     kind: ParseErrorKind::MalformedExpectation,
+                    span,
+                });
+                continue;
+            }
+            Comment::MalformedHide => {
+                errors.push(ParseError {
+                    kind: ParseErrorKind::MalformedHide,
                     span,
                 });
                 continue;
@@ -70,14 +77,20 @@ pub(crate) fn parse(source: &str) -> (Syntax, Vec<ParseError>) {
             .any(|rule| rule.start < span.start && span.end < rule.end);
         match attempts.iter().find(|rule| rule.start >= span.end) {
             Some(next) if !inside => {
-                if let Some(rule) =
+                let Some(rule) =
                     rules.iter_mut().find(|rule| rule.span == *next)
-                {
-                    rule.expectations.push(expectation);
+                else {
+                    continue;
+                };
+                match annotation {
+                    Annotation::Expectation(expectation) => {
+                        rule.expectations.push(expectation);
+                    }
+                    Annotation::Hide => rule.hidden = true,
                 }
             }
             _ => errors.push(ParseError {
-                kind: ParseErrorKind::ExpectationWithoutRule,
+                kind: ParseErrorKind::AnnotationWithoutRule,
                 span,
             }),
         }
@@ -228,8 +241,10 @@ pub(crate) enum ParseErrorKind {
     NoSyntaxRule,
     /// A comment starts with `expect` but is not written as an expectation.
     MalformedExpectation,
-    /// An expectation is not right before a syntax rule.
-    ExpectationWithoutRule,
+    /// A comment starts with `hide` but holds more than that.
+    MalformedHide,
+    /// An annotation is not right before a syntax rule.
+    AnnotationWithoutRule,
 }
 
 /// What the syntax needs where a [`ParseError`] is.
@@ -275,9 +290,12 @@ impl fmt::Display for ParseError {
                 "an expectation is written `(* expect code-in-kebab-case: \
                  reason *)`",
             ),
-            ParseErrorKind::ExpectationWithoutRule => f.write_str(
-                "an expectation must come right before the syntax rule it is \
-                 about",
+            ParseErrorKind::MalformedHide => {
+                f.write_str("a rule is hidden with `(* hide *)` alone")
+            }
+            ParseErrorKind::AnnotationWithoutRule => f.write_str(
+                "an `expect` or `hide` comment must come right before the \
+                 syntax rule it is about",
             ),
         }
     }
@@ -644,6 +662,29 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn hides_the_rule_after_a_hide() {
+        let syntax = parse_valid(
+            "s = a, ws, b; (* hide *) ws = {' '}; a = 'x'; b = 'y';",
+        );
+        let hidden: Vec<bool> =
+            syntax.syntax_rules.iter().map(|rule| rule.hidden).collect();
+        assert_eq!(hidden, [false, true, false, false]);
+    }
+
+    #[test]
+    fn rejects_a_malformed_hide() {
+        let (syntax, errors) = parse("(* hide spaces *) a = 'x';");
+        assert!(!syntax.syntax_rules[0].hidden);
+        assert_eq!(
+            errors,
+            [ParseError {
+                kind: ParseErrorKind::MalformedHide,
+                span: Span { start: 0, end: 17 },
+            }]
+        );
+    }
+
+    #[test]
     fn rejects_a_malformed_expectation() {
         let (syntax, errors) = parse("(* expect empty-rule *) a = 'x';");
         assert_eq!(expectations(&syntax), [Vec::<&str>::new()]);
@@ -657,7 +698,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn rejects_an_expectation_without_a_rule_after_it() {
+    fn rejects_an_annotation_without_a_rule_after_it() {
         for (source, start) in [
             ("a = 'x'; (* expect empty-rule: kept *)", 9),
             ("a = 'x', (* expect empty-rule: kept *) 'y';", 9),
@@ -673,7 +714,7 @@ pub(crate) mod tests {
             assert_eq!(
                 errors,
                 [ParseError {
-                    kind: ParseErrorKind::ExpectationWithoutRule,
+                    kind: ParseErrorKind::AnnotationWithoutRule,
                     span: Span {
                         start,
                         end: start + 29,
@@ -682,6 +723,15 @@ pub(crate) mod tests {
                 "{source:?}"
             );
         }
+        let (syntax, errors) = parse("a = 'x', (* hide *) 'y'; b = 'z';");
+        assert!(syntax.syntax_rules.iter().all(|rule| !rule.hidden));
+        assert_eq!(
+            errors,
+            [ParseError {
+                kind: ParseErrorKind::AnnotationWithoutRule,
+                span: Span { start: 9, end: 19 },
+            }]
+        );
     }
 
     #[test]
@@ -762,9 +812,13 @@ pub(crate) mod tests {
                  reason *)`",
             ),
             (
-                error(ParseErrorKind::ExpectationWithoutRule),
-                "an expectation must come right before the syntax rule it is \
-                 about",
+                error(ParseErrorKind::MalformedHide),
+                "a rule is hidden with `(* hide *)` alone",
+            ),
+            (
+                error(ParseErrorKind::AnnotationWithoutRule),
+                "an `expect` or `hide` comment must come right before the \
+                 syntax rule it is about",
             ),
         ];
         for (error, message) in cases {

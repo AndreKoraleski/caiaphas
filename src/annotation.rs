@@ -12,6 +12,10 @@
 //! application = atom, {' ', argument};
 //! ```
 //!
+//! A hide, written `(* hide *)`, leaves the rule out of the types generated
+//! for the grammar, so the rules that use it get no field for it. It suits
+//! rules whose matches nobody reads, such as whitespace between tokens.
+//!
 //! Each comment holds one annotation, and a rule can have several. The
 //! standard reads quotes in a comment as terminal strings, so a reason cannot
 //! hold a lone `'` or `"`.
@@ -29,14 +33,24 @@ pub(crate) struct Expectation {
     pub(crate) span: Span,
 }
 
+/// What a comment right before a syntax rule tells caiaphas about the rule.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Annotation {
+    Expectation(Expectation),
+    /// Leaves the rule out of the types generated for the grammar.
+    Hide,
+}
+
 /// What a comment holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Comment {
     /// Holds text for people only.
     Ordinary,
-    Expectation(Expectation),
+    Annotation(Annotation),
     /// Text that starts with `expect` but is not written as an expectation.
-    Malformed,
+    MalformedExpectation,
+    /// Text that starts with `hide` but holds more than that.
+    MalformedHide,
 }
 
 impl Comment {
@@ -45,29 +59,42 @@ impl Comment {
         let content = text
             .strip_prefix("(*")
             .and_then(|text| text.strip_suffix("*)"))
-            .unwrap_or(text);
-        let Some(rest) =
-            content.trim_start_matches(is_gap).strip_prefix("expect")
-        else {
+            .unwrap_or(text)
+            .trim_matches(is_gap);
+        if let Some(rest) = after_word(content, "hide") {
+            return if rest.is_empty() {
+                Self::Annotation(Annotation::Hide)
+            } else {
+                Self::MalformedHide
+            };
+        }
+        let Some(rest) = after_word(content, "expect") else {
             return Self::Ordinary;
         };
-        if rest.chars().next().is_some_and(|c| !is_gap(c) && c != ':') {
-            return Self::Ordinary;
-        }
         let Some((code, reason)) = rest.split_once(':') else {
-            return Self::Malformed;
+            return Self::MalformedExpectation;
         };
         let code = code.trim_matches(is_gap);
         let reason = reason.trim_matches(is_gap);
         if !is_kebab_case(code) || reason.is_empty() {
-            return Self::Malformed;
+            return Self::MalformedExpectation;
         }
-        Self::Expectation(Expectation {
+        Self::Annotation(Annotation::Expectation(Expectation {
             code: code.to_owned(),
             reason: reason.to_owned(),
             span,
-        })
+        }))
     }
+}
+
+/// Returns what follows `word` at the start of `content` when it is a word of
+/// its own there, so `expect` is found in `expect:` but not in `expected`.
+fn after_word<'a>(content: &'a str, word: &str) -> Option<&'a str> {
+    let rest = content.strip_prefix(word)?;
+    rest.chars()
+        .next()
+        .is_none_or(|c| is_gap(c) || c == ':')
+        .then_some(rest)
 }
 
 fn is_gap(c: char) -> bool {
@@ -96,14 +123,14 @@ mod tests {
     }
 
     fn expectation(code: &str, reason: &str, length: usize) -> Comment {
-        Comment::Expectation(Expectation {
+        Comment::Annotation(Annotation::Expectation(Expectation {
             code: code.to_owned(),
             reason: reason.to_owned(),
             span: Span {
                 start: 0,
                 end: length,
             },
-        })
+        }))
     }
 
     #[test]
@@ -141,8 +168,28 @@ mod tests {
             "(* expected to change *)",
             "(* expectation: none *)",
             "(* see expect below *)",
+            "(* hidden for now *)",
+            "(* hides the rest *)",
         ] {
             assert_eq!(read(text), Comment::Ordinary, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn reads_a_hide() {
+        for text in ["(* hide *)", "(*hide*)", "(*\n  hide\n*)"] {
+            assert_eq!(
+                read(text),
+                Comment::Annotation(Annotation::Hide),
+                "{text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_a_hide_with_more_after_it() {
+        for text in ["(* hide whitespace *)", "(* hide: whitespace *)"] {
+            assert_eq!(read(text), Comment::MalformedHide, "{text:?}");
         }
     }
 
@@ -159,7 +206,7 @@ mod tests {
             "(* expect shadowed--branch: empty word *)",
             "(* expect shadowed branch: space *)",
         ] {
-            assert_eq!(read(text), Comment::Malformed, "{text:?}");
+            assert_eq!(read(text), Comment::MalformedExpectation, "{text:?}");
         }
     }
 }

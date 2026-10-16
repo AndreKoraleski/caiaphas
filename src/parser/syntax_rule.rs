@@ -17,6 +17,9 @@ pub(crate) struct SyntaxRule {
     pub(crate) definitions_list: DefinitionsList,
     /// The findings the comments right before the rule mark as intended.
     pub(crate) expectations: Vec<Expectation>,
+    /// Whether a hide right before the rule leaves it out of the generated
+    /// types.
+    pub(crate) hidden: bool,
     /// From the meta identifier to the terminator, both included.
     pub(crate) span: Span,
 }
@@ -42,6 +45,7 @@ impl SyntaxRule {
             meta_identifier: name,
             definitions_list,
             expectations: Vec::new(),
+            hidden: false,
             span: start.to(end),
         })
     }
