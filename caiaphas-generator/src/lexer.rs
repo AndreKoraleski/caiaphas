@@ -47,6 +47,11 @@ impl<'a> Lexer<'a> {
         &self.comments
     }
 
+    /// Returns the source the lexer reads.
+    pub(crate) fn source(&self) -> &'a str {
+        self.source
+    }
+
     /// Moves past the gaps and comments at the current position, or past the
     /// first comment that cannot be read.
     fn skip_gaps_and_comments(&mut self) -> Result<(), LexError> {

@@ -47,6 +47,9 @@ impl SyntaxRule {
         parser.bump();
         parser.expect(Symbol::Defining, Expected::DefiningSymbol)?;
         let definitions_list = DefinitionsList::parse(parser)?;
+        if parser.peek_symbol() != Some(Symbol::Terminator) {
+            return Err(parser.unfinished());
+        }
         let end =
             parser.expect(Symbol::Terminator, Expected::TerminatorSymbol)?;
         Ok(Self {

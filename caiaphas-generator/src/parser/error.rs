@@ -48,6 +48,8 @@ pub(crate) enum Expected {
     MetaIdentifier,
     DefiningSymbol,
     TerminatorSymbol,
+    /// What can come between two items of a rule, or after its last.
+    Separator,
     RepetitionSymbol,
     EndGroupSymbol,
     EndOptionSymbol,
@@ -60,6 +62,7 @@ impl fmt::Display for Expected {
             Self::MetaIdentifier => "a rule name",
             Self::DefiningSymbol => "`=`",
             Self::TerminatorSymbol => "`;` or `.`",
+            Self::Separator => "`,`, `|`, `;` or `.`",
             Self::RepetitionSymbol => "`*` after the repetition count",
             Self::EndGroupSymbol => "`)`",
             Self::EndOptionSymbol => "`]` or `/)`",
@@ -126,6 +129,13 @@ impl From<ParseError> for Diagnostic {
         }
         let help = match &error.kind {
             ParseErrorKind::Lex(kind) => kind.help(),
+            ParseErrorKind::UnexpectedToken(Expected::Separator) => Some(
+                "separate the items of a sequence with `,`, as in `'x', 'y'`"
+                    .to_owned(),
+            ),
+            ParseErrorKind::UnexpectedToken(Expected::TerminatorSymbol) => {
+                Some("end the rule with `;`".to_owned())
+            }
             _ => None,
         };
         Self {

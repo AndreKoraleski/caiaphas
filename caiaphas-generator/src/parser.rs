@@ -173,6 +173,44 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Returns the error for a rule that goes on where it should end. Before
+    /// the name of the next rule, the rule lacks its `;`, so the error is
+    /// where the rule ends. Before anything else a rule holds, it lacks a `,`.
+    fn unfinished(&self) -> ParseError {
+        let Some(token) = self.peek() else {
+            return self.unexpected(Expected::TerminatorSymbol);
+        };
+        let after = self.lexer.source()[token.span.end..]
+            .trim_start_matches(|c: char| c.is_ascii_whitespace());
+        let next_rule =
+            matches!(token.symbol, CommentlessSymbol::MetaIdentifier(_))
+                && after.starts_with('=');
+        let starts_item = matches!(
+            token.symbol,
+            CommentlessSymbol::MetaIdentifier(_)
+                | CommentlessSymbol::Integer(_)
+                | CommentlessSymbol::TerminalString(_)
+                | CommentlessSymbol::SpecialSequence(_)
+                | CommentlessSymbol::Symbol(
+                    Symbol::StartGroup
+                        | Symbol::StartOption
+                        | Symbol::StartRepeat
+                )
+        );
+        if next_rule {
+            ParseError {
+                kind: ParseErrorKind::UnexpectedToken(
+                    Expected::TerminatorSymbol,
+                ),
+                span: self.empty_span(),
+            }
+        } else if starts_item {
+            self.unexpected(Expected::Separator)
+        } else {
+            self.unexpected(Expected::TerminatorSymbol)
+        }
+    }
+
     /// Returns an empty span where the last token read ends.
     fn empty_span(&self) -> Span {
         Span {
@@ -403,8 +441,18 @@ pub(crate) mod tests {
     fn rejects_terms_without_a_concatenate_symbol() {
         assert_eq!(
             kinds("a = b 'c';"),
-            [ParseErrorKind::UnexpectedToken(Expected::TerminatorSymbol)]
+            [ParseErrorKind::UnexpectedToken(Expected::Separator)]
         );
+    }
+
+    #[test]
+    fn ends_a_rule_that_lacks_its_terminator_where_it_ends() {
+        let (_, errors) = parse("a = 'x'\nb = 'y';");
+        assert_eq!(
+            errors[0].kind,
+            ParseErrorKind::UnexpectedToken(Expected::TerminatorSymbol)
+        );
+        assert_eq!(errors[0].span, Span { start: 7, end: 7 });
     }
 
     #[test]
