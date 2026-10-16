@@ -126,7 +126,9 @@ fn factored(run: Vec<Expression>, facts: &Facts<'_>) -> Expression {
         .map(|alternative| {
             let end = alternative.span.end;
             let mut steps = into_steps(alternative);
-            start.get_or_insert(steps.remove(0));
+            // Every alternative loses its start, and only the first keeps it.
+            let first = steps.remove(0);
+            start.get_or_insert(first);
             sequence(steps, end)
         })
         .collect();
