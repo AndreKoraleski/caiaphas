@@ -8,7 +8,7 @@ use crate::{
 
 /// A definitions list is one or more single definitions separated by `|`, `/`
 /// or `!`. Each is an alternative to the others.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct DefinitionsList {
     pub(crate) single_definitions: Vec<SingleDefinition>,
     pub(crate) span: Span,

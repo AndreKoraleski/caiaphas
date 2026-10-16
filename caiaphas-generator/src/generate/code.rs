@@ -39,7 +39,7 @@ pub(crate) fn module(
     };
     let rules = grammar.syntax_rules.iter().map(|rule| {
         let name = written(rule);
-        let expression = expression(&rule.definitions_list);
+        let expression = expression(&rule.expression);
         let hidden = rule.hidden;
         quote! {
             __caiaphas::Rule {

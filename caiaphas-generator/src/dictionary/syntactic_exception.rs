@@ -12,18 +12,18 @@ use crate::{
 /// A rule can be replaced when neither it nor any rule it references is
 /// recursive, since then inlining every reference ends.
 pub(super) fn check(rules: &[Rule], errors: &mut Vec<DictionaryError>) {
-    let mut replaceable = Replaceable {
+    let mut replaceable = ReplaceableRules {
         rules,
         states: vec![State::Unvisited; rules.len()],
     };
     for rule in rules {
-        check_expression(&rule.definitions_list, &mut replaceable, errors);
+        check_expression(&rule.expression, &mut replaceable, errors);
     }
 }
 
 fn check_expression(
     expression: &Expression,
-    replaceable: &mut Replaceable<'_>,
+    replaceable: &mut ReplaceableRules<'_>,
     errors: &mut Vec<DictionaryError>,
 ) {
     if let ExpressionKind::SyntacticTerm {
@@ -33,7 +33,7 @@ fn check_expression(
     {
         // This checks every meta identifier in the exception, even in the
         // exceptions nested inside it, so only the factor is left to check.
-        syntactic_exception.meta_identifiers(&mut |rule_id, span| {
+        syntactic_exception.visit_meta_identifiers(&mut |rule_id, span| {
             if !replaceable.is_replaceable(rule_id) {
                 let RuleId(position) = rule_id;
                 errors.push(DictionaryError {
@@ -55,7 +55,7 @@ fn check_expression(
 }
 
 /// Finds which rules can be replaced, remembering each answer.
-struct Replaceable<'a> {
+struct ReplaceableRules<'a> {
     rules: &'a [Rule],
     states: Vec<State>,
 }
@@ -69,7 +69,7 @@ enum State {
     NotReplaceable,
 }
 
-impl Replaceable<'_> {
+impl ReplaceableRules<'_> {
     fn is_replaceable(&mut self, rule_id: RuleId) -> bool {
         let RuleId(position) = rule_id;
         match self.states[position] {
@@ -78,13 +78,13 @@ impl Replaceable<'_> {
             State::Unvisited => {}
         }
         self.states[position] = State::Visiting;
-        let mut targets = Vec::new();
-        self.rules[position]
-            .definitions_list
-            .meta_identifiers(&mut |target, _| targets.push(target));
-        let replaceable = targets
-            .into_iter()
-            .all(|target| self.is_replaceable(target));
+        let rules = self.rules;
+        let mut replaceable = true;
+        rules[position]
+            .expression
+            .visit_meta_identifiers(&mut |target, _| {
+                replaceable = replaceable && self.is_replaceable(target);
+            });
         self.states[position] = if replaceable {
             State::Replaceable
         } else {

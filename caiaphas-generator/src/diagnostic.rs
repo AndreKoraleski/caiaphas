@@ -6,7 +6,7 @@ use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
 use crate::span::Span;
 
 /// How serious a diagnostic is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Severity {
     /// The grammar cannot become a parser that works.
     Error,
@@ -22,7 +22,7 @@ pub(crate) struct Label {
 }
 
 /// A diagnostic is one problem in a grammar, where it is, and how to fix it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Diagnostic {
     pub(crate) severity: Severity,
     pub(crate) message: String,

@@ -22,34 +22,15 @@ use crate::{
 /// Returns the grammar `syntax` defines, and every error found while resolving
 /// it.
 ///
-/// The grammar holds every rule, even those with errors, so later checks can
-/// still read the rest.
+/// The grammar holds every rule but the later definitions of a meta
+/// identifier, even rules with errors, so later checks can still read the
+/// rest.
 pub(crate) fn build(syntax: &Syntax) -> (Grammar, Vec<DictionaryError>) {
     let mut errors = Vec::new();
     let index = Index::new(syntax, &mut errors);
     let syntax_rules = lower::lower(&index, &mut errors);
-    let start_syntax_rules = start_rules::start_rules(&syntax_rules);
-    if start_syntax_rules.is_empty() {
-        if let (Some(first), Some(last)) =
-            (syntax_rules.first(), syntax_rules.last())
-        {
-            errors.push(DictionaryError {
-                kind: DictionaryErrorKind::NoStartSyntaxRule,
-                span: first.span.to(last.span),
-            });
-        }
-    }
-    for &RuleId(position) in &start_syntax_rules {
-        let rule = &syntax_rules[position];
-        if rule.hidden {
-            errors.push(DictionaryError {
-                kind: DictionaryErrorKind::HiddenStartSyntaxRule {
-                    meta_identifier: rule.meta_identifier.clone(),
-                },
-                span: rule.span,
-            });
-        }
-    }
+    let start_syntax_rules =
+        start_rules::start_rules(syntax, &syntax_rules, &mut errors);
     syntactic_exception::check(&syntax_rules, &mut errors);
     errors.sort_by_key(|error| error.span.start);
     (
@@ -64,7 +45,7 @@ pub(crate) fn build(syntax: &Syntax) -> (Grammar, Vec<DictionaryError>) {
 /// Maps each meta identifier to the syntax rule that defines it.
 struct Index<'a> {
     /// The syntax rules in the order they are written, without those that
-    /// define a meta identifier again, so a [`RuleId`] is an index.
+    /// define a meta identifier again.
     syntax_rules: Vec<&'a SyntaxRule>,
     rule_ids: HashMap<&'a str, RuleId>,
 }
@@ -129,8 +110,7 @@ pub(crate) enum DictionaryErrorKind {
     /// Every syntax rule is referenced by another, so none can start a parser.
     NoStartSyntaxRule,
     /// A syntactic exception uses a meta identifier whose rule is recursive or
-    /// references a recursive rule, so it could not be replaced by one without
-    /// meta identifiers.
+    /// references a recursive rule.
     RecursiveSyntacticException { meta_identifier: MetaIdentifier },
     /// A hide comes right before a start rule, whose parser has to return its
     /// type.
@@ -264,7 +244,7 @@ pub(crate) mod tests {
             .iter()
             .find(|rule| rule.meta_identifier.as_str() == name)
             .expect("the grammar defines the rule");
-        render_expression(grammar, &rule.definitions_list)
+        render_expression(grammar, &rule.expression)
     }
 
     fn render_expression(
@@ -376,69 +356,45 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn error_displays_every_message() {
+    fn describes_every_error_with_its_help() {
         let cases = [
-            ("a = 'x'; a = 'y';", "`a` is already defined"),
-            ("a = b;", "`b` is not defined"),
-            (
-                "a = b; b = a;",
-                "every syntax rule is referenced by another, so none starts \
-                 the grammar",
-            ),
-            (
-                "s = 'x' - b; b = 'y', [b];",
-                "`b` is or references a recursive rule, so a syntactic \
-                 exception cannot use it",
-            ),
-            (
-                "s = 'x' - b; b = c; c = 'y', [c];",
-                "`b` is or references a recursive rule, so a syntactic \
-                 exception cannot use it",
-            ),
-            (
-                "(* hide *) s = 'x';",
-                "`s` is a start rule, so it cannot be hidden",
-            ),
-        ];
-        for (source, message) in cases {
-            let (_, errors) = grammar(source);
-            assert_eq!(errors[0].to_string(), message, "{source:?}");
-        }
-    }
-
-    #[test]
-    fn turns_every_error_into_a_diagnostic_with_help() {
-        let cases = [
-            (
-                "a = b;",
-                "define `b` with a syntax rule, or correct its spelling",
-            ),
             (
                 "a = 'x'; a = 'y';",
+                "`a` is already defined",
                 "join both definitions into one rule with `|`, or rename one \
                  of them",
             ),
             (
+                "a = b;",
+                "`b` is not defined",
+                "define `b` with a syntax rule, or correct its spelling",
+            ),
+            (
                 "a = b; b = a;",
+                "every syntax rule is referenced by another, so none starts \
+                 the grammar",
                 "add a rule that no other rule references to start the \
                  grammar, such as `grammar = expression;`",
             ),
             (
                 "s = 'x' - b; b = 'y', [b];",
+                "`b` is or references a recursive rule, so a syntactic \
+                 exception cannot use it",
                 "write the exception with terminal strings and special \
                  sequences instead of `b`",
             ),
             (
                 "(* hide *) s = 'x';",
+                "`s` is a start rule, so it cannot be hidden",
                 "remove the `(* hide *)` before it, since its parser returns \
                  its type",
             ),
         ];
-        for (source, help) in cases {
+        for (source, message, help) in cases {
             let (_, errors) = grammar(source);
             let diagnostic = Diagnostic::from(errors[0].clone());
             assert_eq!(diagnostic.severity, Severity::Error, "{source:?}");
-            assert_eq!(diagnostic.message, errors[0].to_string());
+            assert_eq!(diagnostic.message, message, "{source:?}");
             assert_eq!(diagnostic.span, errors[0].span, "{source:?}");
             assert_eq!(diagnostic.help.as_deref(), Some(help), "{source:?}");
         }
@@ -490,10 +446,9 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn matches_meta_identifiers_without_their_gaps() {
-        let syntax = parse_valid("syntax rule = 'x'; a = syntaxrule;");
-        let index = Index::new(&syntax, &mut Vec::new());
-        assert_eq!(names(&index), ["syntaxrule", "a"]);
+    fn resolves_a_meta_identifier_written_with_other_gaps() {
+        let grammar = build_valid("s = syntaxrule; syntax rule = 'x';");
+        assert_eq!(render(&grammar, "s"), "syntaxrule");
     }
 
     #[test]

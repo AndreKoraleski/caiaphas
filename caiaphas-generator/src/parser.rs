@@ -192,7 +192,7 @@ impl<'a> Parser<'a> {
     fn unexpected(&self, expected: Expected) -> ParseError {
         match self.peek() {
             Some(token) => ParseError {
-                kind: ParseErrorKind::Expected(expected),
+                kind: ParseErrorKind::UnexpectedToken(expected),
                 span: token.span,
             },
             None => ParseError {
@@ -234,7 +234,7 @@ pub(crate) enum ParseErrorKind {
     /// The lexer could not read a token.
     Lex(LexErrorKind),
     /// The next token is not what the syntax needs.
-    Expected(Expected),
+    UnexpectedToken(Expected),
     /// The source ends where the syntax needs more.
     UnexpectedEnd(Expected),
     /// The source has no syntax rule at all.
@@ -277,7 +277,7 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             ParseErrorKind::Lex(kind) => kind.fmt(f),
-            ParseErrorKind::Expected(expected) => {
+            ParseErrorKind::UnexpectedToken(expected) => {
                 write!(f, "expected {expected}")
             }
             ParseErrorKind::UnexpectedEnd(expected) => {
@@ -507,7 +507,9 @@ pub(crate) mod tests {
         assert_eq!(
             errors,
             [ParseError {
-                kind: ParseErrorKind::Expected(Expected::MetaIdentifier),
+                kind: ParseErrorKind::UnexpectedToken(
+                    Expected::MetaIdentifier
+                ),
                 span: Span { start: 0, end: 1 },
             }]
         );
@@ -520,7 +522,9 @@ pub(crate) mod tests {
         assert_eq!(
             errors,
             [ParseError {
-                kind: ParseErrorKind::Expected(Expected::DefiningSymbol),
+                kind: ParseErrorKind::UnexpectedToken(
+                    Expected::DefiningSymbol
+                ),
                 span: Span { start: 2, end: 5 },
             }]
         );
@@ -538,7 +542,7 @@ pub(crate) mod tests {
     fn rejects_terms_without_a_concatenate_symbol() {
         assert_eq!(
             kinds("a = b 'c';"),
-            [ParseErrorKind::Expected(Expected::TerminatorSymbol)]
+            [ParseErrorKind::UnexpectedToken(Expected::TerminatorSymbol)]
         );
     }
 
@@ -546,7 +550,7 @@ pub(crate) mod tests {
     fn rejects_a_repetition_count_without_a_repetition_symbol() {
         assert_eq!(
             kinds("a = 3 b;"),
-            [ParseErrorKind::Expected(Expected::RepetitionSymbol)]
+            [ParseErrorKind::UnexpectedToken(Expected::RepetitionSymbol)]
         );
     }
 
@@ -560,7 +564,7 @@ pub(crate) mod tests {
         ] {
             assert_eq!(
                 kinds(source),
-                [ParseErrorKind::Expected(expected)],
+                [ParseErrorKind::UnexpectedToken(expected)],
                 "{source:?}"
             );
         }
@@ -654,7 +658,9 @@ pub(crate) mod tests {
         assert_eq!(
             errors,
             [ParseError {
-                kind: ParseErrorKind::Expected(Expected::EndGroupSymbol),
+                kind: ParseErrorKind::UnexpectedToken(
+                    Expected::EndGroupSymbol
+                ),
                 span: Span { start: 36, end: 37 },
             }]
         );
@@ -776,7 +782,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn reports_no_missing_rules_when_rules_have_errors() {
+    fn leaves_out_no_syntax_rule_when_another_error_explains_it() {
         assert_eq!(
             kinds("@"),
             [ParseErrorKind::Lex(LexErrorKind::CommentlessSymbol(
@@ -793,7 +799,9 @@ pub(crate) mod tests {
         };
         let cases = [
             (
-                error(ParseErrorKind::Expected(Expected::DefiningSymbol)),
+                error(ParseErrorKind::UnexpectedToken(
+                    Expected::DefiningSymbol,
+                )),
                 "expected `=`",
             ),
             (

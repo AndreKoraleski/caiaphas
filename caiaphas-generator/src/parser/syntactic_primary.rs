@@ -11,9 +11,9 @@ use crate::{
     span::Span,
 };
 
-/// A syntactic primary is the smallest part of a definition, such as a
-/// terminal string or a group in brackets.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A syntactic primary is what a syntactic factor repeats, such as a terminal
+/// string or a group in brackets.
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SyntacticPrimary {
     pub(crate) kind: SyntacticPrimaryKind,
     /// An empty sequence has an empty span where it would be.
@@ -21,7 +21,7 @@ pub(crate) struct SyntacticPrimary {
 }
 
 /// What a [`SyntacticPrimary`] is.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum SyntacticPrimaryKind {
     /// Matches the definitions between `[` and `]` once or not at all.
     OptionalSequence(DefinitionsList),
@@ -36,6 +36,9 @@ pub(crate) enum SyntacticPrimaryKind {
     EmptySequence,
 }
 
+/// Makes the kind of a sequence in brackets from what the brackets hold.
+type Bracketed = fn(DefinitionsList) -> SyntacticPrimaryKind;
+
 impl SyntacticPrimary {
     /// Reads a syntactic primary, or an empty sequence if the next token does
     /// not start one.
@@ -44,6 +47,28 @@ impl SyntacticPrimary {
             return Ok(Self::empty(parser));
         };
         let span = token.span;
+        let bracketed: Option<(Symbol, Expected, Bracketed)> =
+            match token.symbol {
+                CommentlessSymbol::Symbol(Symbol::StartOption) => Some((
+                    Symbol::EndOption,
+                    Expected::EndOptionSymbol,
+                    SyntacticPrimaryKind::OptionalSequence,
+                )),
+                CommentlessSymbol::Symbol(Symbol::StartRepeat) => Some((
+                    Symbol::EndRepeat,
+                    Expected::EndRepeatSymbol,
+                    SyntacticPrimaryKind::RepeatedSequence,
+                )),
+                CommentlessSymbol::Symbol(Symbol::StartGroup) => Some((
+                    Symbol::EndGroup,
+                    Expected::EndGroupSymbol,
+                    SyntacticPrimaryKind::GroupedSequence,
+                )),
+                _ => None,
+            };
+        if let Some((end, expected, kind)) = bracketed {
+            return Self::parse_bracketed(parser, span, end, expected, kind);
+        }
         let kind = match &token.symbol {
             CommentlessSymbol::MetaIdentifier(name) => {
                 SyntacticPrimaryKind::MetaIdentifier(name.clone())
@@ -54,54 +79,27 @@ impl SyntacticPrimary {
             CommentlessSymbol::SpecialSequence(sequence) => {
                 SyntacticPrimaryKind::SpecialSequence(sequence.clone())
             }
-            CommentlessSymbol::Symbol(Symbol::StartOption) => {
-                return Self::parse_bracketed(
-                    parser,
-                    span,
-                    Symbol::EndOption,
-                    Expected::EndOptionSymbol,
-                    SyntacticPrimaryKind::OptionalSequence,
-                );
-            }
-            CommentlessSymbol::Symbol(Symbol::StartRepeat) => {
-                return Self::parse_bracketed(
-                    parser,
-                    span,
-                    Symbol::EndRepeat,
-                    Expected::EndRepeatSymbol,
-                    SyntacticPrimaryKind::RepeatedSequence,
-                );
-            }
-            CommentlessSymbol::Symbol(Symbol::StartGroup) => {
-                return Self::parse_bracketed(
-                    parser,
-                    span,
-                    Symbol::EndGroup,
-                    Expected::EndGroupSymbol,
-                    SyntacticPrimaryKind::GroupedSequence,
-                );
-            }
             _ => return Ok(Self::empty(parser)),
         };
         parser.bump();
         Ok(Self { kind, span })
     }
 
-    /// Reads a definitions list between the next token, found at `open`, and
-    /// `close`.
+    /// Reads a definitions list between the next token, found at `start`, and
+    /// the symbol `end`.
     fn parse_bracketed(
         parser: &mut Parser<'_>,
-        open: Span,
-        close: Symbol,
+        start: Span,
+        end: Symbol,
         expected: Expected,
-        kind: fn(DefinitionsList) -> SyntacticPrimaryKind,
+        kind: Bracketed,
     ) -> Result<Self, ParseError> {
         parser.bump();
         let definitions = DefinitionsList::parse(parser)?;
-        let close = parser.expect(close, expected)?;
+        let span = start.to(parser.expect(end, expected)?);
         Ok(Self {
             kind: kind(definitions),
-            span: open.to(close),
+            span,
         })
     }
 

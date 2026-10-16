@@ -18,9 +18,7 @@ pub(super) fn check(
     findings: &mut Vec<Finding>,
 ) {
     for (position, rule) in grammar.syntax_rules.iter().enumerate() {
-        for (target, span) in
-            facts.first_meta_identifiers(&rule.definitions_list)
-        {
+        for (target, span) in facts.first_meta_identifiers(&rule.expression) {
             if target == RuleId(position) {
                 findings.push(Finding {
                     kind: FindingKind::LeftRecursion {

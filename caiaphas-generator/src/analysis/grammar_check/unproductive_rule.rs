@@ -19,7 +19,7 @@ pub(super) fn check(
     findings: &mut Vec<Finding>,
 ) {
     for rule in &grammar.syntax_rules {
-        if !facts.is_productive(&rule.definitions_list) {
+        if !facts.is_productive(&rule.expression) {
             findings.push(Finding {
                 kind: FindingKind::UnproductiveRule {
                     meta_identifier: rule.meta_identifier.clone(),

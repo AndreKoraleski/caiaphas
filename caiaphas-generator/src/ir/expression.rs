@@ -5,7 +5,7 @@ use std::ops::RangeInclusive;
 use crate::{ir::RuleId, span::Span};
 
 /// An expression is what a rule, or part of one, matches.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Expression {
     pub(crate) kind: ExpressionKind,
     /// The part of the syntax it comes from.
@@ -13,7 +13,7 @@ pub(crate) struct Expression {
 }
 
 /// What an [`Expression`] is.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum ExpressionKind {
     /// Matches each expression one after another.
     SingleDefinition(Vec<Expression>),
@@ -83,7 +83,7 @@ impl Expression {
 
     /// Calls `visit` with the rule and span of every meta identifier in this
     /// expression.
-    pub(crate) fn meta_identifiers(
+    pub(crate) fn visit_meta_identifiers(
         &self,
         visit: &mut impl FnMut(RuleId, Span),
     ) {

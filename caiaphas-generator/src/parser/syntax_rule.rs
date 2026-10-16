@@ -11,7 +11,7 @@ use crate::{
 
 /// A syntax rule defines a meta identifier as a definitions list, such as
 /// `digit = '0' | '1';`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SyntaxRule {
     pub(crate) meta_identifier: MetaIdentifier,
     pub(crate) definitions_list: DefinitionsList,

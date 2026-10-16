@@ -15,21 +15,23 @@ use crate::{
 pub(crate) fn compile(source: &str) -> (Option<Grammar>, Vec<Diagnostic>) {
     let (syntax, errors) = parse(source);
     if !errors.is_empty() {
-        return (None, errors.into_iter().map(Diagnostic::from).collect());
+        return (None, diagnostics(errors));
     }
     let (grammar, errors) = build(&syntax);
     if !errors.is_empty() {
-        return (None, errors.into_iter().map(Diagnostic::from).collect());
+        return (None, diagnostics(errors));
     }
-    let diagnostics: Vec<Diagnostic> = analyse(&grammar)
-        .into_iter()
-        .map(Diagnostic::from)
-        .collect();
+    let diagnostics = diagnostics(analyse(&grammar));
     let grammar = diagnostics
         .iter()
         .all(|diagnostic| diagnostic.severity == Severity::Warning)
         .then_some(grammar);
     (grammar, diagnostics)
+}
+
+/// Returns each of `problems` as a diagnostic.
+fn diagnostics<T: Into<Diagnostic>>(problems: Vec<T>) -> Vec<Diagnostic> {
+    problems.into_iter().map(Into::into).collect()
 }
 
 #[cfg(test)]

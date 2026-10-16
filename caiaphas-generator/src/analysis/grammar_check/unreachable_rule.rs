@@ -28,8 +28,8 @@ pub(super) fn check(
         }
         reached[position] = true;
         grammar.syntax_rules[position]
-            .definitions_list
-            .meta_identifiers(&mut |rule_id, _| pending.push(rule_id));
+            .expression
+            .visit_meta_identifiers(&mut |rule_id, _| pending.push(rule_id));
     }
     for (rule, reached) in grammar.syntax_rules.iter().zip(reached) {
         if !reached {

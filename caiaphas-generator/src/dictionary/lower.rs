@@ -34,8 +34,7 @@ impl Lowering<'_, '_> {
     fn syntax_rule(&mut self, syntax_rule: &SyntaxRule) -> Rule {
         Rule {
             meta_identifier: syntax_rule.meta_identifier.clone(),
-            definitions_list: self
-                .definitions_list(&syntax_rule.definitions_list),
+            expression: self.definitions_list(&syntax_rule.definitions_list),
             expectations: syntax_rule.expectations.clone(),
             hidden: syntax_rule.hidden,
             span: syntax_rule.span,
@@ -47,14 +46,14 @@ impl Lowering<'_, '_> {
         &mut self,
         definitions_list: &DefinitionsList,
     ) -> Expression {
-        let mut expressions: Vec<Expression> = definitions_list
-            .single_definitions
+        let definitions = &definitions_list.single_definitions;
+        if let [definition] = definitions.as_slice() {
+            return self.single_definition(definition);
+        }
+        let expressions = definitions
             .iter()
             .map(|definition| self.single_definition(definition))
             .collect();
-        if expressions.len() == 1 {
-            return expressions.remove(0);
-        }
         Expression {
             kind: ExpressionKind::DefinitionsList(expressions),
             span: definitions_list.span,
@@ -66,14 +65,12 @@ impl Lowering<'_, '_> {
         &mut self,
         single_definition: &SingleDefinition,
     ) -> Expression {
-        let mut expressions: Vec<Expression> = single_definition
-            .syntactic_terms
-            .iter()
-            .map(|term| self.syntactic_term(term))
-            .collect();
-        if expressions.len() == 1 {
-            return expressions.remove(0);
+        let terms = &single_definition.syntactic_terms;
+        if let [term] = terms.as_slice() {
+            return self.syntactic_term(term);
         }
+        let expressions =
+            terms.iter().map(|term| self.syntactic_term(term)).collect();
         Expression {
             kind: ExpressionKind::SingleDefinition(expressions),
             span: single_definition.span,
@@ -101,7 +98,9 @@ impl Lowering<'_, '_> {
     }
 
     /// A factor repeated no times becomes an empty sequence, and one repeated
-    /// once, or without an integer, becomes its syntactic primary.
+    /// once, or without an integer, becomes its syntactic primary. The primary
+    /// is lowered even when it is dropped, so its undefined meta identifiers
+    /// are still reported.
     fn syntactic_factor(
         &mut self,
         syntactic_factor: &SyntacticFactor,
@@ -247,7 +246,7 @@ mod tests {
     fn keeps_the_span_of_a_grouped_sequence() {
         let (grammar, _) = grammar("a = ('x');");
         assert_eq!(
-            grammar.syntax_rules[0].definitions_list.span,
+            grammar.syntax_rules[0].expression.span,
             Span { start: 4, end: 9 }
         );
         assert_eq!(grammar.syntax_rules[0].span, Span { start: 0, end: 10 });

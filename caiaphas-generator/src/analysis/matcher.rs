@@ -94,7 +94,7 @@ fn texts_within(
             let RuleId(position) = *rule_id;
             let found = texts_within(
                 grammar,
-                &grammar.syntax_rules[position].definitions_list,
+                &grammar.syntax_rules[position].expression,
                 entered,
             );
             entered.pop();
@@ -165,7 +165,7 @@ impl Matcher<'_> {
             ExpressionKind::MetaIdentifier(RuleId(rule)) => {
                 let grammar = self.grammar;
                 return self.longest(
-                    &grammar.syntax_rules[*rule].definitions_list,
+                    &grammar.syntax_rules[*rule].expression,
                     position,
                 );
             }
@@ -248,14 +248,13 @@ mod tests {
     /// Returns whether the first rule of `source` matches all of `text`.
     fn first_rule_matches(source: &str, text: &str) -> Option<bool> {
         let grammar = build_valid(source);
-        matches_all(&grammar, &grammar.syntax_rules[0].definitions_list, text)
+        matches_all(&grammar, &grammar.syntax_rules[0].expression, text)
     }
 
     /// Returns the texts the first rule of `source` can match, sorted.
     fn first_rule_texts(source: &str) -> Option<Vec<String>> {
         let grammar = build_valid(source);
-        let mut found =
-            texts(&grammar, &grammar.syntax_rules[0].definitions_list)?;
+        let mut found = texts(&grammar, &grammar.syntax_rules[0].expression)?;
         found.sort();
         Some(found)
     }

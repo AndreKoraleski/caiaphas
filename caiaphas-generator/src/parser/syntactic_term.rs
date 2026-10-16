@@ -8,7 +8,7 @@ use crate::{
 
 /// A syntactic term is a syntactic factor, minus what a syntactic exception
 /// matches if one follows a `-`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SyntacticTerm {
     pub(crate) syntactic_factor: SyntacticFactor,
     /// The standard restricts a syntactic exception to factors that could be

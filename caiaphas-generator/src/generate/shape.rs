@@ -53,7 +53,7 @@ pub(crate) fn shapes(grammar: &Grammar) -> Vec<Option<Shape>> {
     let mut shapes: Vec<Shape> = grammar
         .syntax_rules
         .iter()
-        .map(|rule| shape(grammar, &rule.definitions_list))
+        .map(|rule| shape(grammar, &rule.expression))
         .collect();
     box_cycles(&mut shapes);
     let reached = reached(grammar, &shapes);

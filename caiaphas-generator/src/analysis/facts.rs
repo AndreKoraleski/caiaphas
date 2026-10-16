@@ -107,7 +107,7 @@ impl<'a> Facts<'a> {
     pub(crate) fn walk(&self, visit: &mut impl FnMut(&Expression, &Follow)) {
         for (position, rule) in self.grammar.syntax_rules.iter().enumerate() {
             let after = &self.follow_rules()[position];
-            self.walk_expression(&rule.definitions_list, after, visit);
+            self.walk_expression(&rule.expression, after, visit);
         }
     }
 
@@ -242,7 +242,7 @@ impl<'a> Facts<'a> {
         while changed {
             changed = false;
             for (position, rule) in rules.iter().enumerate() {
-                let next = value(&rule.definitions_list, &values);
+                let next = value(&rule.expression, &values);
                 if next != values[position] {
                     values[position] = next;
                     changed = true;
@@ -285,7 +285,7 @@ impl<'a> Facts<'a> {
                 for (position, rule) in rules.iter().enumerate() {
                     let rule_after = sets[position].clone();
                     self.walk_expression(
-                        &rule.definitions_list,
+                        &rule.expression,
                         &rule_after,
                         &mut |expression, after| {
                             let ExpressionKind::MetaIdentifier(rule_id) =
@@ -455,7 +455,7 @@ fn rule_characters(
     }
     states[position] = Characters::Visiting;
     let characters = single_characters_with(
-        &rules[position].definitions_list,
+        &rules[position].expression,
         &mut |RuleId(target)| rule_characters(rules, states, target),
     );
     states[position] = Characters::Known(characters.clone());
@@ -518,7 +518,7 @@ mod tests {
     use crate::dictionary::tests::build_valid;
 
     fn rule(grammar: &Grammar, position: usize) -> &Expression {
-        &grammar.syntax_rules[position].definitions_list
+        &grammar.syntax_rules[position].expression
     }
 
     #[test]

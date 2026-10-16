@@ -20,8 +20,8 @@ pub(super) fn check(
     findings: &mut Vec<Finding>,
 ) {
     for rule in &grammar.syntax_rules {
-        if facts.is_nullable(&rule.definitions_list)
-            && facts.first(&rule.definitions_list).is_empty()
+        if facts.is_nullable(&rule.expression)
+            && facts.first(&rule.expression).is_empty()
         {
             findings.push(Finding {
                 kind: FindingKind::EmptyRule {

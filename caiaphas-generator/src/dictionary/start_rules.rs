@@ -1,24 +1,56 @@
 //! Start rules are the rules a generated parser can start from.
 
-use crate::ir::{Rule, RuleId};
+use crate::{
+    dictionary::{DictionaryError, DictionaryErrorKind},
+    ir::{Rule, RuleId},
+    parser::Syntax,
+};
 
-/// Returns every rule that no other rule references.
+/// Returns every rule that no other rule references, and reports a grammar
+/// without one and a start rule that is hidden. `rules` are the rules of
+/// `syntax`.
 ///
 /// A rule that only references itself is still a start rule.
-pub(super) fn start_rules(rules: &[Rule]) -> Vec<RuleId> {
+pub(super) fn start_rules(
+    syntax: &Syntax,
+    rules: &[Rule],
+    errors: &mut Vec<DictionaryError>,
+) -> Vec<RuleId> {
     let mut referenced = vec![false; rules.len()];
     for (position, rule) in rules.iter().enumerate() {
-        rule.definitions_list
-            .meta_identifiers(&mut |RuleId(target), _| {
+        rule.expression
+            .visit_meta_identifiers(&mut |RuleId(target), _| {
                 if target != position {
                     referenced[target] = true;
                 }
             });
     }
-    (0..rules.len())
+    let start_rules: Vec<RuleId> = (0..rules.len())
         .filter(|&position| !referenced[position])
         .map(RuleId)
-        .collect()
+        .collect();
+    if start_rules.is_empty() {
+        if let (Some(first), Some(last)) =
+            (syntax.syntax_rules.first(), syntax.syntax_rules.last())
+        {
+            errors.push(DictionaryError {
+                kind: DictionaryErrorKind::NoStartSyntaxRule,
+                span: first.span.to(last.span),
+            });
+        }
+    }
+    for &RuleId(position) in &start_rules {
+        let rule = &rules[position];
+        if rule.hidden {
+            errors.push(DictionaryError {
+                kind: DictionaryErrorKind::HiddenStartSyntaxRule {
+                    meta_identifier: rule.meta_identifier.clone(),
+                },
+                span: rule.span,
+            });
+        }
+    }
+    start_rules
 }
 
 #[cfg(test)]

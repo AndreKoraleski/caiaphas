@@ -8,7 +8,7 @@ use crate::{
 
 /// A single definition is one or more syntactic terms joined by `,`. They
 /// match one after another.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SingleDefinition {
     pub(crate) syntactic_terms: Vec<SyntacticTerm>,
     pub(crate) span: Span,

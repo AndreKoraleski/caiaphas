@@ -25,7 +25,7 @@ pub(super) fn check(
     let first: Vec<Vec<(RuleId, Span)>> = grammar
         .syntax_rules
         .iter()
-        .map(|rule| facts.first_meta_identifiers(&rule.definitions_list))
+        .map(|rule| facts.first_meta_identifiers(&rule.expression))
         .collect();
     for (position, rule) in grammar.syntax_rules.iter().enumerate() {
         for &(target, span) in &first[position] {
