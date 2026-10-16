@@ -67,7 +67,8 @@ mod tests {
 
     #[test]
     fn returns_a_grammar_with_its_warnings() {
-        let (grammar, diagnostics) = compile("a = ['xy'], 'x';", false);
+        let (grammar, diagnostics) =
+            compile("(* greedy *) a = ['xy'], 'x';", false);
         assert!(grammar.is_some());
         assert_eq!(severities(&diagnostics), [Severity::Warning]);
         assert_eq!(

@@ -1,7 +1,4 @@
 (* Sequences that read a `z` before they find they do not match. *)
-(* expect optional-follow-conflict: the sequence reads a `z` and goes back *)
 maybe = [z, 'x'], z;
-(* expect repeated-follow-conflict: the last round reads a `z` and goes
-   back *)
 several = {z, 'x'}, z;
 z = 'z';

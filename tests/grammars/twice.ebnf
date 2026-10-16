@@ -1,4 +1,3 @@
 (* Two runs, then a `b` that the last run leaves. *)
 twice = 2 * run, 'b';
-(* expect repeated-follow-conflict: a run leaves what comes after it *)
 run = 'a', {'b'};

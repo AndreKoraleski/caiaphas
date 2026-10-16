@@ -2,12 +2,13 @@
 //! alternative of the same choice ends, with characters that can also come
 //! after the choice, such as `'x', 'y'` in `s = ('x' | 'x', 'y'), 'y';`.
 //!
-//! A parser takes the alternative that matches the most, so it takes the
+//! A greedy rule takes the alternative that matches the most, so it takes the
 //! longer one whenever it can, even when what comes after the choice needed
-//! the shorter one. It is the follow conflict of an optional sequence, since
-//! `a | a, b` matches like `a, [b]`. A rule that takes the first match never
-//! takes a longer alternative written after the shorter one, so only one
-//! written before it counts there.
+//! the shorter one. Every other rule tries both, so only a greedy rule reports
+//! it. It is the follow conflict of an optional sequence, since `a | a, b`
+//! matches like `a, [b]`. A rule that takes the first match never takes a
+//! longer alternative written after the shorter one, so only one written
+//! before it counts there.
 
 use crate::{
     analysis::{
@@ -19,15 +20,18 @@ use crate::{
     ir::{Expression, ExpressionKind, Grammar, RuleId},
 };
 
-/// Reports every alternative that goes on from where another alternative of
-/// the same definitions list ends, with characters that can come after the
-/// list.
+/// Reports every alternative of a greedy rule that goes on from where another
+/// alternative of the same definitions list ends, with characters that can
+/// come after the list.
 pub(super) fn check(
     grammar: &Grammar,
     facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
     for (position, rule) in grammar.syntax_rules.iter().enumerate() {
+        if !rule.greedy {
+            continue;
+        }
         facts.walk_rule(RuleId(position), &mut |expression, after| {
             let ExpressionKind::DefinitionsList(alternatives) =
                 &expression.kind
@@ -86,13 +90,16 @@ pub(super) fn rest_after<'e>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        analysis::{finding::FindingCode, tests::findings_with},
+        analysis::{finding::FindingCode, tests::greedy_findings},
         span::Span,
     };
 
     fn conflicts(source: &str) -> Vec<(String, Span, Span)> {
-        findings_with(source, FindingCode::LongerBranchConflict)
+        greedy_findings(source)
             .into_iter()
+            .filter(|finding| {
+                finding.kind.code() == FindingCode::LongerBranchConflict
+            })
             .map(|finding| {
                 (
                     finding.kind.to_string(),

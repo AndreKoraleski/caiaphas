@@ -60,14 +60,12 @@ fn accepts_arithmetic_with_repetition_for_each_operator() {
 }
 
 #[test]
-fn accepts_lambda_calculus_that_expects_bodies_to_extend_right() {
+fn accepts_lambda_calculus_whose_bodies_extend_right() {
     let source = r"
         program     = term;
         term        = abstraction | application;
         abstraction = lambda, variable, '.', term;
         lambda      = '\' | ? U+03BB ?;
-        (* expect repeated-follow-conflict: the body of an abstraction
-           extends as far right as it can *)
         application = atom, {' ', argument};
         argument    = atom | abstraction;
         atom        = variable | '(', term, ')';
@@ -79,9 +77,10 @@ fn accepts_lambda_calculus_that_expects_bodies_to_extend_right() {
 }
 
 #[test]
-fn finds_the_dangling_else() {
+fn finds_the_dangling_else_of_a_greedy_rule() {
     let source = "
         program = statement;
+        (* greedy *)
         statement = 'if', 'c', 'then', statement, ['else', statement] | 'x';
     ";
     assert_eq!(
@@ -95,11 +94,12 @@ fn finds_the_dangling_else() {
 }
 
 #[test]
-fn finds_whitespace_that_two_rules_can_both_read() {
+fn finds_whitespace_that_two_rules_can_both_read_in_a_greedy_rule() {
     let source = "
         json = value;
         value = '{', ws, [members], ws, '}' | 'n';
         members = value, {',', value};
+        (* greedy *)
         ws = {' '};
     ";
     assert_eq!(

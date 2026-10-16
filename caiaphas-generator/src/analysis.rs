@@ -59,6 +59,16 @@ mod tests {
         analyse(&build_valid(source))
     }
 
+    /// Returns the findings about the grammar `source` defines with every rule
+    /// greedy, as a parser that takes each way as it comes reads it.
+    pub(super) fn greedy_findings(source: &str) -> Vec<Finding> {
+        let mut grammar = build_valid(source);
+        for rule in &mut grammar.syntax_rules {
+            rule.greedy = true;
+        }
+        analyse(&grammar)
+    }
+
     /// Returns the findings with `code` about the grammar `source` defines.
     pub(super) fn findings_with(
         source: &str,

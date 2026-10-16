@@ -63,7 +63,7 @@ const CASES: &[Case] = &[
                the first written of those that tie",
     },
     Case {
-        source: "s = ('x' | 'x', 'y'), 'y';",
+        source: "(* greedy *) s = ('x' | 'x', 'y'), 'y';",
         code: FindingCode::LongerBranchConflict,
         severity: Severity::Warning,
         message: "this branch goes on from where another ends with 'y', \
@@ -76,7 +76,7 @@ const CASES: &[Case] = &[
                matches",
     },
     Case {
-        source: "a = ['xy'], 'x';",
+        source: "(* greedy *) a = ['xy'], 'x';",
         code: FindingCode::OptionalFollowConflict,
         severity: Severity::Warning,
         message: "this optional sequence and what comes after it can both \
@@ -89,7 +89,7 @@ const CASES: &[Case] = &[
                matches, as usual for a dangling else",
     },
     Case {
-        source: "a = {'xy'}, 'x';",
+        source: "(* greedy *) a = {'xy'}, 'x';",
         code: FindingCode::RepeatedFollowConflict,
         severity: Severity::Warning,
         message: "this repeated sequence and what comes after it can both \
@@ -103,7 +103,7 @@ const CASES: &[Case] = &[
                as it can",
     },
     Case {
-        source: "a = ['x'], 'x';",
+        source: "(* greedy *) a = ['x'], 'x';",
         code: FindingCode::RequiredOptionalSequence,
         severity: Severity::Warning,
         message: "this optional sequence takes every character that can \
@@ -115,7 +115,7 @@ const CASES: &[Case] = &[
                rule, and the grammar stays as it is",
     },
     Case {
-        source: "a = {'x'}, 'x';",
+        source: "(* greedy *) a = {'x'}, 'x';",
         code: FindingCode::DeadEndRepeatedSequence,
         severity: Severity::Warning,
         message: "this repeated sequence takes every character that can \

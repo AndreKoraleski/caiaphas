@@ -5,7 +5,9 @@
 //!
 //! LL(1) parsing calls this a FIRST/FOLLOW conflict. A parser that sees one of
 //! those characters cannot tell from it alone whether to take the sequence, or
-//! whether to repeat it again, so it takes the sequence whenever it matches.
+//! whether to repeat it again. A greedy rule takes the sequence whenever it
+//! matches, so only a greedy rule reports it, since every other rule tries
+//! both ways.
 //!
 //! When the sequence only ever matches one character, it can take every
 //! character that can come after it, and the input cannot end there, the
@@ -18,10 +20,13 @@ use crate::analysis::{
     finding::{Finding, FindingKind},
 };
 
-/// Reports every optional or repeated sequence that can start with what can
-/// come right after it. A sequence that can match nothing is left to the
-/// nullable branches check.
+/// Reports every optional or repeated sequence of a greedy rule that can start
+/// with what can come right after it. A sequence that can match nothing is
+/// left to the nullable branches check.
 pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
+    if !choice_point.greedy {
+        return;
+    }
     // What the sequence is reported as when it can start like what follows it,
     // and when it takes everything that follows it.
     let (conflict, takes_all): (fn(CharacterSet) -> FindingKind, _) =
@@ -71,12 +76,12 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
 #[cfg(test)]
 mod tests {
     use crate::{
-        analysis::{finding::FindingKind, tests::findings},
+        analysis::{finding::FindingKind, tests::greedy_findings},
         span::Span,
     };
 
     fn conflicts(source: &str) -> Vec<(String, Span)> {
-        findings(source)
+        greedy_findings(source)
             .into_iter()
             .filter_map(|finding| match finding.kind {
                 FindingKind::OptionalFollowConflict { characters } => {

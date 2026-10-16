@@ -7,9 +7,8 @@
 //! kebab case, then a colon and the reason:
 //!
 //! ```text
-//! (* expect repeated-follow-conflict: the body of an abstraction extends as
-//!    far right as it can *)
-//! application = atom, {' ', argument};
+//! (* expect tied-branches: a keyword is never a name *)
+//! word = keyword | name;
 //! ```
 //!
 //! A hide, written `(* hide *)`, leaves the rule out of the types generated

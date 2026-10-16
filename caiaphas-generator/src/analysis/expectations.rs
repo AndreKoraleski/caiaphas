@@ -57,11 +57,13 @@ pub(super) fn apply(grammar: &Grammar, findings: &mut Vec<Finding>) {
 mod tests {
     use crate::analysis::{
         finding::{FindingCode, FindingKind},
-        tests::findings,
+        tests::{findings, greedy_findings},
     };
 
+    /// Returns the codes found in the grammar `source` with every rule greedy,
+    /// so a parser misses what a greedy one does.
     fn codes(source: &str) -> Vec<&'static str> {
-        findings(source)
+        greedy_findings(source)
             .iter()
             .map(|finding| finding.kind.code().name())
             .collect()

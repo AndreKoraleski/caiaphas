@@ -280,11 +280,11 @@ mod tests {
 
     #[test]
     fn stops_at_warnings_the_grammar_does_not_expect() {
-        assert_eq!(problems("s = ['xy'], 'x';").len(), 1);
+        assert_eq!(problems("(* greedy *) s = ['xy'], 'x';").len(), 1);
         assert_eq!(
             problems(
                 "(* expect optional-follow-conflict: taken when it can be *) \
-                 s = ['xy'], 'x';"
+                 (* greedy *) s = ['xy'], 'x';"
             ),
             Vec::<String>::new()
         );

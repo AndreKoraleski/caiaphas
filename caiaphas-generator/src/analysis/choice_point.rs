@@ -15,6 +15,8 @@ pub(crate) struct ChoicePoint {
     pub(crate) branches: Vec<Branch>,
     /// Whether the input can end right after the choice point.
     pub(crate) end_of_input: bool,
+    /// Whether its rule takes each way as it comes.
+    pub(crate) greedy: bool,
 }
 
 /// What makes a [`ChoicePoint`].
@@ -142,6 +144,7 @@ fn visit_choice_points<'a>(
                 span: expression.span,
                 branches,
                 end_of_input: after.end_of_input,
+                greedy: rule.greedy,
             };
             visit(expression, choice_point);
         });
