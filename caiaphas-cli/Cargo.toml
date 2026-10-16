@@ -4,16 +4,20 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = """
-The caiaphas command, which checks ISO/IEC 14977 EBNF grammars and suggests \
-how to make their parsers faster"""
+Command that checks ISO/IEC 14977 EBNF grammars for caiaphas and explains \
+each finding"""
 license.workspace = true
 repository.workspace = true
 keywords = ["ebnf", "grammar", "parser-generator", "iso-14977", "cli"]
 categories = ["command-line-utilities", "parsing"]
+# The command has no library, so its docs are the findings it explains.
+documentation = "https://docs.rs/caiaphas-generator/latest/caiaphas_generator/findings/"
 
 [[bin]]
 name = "caiaphas"
 path = "src/main.rs"
+# Its docs would take the place of those of the caiaphas library.
+doc = false
 
 [dependencies]
 caiaphas-generator.workspace = true
