@@ -37,6 +37,7 @@ impl Lowering<'_, '_> {
             definitions_list: self
                 .definitions_list(&syntax_rule.definitions_list),
             expectations: syntax_rule.expectations.clone(),
+            hidden: syntax_rule.hidden,
             span: syntax_rule.span,
         }
     }
@@ -250,6 +251,17 @@ mod tests {
             Span { start: 4, end: 9 }
         );
         assert_eq!(grammar.syntax_rules[0].span, Span { start: 0, end: 10 });
+    }
+
+    #[test]
+    fn keeps_which_rules_are_hidden() {
+        let (grammar, _) = grammar("s = ws, 'x'; (* hide *) ws = {' '};");
+        let hidden: Vec<bool> = grammar
+            .syntax_rules
+            .iter()
+            .map(|rule| rule.hidden)
+            .collect();
+        assert_eq!(hidden, [false, true]);
     }
 
     #[test]

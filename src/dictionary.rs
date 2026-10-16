@@ -39,6 +39,17 @@ pub(crate) fn build(syntax: &Syntax) -> (Grammar, Vec<DictionaryError>) {
             });
         }
     }
+    for &RuleId(position) in &start_syntax_rules {
+        let rule = &syntax_rules[position];
+        if rule.hidden {
+            errors.push(DictionaryError {
+                kind: DictionaryErrorKind::HiddenStartSyntaxRule {
+                    meta_identifier: rule.meta_identifier.clone(),
+                },
+                span: rule.span,
+            });
+        }
+    }
     syntactic_exception::check(&syntax_rules, &mut errors);
     errors.sort_by_key(|error| error.span.start);
     (
@@ -121,6 +132,9 @@ pub(crate) enum DictionaryErrorKind {
     /// references a recursive rule, so it could not be replaced by one without
     /// meta identifiers.
     RecursiveSyntacticException { meta_identifier: MetaIdentifier },
+    /// A hide comes right before a start rule, whose parser has to return its
+    /// type.
+    HiddenStartSyntaxRule { meta_identifier: MetaIdentifier },
 }
 
 impl fmt::Display for DictionaryError {
@@ -149,6 +163,13 @@ impl fmt::Display for DictionaryError {
                  exception cannot use it",
                 meta_identifier.as_str()
             ),
+            DictionaryErrorKind::HiddenStartSyntaxRule { meta_identifier } => {
+                write!(
+                    f,
+                    "`{}` is a start rule, so it cannot be hidden",
+                    meta_identifier.as_str()
+                )
+            }
         }
     }
 }
@@ -184,6 +205,11 @@ impl DictionaryError {
                  sequences instead of `{}`",
                 meta_identifier.as_str()
             ),
+            DictionaryErrorKind::HiddenStartSyntaxRule { .. } => {
+                "remove the `(* hide *)` before it, since its parser returns \
+                 its type"
+                    .to_owned()
+            }
         }
     }
 }
@@ -330,6 +356,7 @@ pub(crate) mod tests {
                 DictionaryErrorKind::RecursiveSyntacticException {
                     ..
                 } => "recursive",
+                DictionaryErrorKind::HiddenStartSyntaxRule { .. } => "hidden",
             })
             .collect();
         assert_eq!(kinds, ["undefined", "duplicate", "recursive"]);
@@ -369,6 +396,10 @@ pub(crate) mod tests {
                 "`b` is or references a recursive rule, so a syntactic \
                  exception cannot use it",
             ),
+            (
+                "(* hide *) s = 'x';",
+                "`s` is a start rule, so it cannot be hidden",
+            ),
         ];
         for (source, message) in cases {
             let (_, errors) = grammar(source);
@@ -397,6 +428,11 @@ pub(crate) mod tests {
                 "s = 'x' - b; b = 'y', [b];",
                 "write the exception with terminal strings and special \
                  sequences instead of `b`",
+            ),
+            (
+                "(* hide *) s = 'x';",
+                "remove the `(* hide *)` before it, since its parser returns \
+                 its type",
             ),
         ];
         for (source, help) in cases {

@@ -17,6 +17,8 @@ pub(crate) struct Rule {
     pub(crate) definitions_list: Expression,
     /// The findings the rule marks as intended.
     pub(crate) expectations: Vec<Expectation>,
+    /// Whether a hide leaves the rule out of the generated types.
+    pub(crate) hidden: bool,
     /// The syntax rule it comes from.
     pub(crate) span: Span,
 }
