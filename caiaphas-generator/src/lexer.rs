@@ -57,22 +57,33 @@ impl<'a> Lexer<'a> {
     fn skip_gaps_and_comments(&mut self) -> Result<(), LexError> {
         loop {
             self.position += gap_separator::length(self.rest());
-            match bracketed_textual_comment::length(self.rest()) {
+            match bracketed_textual_comment::length_or_failure(self.rest()) {
                 Ok(length) => {
                     let span = self.advance(length);
                     self.comments.push(span);
                 }
-                Err(
+                Err((
                     ParseBracketedTextualCommentError::NoStartCommentSymbol,
-                ) => {
+                    _,
+                )) => {
                     return Ok(());
                 }
-                Err(error) => {
+                Err((error, offset)) => {
+                    let start = self.position;
                     let length = comment_recovery_length(self.rest());
-                    return Err(self.skip(
+                    let mut skipped = self.skip(
                         LexErrorKind::BracketedTextualComment(error),
                         length,
-                    ));
+                    );
+                    // A quote or `?` that starts nothing valid is where the
+                    // comment goes wrong, so the error points at it.
+                    if error.is_about_a_part() {
+                        skipped.span = Span {
+                            start: start + offset,
+                            end: start + offset + 1,
+                        };
+                    }
+                    return Err(skipped);
                 }
             }
         }
@@ -505,8 +516,8 @@ mod tests {
     }
 
     #[test]
-    fn goes_on_after_the_end_of_a_broken_comment() {
-        assert_eq!(outline("(* don't *) a"), [Err("(* don't *)"), Ok("a")]);
+    fn goes_on_after_a_broken_comment_and_points_at_its_quote() {
+        assert_eq!(outline("(* don't *) a"), [Err("'"), Ok("a")]);
         assert_eq!(
             outline("(* (* é *) *) a"),
             [Err("(* (* é *) *)"), Ok("a")]

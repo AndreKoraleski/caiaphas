@@ -18,22 +18,36 @@ use crate::lexer::{
 /// special sequences inside a comment are read as such, so the `*)` in
 /// `(* '*)' *)` does not end it, and a `'` in `(* don't *)` starts a terminal
 /// string that has no closing quote.
+#[cfg(test)]
 pub(crate) fn length(
     input: &str,
 ) -> Result<usize, ParseBracketedTextualCommentError> {
+    length_or_failure(input).map_err(|(error, _)| error)
+}
+
+/// Returns how long the bracketed textual comment at the start of `input` is,
+/// as [`length`] does, or why it cannot be read and where in it that is.
+pub(crate) fn length_or_failure(
+    input: &str,
+) -> Result<usize, (ParseBracketedTextualCommentError, usize)> {
     if !input.starts_with("(*") {
-        return Err(ParseBracketedTextualCommentError::NoStartCommentSymbol);
+        return Err((
+            ParseBracketedTextualCommentError::NoStartCommentSymbol,
+            0,
+        ));
     }
     let mut depth = 1;
     let mut total = 2;
     loop {
         total += gap_separator::length(&input[total..]);
         let after = &input[total..];
+        let failed = |error| (error, total);
         let (character, size) = TerminalCharacter::read_first(
             after,
             ParseBracketedTextualCommentError::NoEndCommentSymbol,
             ParseBracketedTextualCommentError::InvalidCharacter,
-        )?;
+        )
+        .map_err(failed)?;
         total += match character {
             TerminalCharacter::Symbol(Symbol::StartComment) => {
                 depth += 1;
@@ -48,12 +62,17 @@ pub(crate) fn length(
             }
             TerminalCharacter::Symbol(
                 Symbol::FirstQuote | Symbol::SecondQuote,
-            ) => terminal_string::length(after)
-                .map_err(ParseBracketedTextualCommentError::TerminalString)?,
+            ) => terminal_string::length(after).map_err(|error| {
+                failed(ParseBracketedTextualCommentError::TerminalString(
+                    error,
+                ))
+            })?,
             TerminalCharacter::Symbol(Symbol::SpecialSequence) => {
-                special_sequence::length(after).map_err(
-                    ParseBracketedTextualCommentError::SpecialSequence,
-                )?
+                special_sequence::length(after).map_err(|error| {
+                    failed(ParseBracketedTextualCommentError::SpecialSequence(
+                        error,
+                    ))
+                })?
             }
             _ => size,
         };
@@ -105,6 +124,12 @@ impl fmt::Display for ParseBracketedTextualCommentError {
 }
 
 impl ParseBracketedTextualCommentError {
+    /// Returns whether the error is about a quote or `?` inside the comment,
+    /// rather than the comment as a whole.
+    pub(crate) fn is_about_a_part(self) -> bool {
+        matches!(self, Self::TerminalString(_) | Self::SpecialSequence(_))
+    }
+
     /// Returns how to fix the comment, when there is a usual way.
     pub(crate) fn help(self) -> Option<String> {
         match self {
