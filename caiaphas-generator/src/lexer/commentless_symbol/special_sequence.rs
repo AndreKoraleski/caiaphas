@@ -16,7 +16,7 @@ use crate::lexer::{
 /// A special sequence stands for any one character in its range.
 ///
 /// A single code point is a range from that code point to itself.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SpecialSequence(RangeInclusive<char>);
 
 impl SpecialSequence {
@@ -28,7 +28,13 @@ impl SpecialSequence {
     pub(crate) fn read(
         input: &str,
     ) -> Result<(Self, usize), ParseSpecialSequenceError> {
-        let (content, length) = read_content(input)?;
+        let length = length(input)?;
+        // Between the `?`, every character that is not part of a gap is a
+        // graphic ASCII character.
+        let content: String = input[1..length - 1]
+            .chars()
+            .filter(char::is_ascii_graphic)
+            .collect();
         Ok((Self(parse_range(&content)?), length))
     }
 
@@ -39,21 +45,11 @@ impl SpecialSequence {
 }
 
 /// Returns how long the special sequence at the start of `input` is, `?`
-/// included, without reading what is between the `?`.
-pub(crate) fn length(input: &str) -> Result<usize, ParseSpecialSequenceError> {
-    read_content(input).map(|(_, length)| length)
-}
-
-/// Returns the special sequence characters between the `?` at the start of
-/// `input` without their gaps, and how long the special sequence is, `?`
 /// included.
-fn read_content(
-    input: &str,
-) -> Result<(String, usize), ParseSpecialSequenceError> {
+pub(crate) fn length(input: &str) -> Result<usize, ParseSpecialSequenceError> {
     if !input.starts_with('?') {
         return Err(ParseSpecialSequenceError::NoOpeningSymbol);
     }
-    let mut content = String::new();
     let mut length = 1;
     loop {
         length += gap_separator::length(&input[length..]);
@@ -62,11 +58,11 @@ fn read_content(
             ParseSpecialSequenceError::NoClosingSymbol,
             ParseSpecialSequenceError::InvalidCharacter,
         )?;
-        // No two-character symbol ends in a `?`.
+        // No two-character symbol holds a `?`, so going by terminal characters
+        // cannot pass the closing one.
         if character == TerminalCharacter::Symbol(Symbol::SpecialSequence) {
-            return Ok((content, length + 1));
+            return Ok(length + 1);
         }
-        content.push_str(&input[length..length + size]);
         length += size;
     }
 }
@@ -100,7 +96,7 @@ fn parse_code_point(text: &str) -> Result<char, ParseSpecialSequenceError> {
         })
         .ok_or(ParseSpecialSequenceError::Unsupported)?;
     let value = u32::from_str_radix(digits, 16)
-        .map_err(|_| ParseSpecialSequenceError::Unsupported)?;
+        .expect("six hexadecimal digits fit in a u32");
     char::from_u32(value)
         .ok_or(ParseSpecialSequenceError::NotAScalarValue(value))
 }

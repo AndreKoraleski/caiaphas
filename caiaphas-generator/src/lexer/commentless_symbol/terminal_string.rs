@@ -11,7 +11,7 @@ use crate::lexer::terminal_character::TerminalCharacter;
 ///
 /// The quotes are not part of it, so `'a'` and `"a"` are the same terminal
 /// string.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TerminalString(String);
 
 impl TerminalString {
@@ -20,32 +20,40 @@ impl TerminalString {
     pub(crate) fn read(
         input: &str,
     ) -> Result<(Self, usize), ParseTerminalStringError> {
-        let is_content = match input.chars().next() {
-            Some('\'') => TerminalCharacter::is_first_terminal_character,
-            Some('"') => TerminalCharacter::is_second_terminal_character,
-            _ => return Err(ParseTerminalStringError::NoOpeningQuote),
-        };
-        let mut length = 1;
-        loop {
-            let (character, size) = TerminalCharacter::read_first(
-                &input[length..],
-                ParseTerminalStringError::NoClosingQuote,
-                ParseTerminalStringError::InvalidCharacter,
-            )?;
-            // No two-character symbol ends in a quote.
-            if !is_content(character) {
-                if length == 1 {
-                    return Err(ParseTerminalStringError::Empty);
-                }
-                return Ok((Self(input[1..length].to_owned()), length + 1));
-            }
-            length += size;
-        }
+        let length = length(input)?;
+        Ok((Self(input[1..length - 1].to_owned()), length))
     }
 
     /// Returns the characters between the quotes.
     pub(crate) fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+/// Returns how long the terminal string at the start of `input` is, quotes
+/// included.
+pub(crate) fn length(input: &str) -> Result<usize, ParseTerminalStringError> {
+    let is_content = match input.chars().next() {
+        Some('\'') => TerminalCharacter::is_first_terminal_character,
+        Some('"') => TerminalCharacter::is_second_terminal_character,
+        _ => return Err(ParseTerminalStringError::NoOpeningQuote),
+    };
+    let mut length = 1;
+    loop {
+        let (character, size) = TerminalCharacter::read_first(
+            &input[length..],
+            ParseTerminalStringError::NoClosingQuote,
+            ParseTerminalStringError::InvalidCharacter,
+        )?;
+        // No two-character symbol holds a quote, so going by terminal
+        // characters cannot pass the closing one.
+        if !is_content(character) {
+            if length == 1 {
+                return Err(ParseTerminalStringError::Empty);
+            }
+            return Ok(length + 1);
+        }
+        length += size;
     }
 }
 
@@ -120,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn holds_symbols_without_reading_them() {
+    fn holds_two_character_symbols() {
         for content in ["(*", "*)", "(/", "/)", "(:", ":)", ";", "?", "="] {
             let quoted = format!("'{content}'");
             assert_eq!(

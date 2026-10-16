@@ -5,7 +5,7 @@ use std::{error::Error, fmt};
 use crate::lexer::{
     commentless_symbol::{
         special_sequence::{self, ParseSpecialSequenceError},
-        terminal_string::{ParseTerminalStringError, TerminalString},
+        terminal_string::{self, ParseTerminalStringError},
     },
     gap_separator,
     terminal_character::{Symbol, TerminalCharacter},
@@ -48,8 +48,7 @@ pub(crate) fn length(
             }
             TerminalCharacter::Symbol(
                 Symbol::FirstQuote | Symbol::SecondQuote,
-            ) => TerminalString::read(after)
-                .map(|(_, length)| length)
+            ) => terminal_string::length(after)
                 .map_err(ParseBracketedTextualCommentError::TerminalString)?,
             TerminalCharacter::Symbol(Symbol::SpecialSequence) => {
                 special_sequence::length(after).map_err(
