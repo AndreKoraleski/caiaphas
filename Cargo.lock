@@ -22,6 +22,9 @@ checksum = "940b3a0ca603d1eade50a4846a2afffd5ef57a9feac2c0e2ec2e14f9ead76000"
 [[package]]
 name = "caiaphas"
 version = "0.1.0"
+dependencies = [
+ "caiaphas-macros",
+]
 
 [[package]]
 name = "caiaphas-generator"
@@ -30,6 +33,16 @@ dependencies = [
  "annotate-snippets",
  "proc-macro2",
  "quote",
+]
+
+[[package]]
+name = "caiaphas-macros"
+version = "0.1.0"
+dependencies = [
+ "caiaphas-generator",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -54,6 +67,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "syn"
+version = "3.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
 ]
 
 [[package]]

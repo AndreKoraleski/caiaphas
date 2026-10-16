@@ -1,7 +1,7 @@
 [workspace]
-members = ["caiaphas-generator"]
+members = ["caiaphas-generator", "caiaphas-macros"]
 # Plain `cargo test` and `cargo clippy` cover every crate, not only this one.
-default-members = [".", "caiaphas-generator"]
+default-members = [".", "caiaphas-generator", "caiaphas-macros"]
 
 [workspace.package]
 version = "0.1.0"
@@ -12,8 +12,11 @@ repository = "https://github.com/AndreKoraleski/caiaphas"
 
 [workspace.dependencies]
 annotate-snippets = "0.12.16"
+caiaphas-generator = { path = "caiaphas-generator", version = "0.1.0" }
+caiaphas-macros = { path = "caiaphas-macros", version = "0.1.0" }
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
+syn = "3.0.9"
 
 [package]
 name = "caiaphas"
@@ -34,6 +37,9 @@ categories = []
 # documentation = ""
 # Makes `cargo publish` refuse until the line is removed.
 # publish = false
+
+[dependencies]
+caiaphas-macros.workspace = true
 
 [lints]
 workspace = true

@@ -1,0 +1,10 @@
+(* Sums and products of whole numbers, with brackets. *)
+arithmetic = expression;
+expression = term, {additive operator, term};
+additive operator = '+' | '-';
+term = factor, {multiplicative operator, factor};
+multiplicative operator = '*' | '/';
+factor = number | '(', expression, ')';
+number = digit, {digit};
+(* hide *)
+digit = ? U+0030..U+0039 ?;

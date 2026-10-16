@@ -1,0 +1,20 @@
+[package]
+name = "caiaphas-macros"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "The grammar! macro of caiaphas"
+license.workspace = true
+repository.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+caiaphas-generator.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+
+[lints]
+workspace = true
