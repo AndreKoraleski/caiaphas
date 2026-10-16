@@ -16,7 +16,8 @@ use crate::{
 };
 
 /// Reports every meta identifier a rule can read before any character that
-/// leads back to the rule through other rules.
+/// leads back to the rule through other rules. Of the rules in one such cycle,
+/// only the first written is reported, since fixing it fixes them all.
 pub(super) fn check(
     grammar: &Grammar,
     facts: &Facts<'_>,
@@ -27,7 +28,14 @@ pub(super) fn check(
         .iter()
         .map(|rule| facts.first_meta_identifiers(&rule.expression))
         .collect();
+    let in_cycle = |from: usize, to: usize| {
+        reaches(&first_meta_identifiers, RuleId(from), RuleId(to))
+            && reaches(&first_meta_identifiers, RuleId(to), RuleId(from))
+    };
     for (position, rule) in grammar.syntax_rules.iter().enumerate() {
+        if (0..position).any(|earlier| in_cycle(earlier, position)) {
+            continue;
+        }
         for &(target, span) in &first_meta_identifiers[position] {
             if target != RuleId(position)
                 && reaches(&first_meta_identifiers, target, RuleId(position))
@@ -109,22 +117,18 @@ mod tests {
     }
 
     #[test]
-    fn finds_two_rules_that_start_with_each_other() {
+    fn finds_two_rules_that_start_with_each_other_once() {
         assert_eq!(
             indirect("s = a; a = b, 'x' | 'y'; b = a, 'z' | 'w';"),
-            [entry("a", "b", 11), entry("b", "a", 29)]
+            [entry("a", "b", 11)]
         );
     }
 
     #[test]
-    fn finds_a_longer_chain_of_rules() {
+    fn finds_a_longer_chain_of_rules_once() {
         assert_eq!(
             indirect("s = a; a = b | 'x'; b = c | 'y'; c = a | 'z';"),
-            [
-                entry("a", "b", 11),
-                entry("b", "c", 24),
-                entry("c", "a", 37)
-            ]
+            [entry("a", "b", 11)]
         );
     }
 
@@ -132,7 +136,18 @@ mod tests {
     fn finds_a_chain_behind_parts_that_can_match_nothing() {
         assert_eq!(
             indirect("s = a; a = ['x'], b, 'y' | 'z'; b = a | 'w';"),
-            [entry("a", "b", 18), entry("b", "a", 36)]
+            [entry("a", "b", 18)]
+        );
+    }
+
+    #[test]
+    fn finds_each_cycle() {
+        assert_eq!(
+            indirect(
+                "s = a | c; a = b, 'x' | 'y'; b = a, 'z' | 'w'; \
+                 c = d, 'x' | 'y'; d = c, 'z' | 'w';"
+            ),
+            [entry("a", "b", 15), entry("c", "d", 51)]
         );
     }
 
