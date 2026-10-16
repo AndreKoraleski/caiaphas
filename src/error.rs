@@ -20,6 +20,8 @@ pub struct Error {
 pub(crate) enum Expected {
     Text(&'static str),
     Range(char, char),
+    /// Any match of the rule with this name.
+    Rule(&'static str),
     End,
 }
 
@@ -62,33 +64,66 @@ impl Error {
 impl fmt::Display for Expected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Text(text) => write!(f, "`{text}`"),
+            Self::Text(text) => write!(f, "`{}`", Shown(text)),
             Self::Range(first, last) if first == last => {
-                write!(f, "`{first}`")
+                write!(f, "`{}`", Shown(&first.to_string()))
             }
-            Self::Range(first, last) => {
-                write!(f, "a character from `{first}` to `{last}`")
+            Self::Range(first, last) => write!(
+                f,
+                "a character from `{}` to `{}`",
+                Shown(&first.to_string()),
+                Shown(&last.to_string())
+            ),
+            Self::Rule(name) => {
+                let article = if name.starts_with(['a', 'e', 'i', 'o', 'u']) {
+                    "an"
+                } else {
+                    "a"
+                };
+                write!(f, "{article} {name}")
             }
             Self::End => f.write_str("the end of the input"),
         }
     }
 }
 
+/// Shows text with its control characters escaped, so a tab reads `\t`.
+struct Shown<'a>(&'a str);
+
+impl fmt::Display for Shown<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for c in self.0.chars() {
+            if c.is_control() {
+                write!(f, "{}", c.escape_debug())?;
+            } else {
+                f.write_char(c)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut expected = String::new();
-        for (index, item) in self.expected.iter().enumerate() {
-            if index > 0 {
-                let last = index == self.expected.len() - 1;
-                expected.push_str(if last { " or " } else { ", " });
+        if !self.expected.is_empty() {
+            f.write_str("expected ")?;
+            for (index, item) in self.expected.iter().enumerate() {
+                if index > 0 {
+                    let last = index == self.expected.len() - 1;
+                    f.write_str(if last { " or " } else { ", " })?;
+                }
+                write!(f, "{item}")?;
             }
-            write!(expected, "{item}")?;
         }
-        match self.found {
-            Some(c) => write!(f, "expected {expected}, found `{c}`")?,
-            None => {
-                write!(f, "expected {expected}, found the end of the input")?
+        match (self.expected.is_empty(), self.found) {
+            (true, Some(c)) => {
+                write!(f, "unexpected `{}`", Shown(&c.to_string()))?;
             }
+            (true, None) => f.write_str("unexpected end of the input")?,
+            (false, Some(c)) => {
+                write!(f, ", found `{}`", Shown(&c.to_string()))?;
+            }
+            (false, None) => f.write_str(", found the end of the input")?,
         }
         write!(f, " at line {}, column {}", self.line, self.column)
     }
@@ -135,6 +170,39 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "expected the end of the input, found `b` at line 1, column 2"
+        );
+    }
+
+    #[test]
+    fn names_rules_with_their_article() {
+        let error = Error::new(
+            "]",
+            0,
+            vec![Expected::Rule("value"), Expected::Rule("object")],
+        );
+        assert_eq!(
+            error.to_string(),
+            "expected an object or a value, found `]` at line 1, column 1"
+        );
+    }
+
+    #[test]
+    fn escapes_control_characters() {
+        let error = Error::new("\t", 0, vec![Expected::Text("\n")]);
+        assert_eq!(
+            error.to_string(),
+            "expected `\\n`, found `\\t` at line 1, column 1"
+        );
+    }
+
+    #[test]
+    fn says_what_it_found_when_nothing_in_particular_was_expected() {
+        let error = Error::new("x", 0, Vec::new());
+        assert_eq!(error.to_string(), "unexpected `x` at line 1, column 1");
+        let error = Error::new("", 0, Vec::new());
+        assert_eq!(
+            error.to_string(),
+            "unexpected end of the input at line 1, column 1"
         );
     }
 }

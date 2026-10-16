@@ -24,8 +24,11 @@ pub struct Grammar {
 /// A rule of a [`Grammar`].
 #[derive(Debug)]
 pub struct Rule {
+    /// The name of the rule as written, which errors use for it.
+    pub name: &'static str,
     pub expression: Expression,
-    /// Whether the rule is left out of the tree, along with what it matches.
+    /// Whether the rule is left out of the tree and of errors, along with
+    /// what it matches.
     pub hidden: bool,
 }
 
@@ -230,6 +233,11 @@ impl<'i> Parser<'i> {
             return found;
         }
         let definition = &self.grammar.rules[rule];
+        let earlier = if self.furthest == position {
+            self.expected.len()
+        } else {
+            0
+        };
         let mut children = Vec::new();
         let found = self
             .expression(&definition.expression, position, &mut children)
@@ -245,6 +253,17 @@ impl<'i> Parser<'i> {
                 });
                 (end, node)
             });
+        // What the rule could not read where it starts is told as the rule
+        // itself, unless it is hidden.
+        if self.reports
+            && self.furthest == position
+            && self.expected.len() > earlier
+        {
+            self.expected.truncate(earlier);
+            if !definition.hidden {
+                self.expected.push(Expected::Rule(definition.name));
+            }
+        }
         self.matches.insert((rule, position), found);
         found
     }
@@ -362,6 +381,7 @@ mod tests {
     static LIST: Grammar = Grammar {
         rules: &[
             Rule {
+                name: "list",
                 expression: Expression::Sequence(&[
                     Expression::Rule(1),
                     Expression::Repeated(&Expression::Sequence(&[
@@ -372,6 +392,7 @@ mod tests {
                 hidden: false,
             },
             Rule {
+                name: "item",
                 expression: Expression::Choice(&[
                     Expression::Sequence(&[
                         Expression::Rule(2),
@@ -386,6 +407,7 @@ mod tests {
                 hidden: false,
             },
             Rule {
+                name: "digit",
                 expression: Expression::Range('0', '9'),
                 hidden: true,
             },
@@ -411,22 +433,21 @@ mod tests {
     }
 
     #[test]
-    fn reports_the_furthest_place_it_could_not_match() {
+    fn reports_a_rule_that_could_not_start_by_its_name() {
         let error = parse(&LIST, 0, "1,(2,)").unwrap_err();
         assert_eq!(
             error.to_string(),
-            "expected `(` or a character from `0` to `9`, found `)` at line \
-             1, column 6"
+            "expected an item, found `)` at line 1, column 6"
         );
     }
 
     #[test]
-    fn reports_an_input_that_goes_on_past_the_rule() {
+    fn reports_an_input_that_goes_on_past_the_rule_without_hidden_rules() {
         let error = parse(&LIST, 0, "1)").unwrap_err();
         assert_eq!(
             error.to_string(),
-            "expected `,`, a character from `0` to `9` or the end of the \
-             input, found `)` at line 1, column 2"
+            "expected `,` or the end of the input, found `)` at line 1, \
+             column 2"
         );
     }
 
@@ -434,6 +455,7 @@ mod tests {
     static WORDS: Grammar = Grammar {
         rules: &[
             Rule {
+                name: "word",
                 expression: Expression::Choice(&[
                     Expression::Rule(1),
                     Expression::Rule(2),
@@ -441,10 +463,12 @@ mod tests {
                 hidden: false,
             },
             Rule {
+                name: "keyword",
                 expression: Expression::Text("if"),
                 hidden: false,
             },
             Rule {
+                name: "name",
                 expression: Expression::Sequence(&[
                     Expression::Range('a', 'z'),
                     Expression::Repeated(&Expression::Range('a', 'z')),
@@ -469,6 +493,7 @@ mod tests {
     /// `word = letter - 'if', ['!'] | 2 * '?';`
     static EXCEPT: Grammar = Grammar {
         rules: &[Rule {
+            name: "word",
             expression: Expression::Choice(&[
                 Expression::Sequence(&[
                     Expression::Except(
@@ -502,6 +527,7 @@ mod tests {
     /// `s = {['x']};`
     static NULLABLE: Grammar = Grammar {
         rules: &[Rule {
+            name: "s",
             expression: Expression::Repeated(&Expression::Optional(
                 &Expression::Text("x"),
             )),
