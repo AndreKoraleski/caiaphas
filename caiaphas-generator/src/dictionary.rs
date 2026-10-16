@@ -91,6 +91,15 @@ impl<'a> Index<'a> {
         self.rule_ids.get(meta_identifier.as_str()).copied()
     }
 
+    /// Returns whether `meta_identifier` is written as several words that each
+    /// name a rule, as when the `,` between them is missing.
+    fn separate(&self, meta_identifier: &MetaIdentifier) -> bool {
+        meta_identifier.words().count() > 1
+            && meta_identifier
+                .words()
+                .all(|word| self.rule_ids.contains_key(word))
+    }
+
     /// Returns the defined meta identifier closest to `meta_identifier` when
     /// few enough edits make one into the other, as with a misspelling.
     fn similar(
@@ -131,6 +140,8 @@ pub(crate) enum DictionaryErrorKind {
         meta_identifier: MetaIdentifier,
         /// A defined meta identifier written almost the same way, if any.
         similar: Option<MetaIdentifier>,
+        /// Whether each of its words names a rule.
+        separate: bool,
     },
     /// Every syntax rule is referenced by another, so none can start a parser.
     NoStartSyntaxRule,
@@ -223,7 +234,21 @@ impl DictionaryError {
             }
             DictionaryErrorKind::UndefinedMetaIdentifier {
                 meta_identifier,
+                separate: true,
+                ..
+            } => {
+                let words: Vec<&str> = meta_identifier.words().collect();
+                format!(
+                    "the gaps join `{}` into one name; to read each rule in \
+                     turn, write `{}`",
+                    meta_identifier.written(),
+                    words.join(", ")
+                )
+            }
+            DictionaryErrorKind::UndefinedMetaIdentifier {
+                meta_identifier,
                 similar: Some(similar),
+                ..
             } => format!(
                 "correct its spelling to `{}`, or define `{}` with a syntax \
                  rule",
@@ -233,6 +258,7 @@ impl DictionaryError {
             DictionaryErrorKind::UndefinedMetaIdentifier {
                 meta_identifier,
                 similar: None,
+                ..
             } => {
                 format!(
                     "define `{}` with a syntax rule, or correct its spelling",

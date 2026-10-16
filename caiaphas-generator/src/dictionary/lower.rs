@@ -152,6 +152,7 @@ impl Lowering<'_, '_> {
                         kind: DictionaryErrorKind::UndefinedMetaIdentifier {
                             meta_identifier: meta_identifier.clone(),
                             similar: self.index.similar(meta_identifier),
+                            separate: self.index.separate(meta_identifier),
                         },
                         span: syntactic_primary.span,
                     });
@@ -321,5 +322,16 @@ mod tests {
                 span: Span { start: 9, end: 10 },
             } if meta_identifier.as_str() == "b"
         ));
+    }
+
+    #[test]
+    fn tells_of_words_that_each_name_a_rule() {
+        let (_, errors) =
+            grammar("s = word space word; word = 'w'; space = ' ';");
+        assert_eq!(
+            errors[0].help(),
+            "the gaps join `word space word` into one name; to read each rule \
+             in turn, write `word, space, word`"
+        );
     }
 }
