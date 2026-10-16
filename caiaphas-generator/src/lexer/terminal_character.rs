@@ -82,19 +82,28 @@ impl TerminalCharacter {
     }
 }
 
-/// Returns how to write `c` when it is not a terminal character: as a special
-/// sequence, since one can hold any character, or as the plain character it
-/// looks like, when that was meant.
-pub(crate) fn how_to_write(c: char) -> String {
-    let code = u32::from(c);
-    match looks_like(c) {
-        Some(plain) => format!(
+/// Returns how to write `c` when it is not a terminal character, `quoted` or
+/// not: as a special sequence, since one can hold any character, or as the
+/// plain character it looks like, when that was meant.
+pub(crate) fn how_to_write(c: char, quoted: bool) -> String {
+    let special = format!("`? U+{:04X} ?`", u32::from(c));
+    match (looks_like(c), quoted) {
+        (Some(plain), true) => format!(
             "write `{plain}` if that was meant, or write the character itself \
-             as `? U+{code:04X} ?`"
+             as {special}"
         ),
-        None => format!(
-            "write it as `? U+{code:04X} ?` outside the quotes, since a \
-             special sequence can hold any character"
+        (Some(plain), false) => format!("write `{plain}` if that was meant"),
+        (None, true) => format!(
+            "write it as {special} outside the quotes, since a special \
+             sequence can hold any character"
+        ),
+        (None, false) if c.is_alphabetic() => format!(
+            "write the rule name without `{c}`, since one only holds ASCII \
+             letters, digits and spaces; to match `{c}`, write {special}"
+        ),
+        (None, false) => format!(
+            "write it as {special} to match it, since a special sequence can \
+             hold any character"
         ),
     }
 }

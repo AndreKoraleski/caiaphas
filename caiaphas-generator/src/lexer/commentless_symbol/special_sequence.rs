@@ -119,17 +119,17 @@ impl fmt::Display for ParseSpecialSequenceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoOpeningSymbol => {
-                f.write_str("EBNF special sequence has no opening `?`")
+                f.write_str("special sequence has no opening `?`")
             }
             Self::NoClosingSymbol => {
-                f.write_str("EBNF special sequence has no closing `?`")
+                f.write_str("special sequence has no closing `?`")
             }
             Self::InvalidCharacter(c) => write!(
                 f,
-                "{c:?} is not a valid character in an EBNF special sequence"
+                "{c:?} is not a valid character in a special sequence"
             ),
             Self::Unsupported => f.write_str(
-                "EBNF special sequence must hold a code point such as \
+                "special sequence must hold a code point such as \
                  U+00E9 or a range such as U+0041..U+005A",
             ),
             Self::NotAScalarValue(value) => {
@@ -311,19 +311,19 @@ mod tests {
         let cases = [
             (
                 ParseSpecialSequenceError::NoOpeningSymbol,
-                "EBNF special sequence has no opening `?`",
+                "special sequence has no opening `?`",
             ),
             (
                 ParseSpecialSequenceError::NoClosingSymbol,
-                "EBNF special sequence has no closing `?`",
+                "special sequence has no closing `?`",
             ),
             (
                 ParseSpecialSequenceError::InvalidCharacter('é'),
-                "'é' is not a valid character in an EBNF special sequence",
+                "'é' is not a valid character in a special sequence",
             ),
             (
                 ParseSpecialSequenceError::Unsupported,
-                "EBNF special sequence must hold a code point such as U+00E9 \
+                "special sequence must hold a code point such as U+00E9 \
                  or a range such as U+0041..U+005A",
             ),
             (

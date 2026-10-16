@@ -149,9 +149,12 @@ fn symbol_recovery_length(
             .find('?')
             .map_or(input.len(), |end| first + end + 1),
         ParseCommentlessSymbolError::UnmatchedEndCommentSymbol => 2,
-        ParseCommentlessSymbolError::EndOfInput
-        | ParseCommentlessSymbolError::InvalidCharacter(_)
-        | ParseCommentlessSymbolError::NotCommentless(_) => first,
+        // A run of the same character, as the `::` of `::=`, is one mistake.
+        ParseCommentlessSymbolError::InvalidCharacter(c)
+        | ParseCommentlessSymbolError::NotCommentless(c) => {
+            input.find(|other| other != c).unwrap_or(input.len())
+        }
+        ParseCommentlessSymbolError::EndOfInput => first,
     }
 }
 
@@ -213,7 +216,7 @@ impl LexErrorKind {
     pub(crate) fn help(&self) -> Option<String> {
         match self {
             Self::CommentlessSymbol(error) => error.help(),
-            Self::BracketedTextualComment(_) => None,
+            Self::BracketedTextualComment(error) => error.help(),
         }
     }
 }
@@ -519,16 +522,16 @@ mod tests {
         );
         assert_eq!(
             error("(* a").kind.to_string(),
-            "EBNF comment has no closing `*)`"
+            "comment has no closing `*)`"
         );
     }
 
     #[test]
     fn error_gives_the_source_of_what_failed() {
-        let error = error("(* don't *)");
+        let error = error("(* '' *)");
         assert_eq!(
             error.kind.source().map(ToString::to_string),
-            Some(ParseTerminalStringError::NoClosingQuote.to_string())
+            Some(ParseTerminalStringError::Empty.to_string())
         );
     }
 }

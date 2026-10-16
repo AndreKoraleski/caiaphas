@@ -57,7 +57,7 @@ pub(crate) enum Expected {
 impl fmt::Display for Expected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::MetaIdentifier => "a meta identifier",
+            Self::MetaIdentifier => "a rule name",
             Self::DefiningSymbol => "`=`",
             Self::TerminatorSymbol => "`;` or `.`",
             Self::RepetitionSymbol => "`*` after the repetition count",
@@ -79,7 +79,7 @@ impl fmt::Display for ParseError {
                 write!(f, "expected {expected}, found the end of the grammar")
             }
             ParseErrorKind::NoSyntaxRule => {
-                f.write_str("EBNF grammar has no syntax rule")
+                f.write_str("the grammar has no rule")
             }
             ParseErrorKind::MalformedExpectation => f.write_str(
                 "an expectation is written `(* expect code-in-kebab-case: \
@@ -165,10 +165,10 @@ mod tests {
 
     #[test]
     fn keeps_what_caused_an_error_in_its_diagnostic() {
-        let (_, errors) = parse("a = '';");
+        let (_, errors) = parse("(* '' *) a = 'x';");
         assert_eq!(
             Diagnostic::from(errors[0]).message,
-            "invalid EBNF terminal string: EBNF terminal string is empty"
+            "invalid terminal string in a comment: terminal string is empty"
         );
     }
 
@@ -191,7 +191,7 @@ mod tests {
             ),
             (
                 error(ParseErrorKind::NoSyntaxRule),
-                "EBNF grammar has no syntax rule",
+                "the grammar has no rule",
             ),
             (
                 error(ParseErrorKind::MalformedExpectation),
@@ -225,16 +225,16 @@ mod tests {
         }
         assert_eq!(
             parse("a = @;").1[0].to_string(),
-            "'@' does not start an EBNF commentless symbol"
+            "unexpected character '@'"
         );
     }
 
     #[test]
     fn error_gives_the_source_of_a_lexer_error() {
-        let (_, errors) = parse("a = '';");
+        let (_, errors) = parse("(* '' *) a = 'x';");
         assert_eq!(
             errors[0].source().map(ToString::to_string),
-            Some("EBNF terminal string is empty".to_owned())
+            Some("terminal string is empty".to_owned())
         );
     }
 }

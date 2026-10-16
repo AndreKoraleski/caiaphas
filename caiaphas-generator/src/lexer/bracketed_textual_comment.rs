@@ -80,20 +80,50 @@ impl fmt::Display for ParseBracketedTextualCommentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoStartCommentSymbol => {
-                f.write_str("EBNF comment has no opening `(*`")
+                f.write_str("comment has no opening `(*`")
             }
             Self::NoEndCommentSymbol => {
-                f.write_str("EBNF comment has no closing `*)`")
+                f.write_str("comment has no closing `*)`")
             }
             Self::InvalidCharacter(c) => {
-                write!(f, "{c:?} is not a valid character in an EBNF comment")
+                write!(f, "{c:?} is not a valid character in a comment")
+            }
+            Self::TerminalString(ParseTerminalStringError::NoClosingQuote) => {
+                f.write_str(
+                    "a quote in this comment starts a terminal string that \
+                     never closes",
+                )
             }
             Self::TerminalString(_) => {
-                f.write_str("invalid EBNF terminal string in a comment")
+                f.write_str("invalid terminal string in a comment")
             }
             Self::SpecialSequence(_) => {
-                f.write_str("invalid EBNF special sequence in a comment")
+                f.write_str("invalid special sequence in a comment")
             }
+        }
+    }
+}
+
+impl ParseBracketedTextualCommentError {
+    /// Returns how to fix the comment, when there is a usual way.
+    pub(crate) fn help(self) -> Option<String> {
+        match self {
+            Self::NoEndCommentSymbol => Some("end it with `*)`".to_owned()),
+            Self::TerminalString(ParseTerminalStringError::NoClosingQuote) => {
+                Some(
+                    "the standard reads quotes in a comment as terminal \
+                     strings, so write `it is` rather than `it's`, or put the \
+                     word in the other quotes, as in `\"it's\"`"
+                        .to_owned(),
+                )
+            }
+            Self::SpecialSequence(_) => Some(
+                "the standard reads `?` in a comment as the start of a \
+                 special sequence, so close it with another `?` or leave it \
+                 out"
+                .to_owned(),
+            ),
+            _ => None,
         }
     }
 }
@@ -101,6 +131,9 @@ impl fmt::Display for ParseBracketedTextualCommentError {
 impl Error for ParseBracketedTextualCommentError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
+            Self::TerminalString(ParseTerminalStringError::NoClosingQuote) => {
+                None
+            }
             Self::TerminalString(error) => Some(error),
             Self::SpecialSequence(error) => Some(error),
             _ => None,
@@ -233,27 +266,34 @@ mod tests {
         let cases = [
             (
                 ParseBracketedTextualCommentError::NoStartCommentSymbol,
-                "EBNF comment has no opening `(*`",
+                "comment has no opening `(*`",
             ),
             (
                 ParseBracketedTextualCommentError::NoEndCommentSymbol,
-                "EBNF comment has no closing `*)`",
+                "comment has no closing `*)`",
             ),
             (
                 ParseBracketedTextualCommentError::InvalidCharacter('é'),
-                "'é' is not a valid character in an EBNF comment",
+                "'é' is not a valid character in a comment",
             ),
             (
                 ParseBracketedTextualCommentError::TerminalString(
                     ParseTerminalStringError::NoClosingQuote,
                 ),
-                "invalid EBNF terminal string in a comment",
+                "a quote in this comment starts a terminal string that never \
+                 closes",
+            ),
+            (
+                ParseBracketedTextualCommentError::TerminalString(
+                    ParseTerminalStringError::Empty,
+                ),
+                "invalid terminal string in a comment",
             ),
             (
                 ParseBracketedTextualCommentError::SpecialSequence(
                     ParseSpecialSequenceError::NoClosingSymbol,
                 ),
-                "invalid EBNF special sequence in a comment",
+                "invalid special sequence in a comment",
             ),
         ];
         for (error, message) in cases {
@@ -264,11 +304,11 @@ mod tests {
     #[test]
     fn error_gives_the_wrapped_error_as_its_source() {
         let error = ParseBracketedTextualCommentError::TerminalString(
-            ParseTerminalStringError::NoClosingQuote,
+            ParseTerminalStringError::Empty,
         );
         assert_eq!(
             error.source().map(ToString::to_string),
-            Some(ParseTerminalStringError::NoClosingQuote.to_string())
+            Some(ParseTerminalStringError::Empty.to_string())
         );
         let error = ParseBracketedTextualCommentError::SpecialSequence(
             ParseSpecialSequenceError::NoClosingSymbol,

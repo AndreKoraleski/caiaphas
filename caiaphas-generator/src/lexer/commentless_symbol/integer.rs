@@ -50,9 +50,9 @@ impl fmt::Display for ParseIntegerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::NoDecimalDigit => {
-                "EBNF integer does not start with a decimal digit"
+                "integer does not start with a decimal digit"
             }
-            Self::TooLarge => "EBNF integer is too large to fit in a u32",
+            Self::TooLarge => "integer is too large to fit in a u32",
         })
     }
 }
@@ -128,11 +128,11 @@ mod tests {
     fn error_displays_message() {
         assert_eq!(
             ParseIntegerError::NoDecimalDigit.to_string(),
-            "EBNF integer does not start with a decimal digit"
+            "integer does not start with a decimal digit"
         );
         assert_eq!(
             ParseIntegerError::TooLarge.to_string(),
-            "EBNF integer is too large to fit in a u32"
+            "integer is too large to fit in a u32"
         );
     }
 }

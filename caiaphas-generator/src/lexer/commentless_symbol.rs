@@ -50,9 +50,8 @@ impl CommentlessSymbol {
         )?;
         Ok(match character {
             TerminalCharacter::Letter(_) => {
-                let (identifier, length) = MetaIdentifier::read(input).expect(
-                    "text starting with a letter is a meta identifier",
-                );
+                let (identifier, length) = MetaIdentifier::read(input)
+                    .expect("text starting with a letter is a rule name");
                 (Self::MetaIdentifier(identifier), length)
             }
             TerminalCharacter::DecimalDigit(_) => {
@@ -117,23 +116,17 @@ pub(crate) enum ParseCommentlessSymbolError {
 impl fmt::Display for ParseCommentlessSymbolError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EndOfInput => f.write_str("expected an EBNF symbol"),
-            Self::InvalidCharacter(c) => {
-                write!(f, "{c:?} is not a valid EBNF terminal character")
-            }
-            Self::NotCommentless(c) => {
-                write!(f, "{c:?} does not start an EBNF commentless symbol")
+            Self::EndOfInput => f.write_str("expected a symbol"),
+            Self::InvalidCharacter(c) | Self::NotCommentless(c) => {
+                write!(f, "unexpected character {c:?}")
             }
             Self::UnmatchedEndCommentSymbol => {
                 f.write_str("`*)` without a matching `(*`")
             }
-            Self::Integer(_) => f.write_str("invalid EBNF integer"),
-            Self::TerminalString(_) => {
-                f.write_str("invalid EBNF terminal string")
-            }
-            Self::SpecialSequence(_) => {
-                f.write_str("invalid EBNF special sequence")
-            }
+            // Each of these says itself what is wrong.
+            Self::Integer(error) => error.fmt(f),
+            Self::TerminalString(error) => error.fmt(f),
+            Self::SpecialSequence(error) => error.fmt(f),
         }
     }
 }
@@ -143,24 +136,30 @@ impl ParseCommentlessSymbolError {
     pub(crate) fn help(self) -> Option<String> {
         match self {
             Self::InvalidCharacter(c) => {
-                Some(crate::lexer::terminal_character::how_to_write(c))
+                Some(crate::lexer::terminal_character::how_to_write(c, false))
             }
+            Self::NotCommentless(c) => Some(how_to_write_outside(c)),
             Self::TerminalString(error) => error.help(),
             _ => None,
         }
     }
 }
 
-impl Error for ParseCommentlessSymbolError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::Integer(error) => Some(error),
-            Self::TerminalString(error) => Some(error),
-            Self::SpecialSequence(error) => Some(error),
-            _ => None,
-        }
+/// Returns how to write what the character `c` stands for, where it cannot
+/// stand outside a terminal string, as with the notation of other grammars.
+fn how_to_write_outside(c: char) -> String {
+    match c {
+        ':' => "write `=` to define a rule, as in `a = 'x';`".to_owned(),
+        '_' => "write a space instead, since a rule name holds letters, \
+                digits and spaces"
+            .to_owned(),
+        '+' => "for one or more of `x`, write `x, {x}`".to_owned(),
+        '<' | '>' => "write a rule name without `<` and `>`".to_owned(),
+        _ => format!("write it in quotes to match it, as in `'{c}'`"),
     }
 }
+
+impl Error for ParseCommentlessSymbolError {}
 
 #[cfg(test)]
 mod tests {
@@ -362,17 +361,14 @@ mod tests {
     #[test]
     fn error_displays_message() {
         let cases = [
-            (
-                ParseCommentlessSymbolError::EndOfInput,
-                "expected an EBNF symbol",
-            ),
+            (ParseCommentlessSymbolError::EndOfInput, "expected a symbol"),
             (
                 ParseCommentlessSymbolError::InvalidCharacter('é'),
-                "'é' is not a valid EBNF terminal character",
+                "unexpected character 'é'",
             ),
             (
                 ParseCommentlessSymbolError::NotCommentless('@'),
-                "'@' does not start an EBNF commentless symbol",
+                "unexpected character '@'",
             ),
             (
                 ParseCommentlessSymbolError::UnmatchedEndCommentSymbol,
@@ -382,19 +378,13 @@ mod tests {
                 ParseCommentlessSymbolError::Integer(
                     ParseIntegerError::TooLarge,
                 ),
-                "invalid EBNF integer",
+                "integer is too large to fit in a u32",
             ),
             (
                 ParseCommentlessSymbolError::TerminalString(
                     ParseTerminalStringError::Empty,
                 ),
-                "invalid EBNF terminal string",
-            ),
-            (
-                ParseCommentlessSymbolError::SpecialSequence(
-                    ParseSpecialSequenceError::Unsupported,
-                ),
-                "invalid EBNF special sequence",
+                "terminal string is empty",
             ),
         ];
         for (error, message) in cases {
@@ -403,27 +393,42 @@ mod tests {
     }
 
     #[test]
-    fn error_gives_the_wrapped_error_as_its_source() {
-        let error =
-            ParseCommentlessSymbolError::Integer(ParseIntegerError::TooLarge);
-        assert_eq!(
-            error.source().map(ToString::to_string),
-            Some(ParseIntegerError::TooLarge.to_string())
-        );
-        let error = ParseCommentlessSymbolError::TerminalString(
-            ParseTerminalStringError::Empty,
-        );
-        assert_eq!(
-            error.source().map(ToString::to_string),
-            Some(ParseTerminalStringError::Empty.to_string())
-        );
+    fn says_itself_what_a_wrapped_error_says() {
         let error = ParseCommentlessSymbolError::SpecialSequence(
             ParseSpecialSequenceError::Unsupported,
         );
         assert_eq!(
-            error.source().map(ToString::to_string),
-            Some(ParseSpecialSequenceError::Unsupported.to_string())
+            error.to_string(),
+            ParseSpecialSequenceError::Unsupported.to_string()
         );
-        assert!(ParseCommentlessSymbolError::EndOfInput.source().is_none());
+        assert!(error.source().is_none());
+    }
+
+    #[test]
+    fn tells_how_to_write_what_other_notations_write() {
+        let help = |c| ParseCommentlessSymbolError::NotCommentless(c).help();
+        assert_eq!(
+            help(':').as_deref(),
+            Some("write `=` to define a rule, as in `a = 'x';`")
+        );
+        assert_eq!(
+            help('@').as_deref(),
+            Some("write it in quotes to match it, as in `'@'`")
+        );
+        let help = |c| ParseCommentlessSymbolError::InvalidCharacter(c).help();
+        assert_eq!(
+            help('€').as_deref(),
+            Some(
+                "write it as `? U+20AC ?` to match it, since a special \
+                 sequence can hold any character"
+            )
+        );
+        assert_eq!(
+            help('é').as_deref(),
+            Some(
+                "write the rule name without `é`, since one only holds ASCII \
+                 letters, digits and spaces; to match `é`, write `? U+00E9 ?`"
+            )
+        );
     }
 }

@@ -79,15 +79,15 @@ impl fmt::Display for ParseTerminalStringError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoOpeningQuote => {
-                f.write_str("EBNF terminal string has no opening quote")
+                f.write_str("terminal string has no opening quote")
             }
             Self::NoClosingQuote => {
-                f.write_str("EBNF terminal string has no closing quote")
+                f.write_str("terminal string has no closing quote")
             }
-            Self::Empty => f.write_str("EBNF terminal string is empty"),
+            Self::Empty => f.write_str("terminal string is empty"),
             Self::InvalidCharacter(c) => write!(
                 f,
-                "{c:?} is not a valid character in an EBNF terminal string"
+                "{c:?} is not a valid character in a terminal string"
             ),
         }
     }
@@ -100,7 +100,7 @@ impl ParseTerminalStringError {
     pub(crate) fn help(self) -> Option<String> {
         match self {
             Self::InvalidCharacter(c) => {
-                Some(crate::lexer::terminal_character::how_to_write(c))
+                Some(crate::lexer::terminal_character::how_to_write(c, true))
             }
             Self::NoClosingQuote => {
                 Some("end it with the quote it starts with".to_owned())
@@ -225,19 +225,16 @@ mod tests {
         let cases = [
             (
                 ParseTerminalStringError::NoOpeningQuote,
-                "EBNF terminal string has no opening quote",
+                "terminal string has no opening quote",
             ),
             (
                 ParseTerminalStringError::NoClosingQuote,
-                "EBNF terminal string has no closing quote",
+                "terminal string has no closing quote",
             ),
-            (
-                ParseTerminalStringError::Empty,
-                "EBNF terminal string is empty",
-            ),
+            (ParseTerminalStringError::Empty, "terminal string is empty"),
             (
                 ParseTerminalStringError::InvalidCharacter('é'),
-                "'é' is not a valid character in an EBNF terminal string",
+                "'é' is not a valid character in a terminal string",
             ),
         ];
         for (error, message) in cases {
