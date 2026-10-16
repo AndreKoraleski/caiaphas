@@ -89,10 +89,9 @@ impl Parse for Input {
 ///
 /// Attributes and doc comments before `mod` go to the module. `suggest` after
 /// the grammar makes every suggestion stop the build, as a warning does.
-/// `optimize` makes the parser match the grammar rearranged wherever that
-/// keeps its types, such as with a start that alternatives share written once,
-/// and leaves those suggestions out. The [tutorial] tells what the module
-/// holds.
+/// `optimize` makes the parser read each start that alternatives share once,
+/// without changing the types, and leaves out the `shared-start` suggestions.
+/// The [tutorial] tells what the module holds.
 ///
 /// [tutorial]: https://docs.rs/caiaphas/latest/caiaphas/tutorial/
 #[proc_macro]
