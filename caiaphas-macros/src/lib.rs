@@ -17,6 +17,9 @@ struct Input {
     visibility: Visibility,
     name: Ident,
     path: LitStr,
+    /// Whether the suggestions about the grammar stop the build, which
+    /// `suggest` after the path asks for.
+    suggest: bool,
 }
 
 impl Parse for Input {
@@ -27,12 +30,23 @@ impl Parse for Input {
         let name = input.parse()?;
         input.parse::<Token![=]>()?;
         let path = input.parse()?;
+        let suggest = input.parse::<Option<Token![,]>>()?.is_some();
+        if suggest {
+            let flag: Ident = input.parse()?;
+            if flag != "suggest" {
+                return Err(syn::Error::new(
+                    flag.span(),
+                    "expected `suggest`",
+                ));
+            }
+        }
         input.parse::<Option<Token![;]>>()?;
         Ok(Self {
             attributes,
             visibility,
             name,
             path,
+            suggest,
         })
     }
 }
@@ -47,6 +61,13 @@ impl Parse for Input {
 /// caiaphas::grammar!(pub mod json = "grammars/json.ebnf");
 /// ```
 ///
+/// With `suggest` after the path, every change that would make the parser
+/// faster stops the build, as a problem in the grammar does:
+///
+/// ```text
+/// caiaphas::grammar!(pub mod json = "grammars/json.ebnf", suggest);
+/// ```
+///
 /// The crate documentation of `caiaphas` tells what the module holds.
 #[proc_macro]
 pub fn grammar(input: TokenStream) -> TokenStream {
@@ -55,6 +76,7 @@ pub fn grammar(input: TokenStream) -> TokenStream {
         visibility,
         name,
         path,
+        suggest,
     } = parse_macro_input!(input as Input);
     let relative = path.value();
     // A grammar's path is relative to the root of the crate that uses it,
@@ -70,17 +92,21 @@ pub fn grammar(input: TokenStream) -> TokenStream {
                 .into();
         }
     };
+    let errors = |problems: Vec<String>| -> TokenStream {
+        problems
+            .into_iter()
+            .map(|problem| {
+                syn::Error::new(path.span(), problem).into_compile_error()
+            })
+            .collect::<proc_macro2::TokenStream>()
+            .into()
+    };
     let module = match caiaphas_generator::generate(&source, &relative) {
-        Ok(module) => module,
-        Err(problems) => {
-            return problems
-                .into_iter()
-                .map(|problem| {
-                    syn::Error::new(path.span(), problem).into_compile_error()
-                })
-                .collect::<proc_macro2::TokenStream>()
-                .into();
+        Ok(module) if suggest && !module.suggestions.is_empty() => {
+            return errors(module.suggestions);
         }
+        Ok(module) => module,
+        Err(problems) => return errors(problems),
     };
     let documentation = (!attributes
         .iter()
@@ -112,4 +138,28 @@ pub fn grammar(input: TokenStream) -> TokenStream {
         }
     }
     .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_the_module_and_the_path() {
+        let input: Input =
+            syn::parse_str("#[doc = \"x\"] pub mod json = \"json.ebnf\";")
+                .unwrap();
+        assert_eq!(input.name, "json");
+        assert_eq!(input.path.value(), "json.ebnf");
+        assert_eq!(input.attributes.len(), 1);
+        assert!(!input.suggest);
+    }
+
+    #[test]
+    fn reads_whether_to_stop_at_suggestions() {
+        let input: Input =
+            syn::parse_str("mod json = \"json.ebnf\", suggest").unwrap();
+        assert!(input.suggest);
+        assert!(syn::parse_str::<Input>("mod json = \"j\", hint").is_err());
+    }
 }
