@@ -321,3 +321,59 @@ fn reports_what_a_hidden_rule_expected_unless_it_can_match_nothing() {
         "expected `)`, found the end of the input at line 1, column 3"
     );
 }
+
+caiaphas::grammar!(mod settings {
+    "settings = setting, {';', setting};
+     setting = name, '=', value;
+     (* expect tied-branches: a flag is never a word *)
+     value = number | flag | word;
+     (* as u8 *) number = digit, {digit};
+     (* as bool *) flag = 'true' | 'false';
+     (* as String *) word = letter, {letter};
+     (* as String *) name = letter, {letter};
+     (* hide *) digit = ? U+0030..U+0039 ?;
+     (* hide *) letter = ? U+0061..U+007A ?;"
+});
+
+caiaphas::grammar!(mod price {
+    "price = amount, ' ', currency;
+     (* as f64 *) amount = digit, {digit}, ['.', digit, {digit}];
+     currency = 'EUR' | 'USD';
+     (* hide *) digit = ? U+0030..U+0039 ?;"
+});
+
+caiaphas::grammar!(mod bytes {
+    "pair = byte, byte; (* as u8 *) byte = digit, {digit};
+     (* hide *) digit = ? U+0030..U+0039 ?;"
+});
+
+#[test]
+fn reads_the_value_of_a_converted_rule_from_its_text() {
+    use settings::{Settings, Value};
+    let parsed: Settings = "port=80;debug=true;mode=fast".parse().unwrap();
+    let values: Vec<(&str, Value)> = parsed
+        .setting
+        .iter()
+        .map(|setting| (setting.name.as_str(), setting.value.clone()))
+        .collect();
+    assert_eq!(
+        values,
+        [
+            ("port", Value::Number(80)),
+            ("debug", Value::Flag(true)),
+            ("mode", Value::Word("fast".to_owned())),
+        ]
+    );
+    let price = price::Price::parse("12.5 EUR").unwrap();
+    assert!((price.amount - 12.5).abs() < f64::EPSILON);
+}
+
+#[test]
+fn fails_where_a_type_does_not_read_the_text() {
+    let error = "port=300".parse::<settings::Settings>().unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "expected a value, found `300` at line 1, column 6"
+    );
+    assert_eq!(bytes::Pair::parse("2555").unwrap().byte, [255, 5]);
+}

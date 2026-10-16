@@ -40,6 +40,10 @@
 //! - A rule written right after `(* inline *)` gets no type, and each rule
 //!   that holds it holds what it holds instead, as if its definition were
 //!   written there.
+//! - A rule written right after `(* as T *)`, such as `(* as u16 *)`, has the
+//!   Rust type `T` instead, read from its text with `FromStr`, and text `T`
+//!   does not read fails to match. `T` needs `Debug`, `Clone` and `PartialEq`
+//!   too.
 //!
 //! # Grammars
 //!

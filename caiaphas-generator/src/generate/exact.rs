@@ -13,6 +13,7 @@ use quote::{format_ident, quote};
 
 use crate::{
     generate::{
+        code,
         matching::{self, FunctionWriter, pattern},
         name,
     },
@@ -64,6 +65,16 @@ impl ExactWriter<'_> {
             };
         };
         let body = self.ends(&rule.expression);
+        // A rule whose type its text converts to keeps only the ends whose
+        // text the type reads.
+        let convert = code::value_type(rule).map(|value| {
+            quote! {
+                let mut ends = ends;
+                ends.retain(|end| {
+                    parser.accepts::<#value>(&RULE, position, end)
+                });
+            }
+        });
         let ends_function = quote! {
             fn #ends<const REPORTS: bool>(
                 parser: &mut __caiaphas::Parser<'_, REPORTS>,
@@ -77,6 +88,7 @@ impl ExactWriter<'_> {
                 }
                 let start = parser.start_rule(position);
                 let ends = #body;
+                #convert
                 parser.finish_ends(&RULE, start, ends)
             }
         };

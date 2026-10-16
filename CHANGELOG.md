@@ -17,6 +17,7 @@ adheres to [Semantic Versioning][semver].
 - `(* hide *)`, which leaves a rule out of the generated types.
 - `(* inline *)`, which gives the rules that hold a rule what it holds instead
   of its type.
+- `(* as T *)`, which makes the type of a rule a Rust type read from its text.
 - Fields of `[T; N]` for a rule held the same number of times on every way,
   and `char()` on the type of a rule that only ever matches one character.
 - Parsers that match exactly the inputs a grammar describes. Where an input

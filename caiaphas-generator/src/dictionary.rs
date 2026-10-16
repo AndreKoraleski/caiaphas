@@ -161,6 +161,9 @@ pub(crate) enum DictionaryErrorKind {
     /// A hide comes right before a start rule, whose parser has to return its
     /// type.
     HiddenStartSyntaxRule { meta_identifier: MetaIdentifier },
+    /// A conversion comes right before a start rule, whose parser has to be a
+    /// method of its own type.
+    ConvertedStartSyntaxRule { meta_identifier: MetaIdentifier },
     /// An inline comes right before a start rule, whose parser has to return
     /// its type.
     InlineStartSyntaxRule { meta_identifier: MetaIdentifier },
@@ -202,6 +205,13 @@ impl fmt::Display for DictionaryError {
                     meta_identifier.as_str()
                 )
             }
+            DictionaryErrorKind::ConvertedStartSyntaxRule {
+                meta_identifier,
+            } => write!(
+                f,
+                "`{}` is a start rule, so its type cannot be another one",
+                meta_identifier.as_str()
+            ),
             DictionaryErrorKind::InlineStartSyntaxRule { meta_identifier } => {
                 write!(
                     f,
@@ -265,6 +275,11 @@ impl DictionaryError {
             DictionaryErrorKind::HiddenStartSyntaxRule { .. } => {
                 "remove the `(* hide *)` before it, since its parser returns \
                  its type"
+                    .to_owned()
+            }
+            DictionaryErrorKind::ConvertedStartSyntaxRule { .. } => {
+                "remove the `(* as ... *)` before it, since its parser is a \
+                 method of its own type"
                     .to_owned()
             }
             DictionaryErrorKind::InlineStartSyntaxRule { .. } => {
@@ -424,6 +439,9 @@ pub(crate) mod tests {
                 } => "recursive",
                 DictionaryErrorKind::HiddenStartSyntaxRule { .. } => "hidden",
                 DictionaryErrorKind::InlineStartSyntaxRule { .. } => "inline",
+                DictionaryErrorKind::ConvertedStartSyntaxRule { .. } => {
+                    "converted"
+                }
                 DictionaryErrorKind::RecursiveInlineSyntaxRule { .. } => {
                     "recursive inline"
                 }

@@ -11,7 +11,10 @@ use quote::quote;
 
 use crate::{
     analysis::{Facts, general_rules},
-    generate::{exact, matching, name, shape::Shape},
+    generate::{
+        exact, matching, name,
+        shape::{self, Shape},
+    },
     ir::{Grammar, Rule, RuleId},
 };
 
@@ -19,6 +22,10 @@ use crate::{
 struct Names {
     types: Vec<Ident>,
     fields: Vec<Ident>,
+    /// The Rust type a conversion makes each rule's type, if any.
+    values: Vec<Option<TokenStream>>,
+    /// Whether each rule's type can derive `Eq` and `Hash`.
+    hashable: Vec<bool>,
 }
 
 /// Returns the items of the module that parses `grammar`, whose source is
@@ -37,6 +44,8 @@ pub(crate) fn module(
     let names = Names {
         types: written_names.clone().map(name::type_name).collect(),
         fields: written_names.map(name::field_name).collect(),
+        values: grammar.syntax_rules.iter().map(value_type).collect(),
+        hashable: hashable(shapes),
     };
     let facts = Facts::new(matched);
     let general = general_rules(&facts);
@@ -77,6 +86,7 @@ pub(crate) fn module(
                 parse.as_ref(),
                 &documentation,
             ),
+            Shape::Converted(_) => return None,
         };
         Some(quote! { #type_code #from_str })
     });
@@ -87,6 +97,46 @@ pub(crate) fn module(
 
         #(#types)*
     }
+}
+
+/// Returns the Rust type a conversion makes the type of `rule`, if any.
+pub(super) fn value_type(rule: &Rule) -> Option<TokenStream> {
+    let ty = rule.converts_to.as_ref()?;
+    Some(ty.parse().expect("a conversion names a Rust type"))
+}
+
+/// Returns whether the type of each rule can derive `Eq` and `Hash`. A
+/// converted rule's type can when it is an integer, `bool`, `char` or
+/// `String`, and any other type can when every type it holds can.
+fn hashable(shapes: &[Option<Shape>]) -> Vec<bool> {
+    const WHOLE: &[&str] = &[
+        "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64",
+        "u128", "usize", "bool", "char", "String",
+    ];
+    let mut hashable: Vec<bool> = shapes
+        .iter()
+        .map(|shape| match shape {
+            Some(Shape::Converted(ty)) => WHOLE.contains(&ty.as_str()),
+            _ => true,
+        })
+        .collect();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for (position, shape) in shapes.iter().enumerate() {
+            let Some(shape) = shape else {
+                continue;
+            };
+            let held = shape::held(shape);
+            if hashable[position]
+                && held.iter().any(|&RuleId(rule)| !hashable[rule])
+            {
+                hashable[position] = false;
+                changed = true;
+            }
+        }
+    }
+    hashable
 }
 
 /// Returns the `parse` function of the start rule `rule_id`, written `rule`.

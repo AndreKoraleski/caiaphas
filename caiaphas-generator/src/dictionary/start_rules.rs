@@ -41,6 +41,14 @@ pub(super) fn start_rules(
     }
     for &RuleId(position) in &start_rules {
         let rule = &rules[position];
+        if rule.converts_to.is_some() {
+            errors.push(DictionaryError {
+                kind: DictionaryErrorKind::ConvertedStartSyntaxRule {
+                    meta_identifier: rule.meta_identifier.clone(),
+                },
+                span: rule.span,
+            });
+        }
         if rule.hidden {
             errors.push(DictionaryError {
                 kind: DictionaryErrorKind::HiddenStartSyntaxRule {

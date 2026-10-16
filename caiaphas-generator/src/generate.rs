@@ -119,7 +119,7 @@ fn clashes(grammar: &Grammar, shapes: &[Option<Shape>]) -> Vec<Diagnostic> {
     let mut named = HashMap::new();
     let mut errors = Vec::new();
     for (rule, shape) in grammar.syntax_rules.iter().zip(shapes) {
-        if shape.is_none() {
+        if matches!(shape, None | Some(Shape::Converted(_))) {
             continue;
         }
         let name = name::type_name(rule.meta_identifier.written());

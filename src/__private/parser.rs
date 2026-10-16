@@ -204,7 +204,15 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         if self.input[position..end].parse::<T>().is_ok() {
             return true;
         }
-        if REPORTS && position >= self.furthest {
+        // A failure inside text a rule matched in full tells how far the match
+        // could go, not why the input does not match, so the type that did not
+        // read the text tells it instead.
+        if REPORTS && self.furthest <= end {
+            if self.furthest > position {
+                self.furthest = position;
+                self.expected.clear();
+                self.rejected = None;
+            }
             self.fail(position, &[Expected::Rule(rule.name)]);
             self.rejected =
                 Some(self.rejected.map_or(end, |most| most.max(end)));

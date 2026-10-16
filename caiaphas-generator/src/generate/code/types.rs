@@ -15,11 +15,62 @@ use crate::{
 
 /// Returns the type of the rule `rule`, either as is or in a box.
 fn held_type(names: &Names, RuleId(rule): RuleId, boxed: bool) -> TokenStream {
+    if let Some(value) = &names.values[rule] {
+        return value.clone();
+    }
     let name = &names.types[rule];
     if boxed {
         quote! { ::std::boxed::Box<#name> }
     } else {
         quote! { #name }
+    }
+}
+
+/// Returns the derive attribute of the type of the rule numbered `position`.
+fn derives(names: &Names, position: usize) -> TokenStream {
+    let hash = names.hashable[position]
+        .then(|| quote! { ::core::cmp::Eq, ::core::hash::Hash, });
+    quote! {
+        #[derive(
+            ::core::fmt::Debug,
+            ::core::clone::Clone,
+            ::core::cmp::PartialEq,
+            #hash
+        )]
+    }
+}
+
+/// Returns the code that reads the field of `rule`, held `count` times, from
+/// `node`. A converted rule is read from its text.
+fn read(names: &Names, rule: RuleId, count: Count) -> TokenStream {
+    let RuleId(held) = rule;
+    let index = Literal::usize_unsuffixed(held);
+    let Some(value) = &names.values[held] else {
+        return match count {
+            Count::One => quote! { node.one(#index) },
+            Count::Optional => quote! { node.optional(#index) },
+            Count::Fixed(_) => quote! { node.array(#index) },
+            Count::Many => quote! { node.many(#index) },
+        };
+    };
+    let converted = quote! { __caiaphas::Converted<#value> };
+    match count {
+        Count::One => quote! { node.one::<#converted>(#index).0 },
+        Count::Optional => {
+            quote! { node.optional::<#converted>(#index).map(|value| value.0) }
+        }
+        Count::Fixed(times) => {
+            let length = Literal::usize_unsuffixed(usize::from(times));
+            quote! {
+                node.array::<#converted, #length>(#index).map(|value| value.0)
+            }
+        }
+        Count::Many => quote! {
+            node.many::<#converted>(#index)
+                .into_iter()
+                .map(|value| value.0)
+                .collect()
+        },
     }
 }
 
@@ -45,12 +96,11 @@ pub(super) fn structure(
         let RuleId(held) = field.rule;
         let held_name = name::spaced(&grammar.syntax_rules[held]);
         let inner = held_type(names, field.rule, field.boxed);
-        let index = Literal::usize_unsuffixed(held);
         let (ty, documentation, build) = match field.count {
             Count::One => (
                 inner,
                 format!(" The `{held_name}` this `{this}` matched."),
-                quote! { node.one(#index) },
+                read(names, field.rule, field.count),
             ),
             Count::Optional => (
                 quote! { ::core::option::Option<#inner> },
@@ -58,7 +108,7 @@ pub(super) fn structure(
                     " The `{held_name}` this `{this}` matched, if it matched \
                      one."
                 ),
-                quote! { node.optional(#index) },
+                read(names, field.rule, field.count),
             ),
             Count::Fixed(times) => {
                 let length = Literal::usize_unsuffixed(usize::from(times));
@@ -68,7 +118,7 @@ pub(super) fn structure(
                         " The {times} `{held_name}` matches of this \
                          `{this}`, in order."
                     ),
-                    quote! { node.array(#index) },
+                    read(names, field.rule, field.count),
                 )
             }
             Count::Many => (
@@ -76,22 +126,17 @@ pub(super) fn structure(
                 format!(
                     " Every `{held_name}` this `{this}` matched, in order."
                 ),
-                quote! { node.many(#index) },
+                read(names, field.rule, field.count),
             ),
         };
         types.push(ty);
         documentations.push(documentation);
         builds.push(build);
     }
+    let derives = derives(names, position);
     quote! {
         #[doc = #documentation]
-        #[derive(
-            ::core::fmt::Debug,
-            ::core::clone::Clone,
-            ::core::cmp::PartialEq,
-            ::core::cmp::Eq,
-            ::core::hash::Hash,
-        )]
+        #derives
         pub struct #name {
             #(
                 #[doc = #documentations]
@@ -136,7 +181,7 @@ pub(super) fn enumeration(
 ) -> TokenStream {
     let name = &names.types[position];
     let mut declarations = Vec::new();
-    let mut texts = Vec::new();
+    let mut texts = Some(Vec::new());
     let mut by_rule = Vec::new();
     let mut by_text = Vec::new();
     for variant in variants {
@@ -154,12 +199,27 @@ pub(super) fn enumeration(
                     #[doc = #documentation]
                     #variant(#ty)
                 });
-                texts.push(quote! { Self::#variant(inner) => inner.text() });
-                by_rule.push(quote! {
-                    #index => Self::#variant(
-                        __caiaphas::FromNode::from_node(child),
-                    )
-                });
+                if let Some(value) = &names.values[held] {
+                    // A value has no text, so neither does the enum.
+                    texts = None;
+                    by_rule.push(quote! {
+                        #index => Self::#variant(
+                            <__caiaphas::Converted<#value> as
+                                __caiaphas::FromNode>::from_node(child).0,
+                        )
+                    });
+                } else {
+                    if let Some(texts) = &mut texts {
+                        texts.push(
+                            quote! { Self::#variant(inner) => inner.text() },
+                        );
+                    }
+                    by_rule.push(quote! {
+                        #index => Self::#variant(
+                            __caiaphas::FromNode::from_node(child),
+                        )
+                    });
+                }
             }
             Variant::Word(word) => {
                 let variant = name::word_variant(word)
@@ -169,20 +229,27 @@ pub(super) fn enumeration(
                     #[doc = #documentation]
                     #variant
                 });
-                texts.push(quote! { Self::#variant => #word });
+                if let Some(texts) = &mut texts {
+                    texts.push(quote! { Self::#variant => #word });
+                }
                 by_text.push(quote! { #word => Self::#variant });
             }
         }
     }
+    let derives = derives(names, position);
+    let text = texts.map(|texts| {
+        quote! {
+            /// Returns the text this rule matched.
+            pub fn text(&self) -> &str {
+                match self {
+                    #(#texts,)*
+                }
+            }
+        }
+    });
     quote! {
         #[doc = #documentation]
-        #[derive(
-            ::core::fmt::Debug,
-            ::core::clone::Clone,
-            ::core::cmp::PartialEq,
-            ::core::cmp::Eq,
-            ::core::hash::Hash,
-        )]
+        #derives
         pub enum #name {
             #(#declarations,)*
         }
@@ -190,12 +257,7 @@ pub(super) fn enumeration(
         impl #name {
             #parse
 
-            /// Returns the text this rule matched.
-            pub fn text(&self) -> &str {
-                match self {
-                    #(#texts,)*
-                }
-            }
+            #text
         }
 
         impl __caiaphas::FromNode for #name {

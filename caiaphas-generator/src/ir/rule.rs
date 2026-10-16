@@ -46,6 +46,9 @@ pub(crate) struct Rule {
     /// Whether an `(* inline *)` right before the rule gives the rules that
     /// hold it what it holds, instead of its type.
     pub(crate) inline: bool,
+    /// The Rust type an `(* as T *)` right before the rule makes its type,
+    /// read from the text it matched.
+    pub(crate) converts_to: Option<String>,
     /// The syntax rule it comes from.
     pub(crate) span: Span,
 }

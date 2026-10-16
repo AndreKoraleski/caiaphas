@@ -69,6 +69,9 @@ Each rule becomes a type named after it, so `syntax rule` becomes
 * A rule marked `(* hide *)`, such as `ws`, gets no type and no field.
 * A rule marked `(* inline *)` gets no type, and each rule that holds it holds
   what it holds instead, as if its definition were written there.
+* A rule marked `(* as T *)`, such as `(* as u16 *)`, has the Rust type `T`
+  instead, read from its text with `FromStr`, and text `T` does not read fails
+  to match. `T` needs `Debug`, `Clone` and `PartialEq` too.
 
 ## Grammars
 

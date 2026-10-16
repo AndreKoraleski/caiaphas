@@ -21,6 +21,8 @@ use crate::{
 pub(crate) enum Shape {
     Struct(Vec<Field>),
     Enum(Vec<Variant>),
+    /// The Rust type a conversion names, read from the rule's text.
+    Converted(String),
 }
 
 /// A field of a struct, holding the type of another rule.
@@ -62,7 +64,10 @@ pub(crate) fn shapes(grammar: &Grammar) -> Vec<Option<Shape>> {
     let mut shapes: Vec<Shape> = grammar
         .syntax_rules
         .iter()
-        .map(|rule| shape(grammar, &rule.expression))
+        .map(|rule| match &rule.converts_to {
+            Some(ty) => Shape::Converted(ty.clone()),
+            None => shape(grammar, &rule.expression),
+        })
         .collect();
     box_cycles(&mut shapes);
     let reached = reached(grammar, &shapes);
@@ -255,7 +260,7 @@ fn scaled(
 }
 
 /// Returns the rules whose types `shape` holds.
-fn held(shape: &Shape) -> Vec<RuleId> {
+pub(super) fn held(shape: &Shape) -> Vec<RuleId> {
     match shape {
         Shape::Struct(fields) => {
             fields.iter().map(|field| field.rule).collect()
@@ -267,6 +272,7 @@ fn held(shape: &Shape) -> Vec<RuleId> {
                 Variant::Word(_) => None,
             })
             .collect(),
+        Shape::Converted(_) => Vec::new(),
     }
 }
 
@@ -279,7 +285,7 @@ fn contained(shape: &Shape) -> Vec<RuleId> {
             .filter(|field| field.count != Count::Many)
             .map(|field| field.rule)
             .collect(),
-        Shape::Enum(_) => held(shape),
+        Shape::Enum(_) | Shape::Converted(_) => held(shape),
     }
 }
 
@@ -303,6 +309,7 @@ fn box_cycles(shapes: &mut [Shape]) {
                     }
                 }
             }
+            Shape::Converted(_) => {}
         }
     }
 }
@@ -374,6 +381,7 @@ mod tests {
                             .collect();
                         format!("enum {{{}}}", variants.join(", "))
                     }
+                    Shape::Converted(ty) => format!("converted {ty}"),
                 });
                 (name(RuleId(position)), shape)
             })
@@ -450,6 +458,22 @@ mod tests {
             shapes_of("s = g | h; (* inline *) g = e, e; e = 'x'; h = 'y';")
                 [0],
             shape("s", "struct {e Many, h Optional}")
+        );
+    }
+
+    #[test]
+    fn makes_a_converted_rule_its_rust_type() {
+        assert_eq!(
+            shapes_of(
+                "s = n, [w]; (* as u8 *) n = d, {d}; d = '1'; \
+                 (* as String *) w = 'x';"
+            ),
+            [
+                shape("s", "struct {n One, w Optional}"),
+                shape("n", "converted u8"),
+                ("d".to_owned(), None),
+                shape("w", "converted String"),
+            ]
         );
     }
 

@@ -26,6 +26,8 @@ pub(crate) struct SyntaxRule {
     pub(crate) greedy: bool,
     /// Whether an `(* inline *)` comes right before the rule.
     pub(crate) inline: bool,
+    /// The Rust type an `(* as T *)` right before the rule names, if any.
+    pub(crate) converts_to: Option<String>,
     /// From the meta identifier to the terminator, both included.
     pub(crate) span: Span,
 }
@@ -55,6 +57,7 @@ impl SyntaxRule {
             first_match: false,
             greedy: false,
             inline: false,
+            converts_to: None,
             span: start.to(end),
         })
     }

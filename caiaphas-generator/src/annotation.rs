@@ -35,6 +35,12 @@
 //! group = '(', expression, ')';
 //! ```
 //!
+//! A conversion, written such as `(* as u16 *)`, makes the rule's type that
+//! Rust type, read from the text the rule matched with `FromStr`. Text the
+//! type does not read fails to match there. The type is a primitive, such as
+//! `i64`, or a path whose last part starts with a capital, such as `String` or
+//! `std::net::Ipv4Addr`, so a comment such as `(* as such *)` stays a comment.
+//!
 //! Each comment holds one annotation, and a rule can have several. The
 //! standard reads quotes in a comment as terminal strings, so a reason cannot
 //! hold a lone `'` or `"`.
@@ -65,6 +71,8 @@ pub(crate) enum Annotation {
     Greedy,
     /// Gives the rules that hold the rule what it holds, instead of its type.
     Inline,
+    /// Makes the rule's type this Rust type, read from the text it matched.
+    Converts(String),
 }
 
 /// What a comment holds.
@@ -99,6 +107,14 @@ impl Comment {
             } else {
                 Self::MalformedHide
             };
+        }
+        if let Some(rest) = after_word(content, "as") {
+            let rest = rest.trim_matches(is_gap);
+            if is_type(rest) {
+                return Self::Annotation(Annotation::Converts(
+                    rest.to_owned(),
+                ));
+            }
         }
         if let Some(rest) = after_word(content, "inline") {
             return if rest.is_empty() {
@@ -158,6 +174,30 @@ fn after_word<'a>(content: &'a str, word: &str) -> Option<&'a str> {
 /// changes nothing.
 fn is_gap(c: char) -> bool {
     matches!(c, ' ' | '\t' | '\n' | '\r' | '\x0B' | '\x0C')
+}
+
+/// Returns whether `text` reads as a Rust type: a primitive, or a path whose
+/// last part starts with a capital letter.
+fn is_type(text: &str) -> bool {
+    const PRIMITIVES: &[&str] = &[
+        "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64",
+        "u128", "usize", "f32", "f64", "bool", "char",
+    ];
+    let path = text.strip_prefix("::").unwrap_or(text);
+    let parts: Vec<&str> = path.split("::").collect();
+    let identifier = |part: &&str| {
+        let mut chars = part.chars();
+        chars
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+            && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+    };
+    if !parts.iter().all(identifier) {
+        return false;
+    }
+    let last = parts[parts.len() - 1];
+    parts.len() == 1 && PRIMITIVES.contains(&last)
+        || last.starts_with(|c: char| c.is_ascii_uppercase())
 }
 
 /// Returns whether `text` is lowercase words joined by `-`.
@@ -298,6 +338,24 @@ mod tests {
             );
         }
         assert_eq!(read("(* inline group *)"), Comment::MalformedInline);
+    }
+
+    #[test]
+    fn reads_a_conversion_to_a_rust_type() {
+        for (text, ty) in [
+            ("(* as u16 *)", "u16"),
+            ("(* as String *)", "String"),
+            ("(*as std::net::Ipv4Addr*)", "std::net::Ipv4Addr"),
+        ] {
+            assert_eq!(
+                read(text),
+                Comment::Annotation(Annotation::Converts(ty.to_owned())),
+                "{text:?}"
+            );
+        }
+        for text in ["(* as such *)", "(* as noted above *)", "(* as 1x *)"] {
+            assert_eq!(read(text), Comment::Ordinary, "{text:?}");
+        }
     }
 
     #[test]

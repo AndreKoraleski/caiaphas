@@ -15,7 +15,7 @@ use quote::{format_ident, quote};
 
 use crate::{
     analysis::{CharacterSet, Facts, revisited_rules},
-    generate::{exact::ExactWriter, name},
+    generate::{code, exact::ExactWriter, name},
     ir::{Expression, ExpressionKind, Grammar, Rule, RuleId},
 };
 
@@ -93,6 +93,15 @@ impl FunctionWriter<'_> {
         let (hidden, inline) = (rule.hidden, rule.inline);
         let quiet = hidden && self.facts.is_nullable(&rule.expression);
         let body = self.expression(&rule.expression);
+        // A rule whose type its text converts to fails where the type does not
+        // read the text.
+        let convert = code::value_type(rule).map(|value| {
+            quote! {
+                let end = end.filter(|&end| {
+                    parser.accepts::<#value>(&RULE, position, end)
+                });
+            }
+        });
         let recall = remembers.then(|| {
             quote! {
                 if let ::core::option::Option::Some(found) =
@@ -118,6 +127,7 @@ impl FunctionWriter<'_> {
                 #recall
                 let start = parser.start_rule(position);
                 let end = #body;
+                #convert
                 parser.finish_rule(&RULE, start, end)
             }
         }
