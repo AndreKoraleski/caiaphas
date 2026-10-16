@@ -4,18 +4,27 @@ members = ["caiaphas-cli", "caiaphas-generator", "caiaphas-macros"]
 default-members = [".", "caiaphas-cli", "caiaphas-generator", "caiaphas-macros"]
 
 [workspace.package]
+# Every crate of the workspace is released at this version together.
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/AndreKoraleski/caiaphas"
 
+# The crates of this workspace, each at exactly the version above, since the
+# code the macros generate calls into the internals of caiaphas. Cargo cannot
+# take these from `workspace.package`, so `cargo set-version` from cargo-edit
+# bumps all three at once.
+[workspace.dependencies.caiaphas-generator]
+path = "caiaphas-generator"
+version = "=0.1.0"
+
+[workspace.dependencies.caiaphas-macros]
+path = "caiaphas-macros"
+version = "=0.1.0"
+
 [workspace.dependencies]
 annotate-snippets = "0.12.16"
-# Exact versions, since generated code calls into the internals of caiaphas,
-# so the macros and the generator have to come from the same release.
-caiaphas-generator = { path = "caiaphas-generator", version = "=0.1.0" }
-caiaphas-macros = { path = "caiaphas-macros", version = "=0.1.0" }
 heck = "0.5.0"
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
