@@ -116,7 +116,12 @@ impl FindingKind {
     /// when it can be.
     pub(crate) fn help(&self) -> String {
         let code = self.code();
-        let remedy = self.remedy();
+        let mut remedy = self.remedy();
+        if code.is_greedy_only() {
+            remedy.push_str(
+                ", or remove `(* greedy *)` so the parser tries every way",
+            );
+        }
         match code.intended_behaviour() {
             Some(behaviour) => format!(
                 "{remedy}; if this is intended, write `(* expect {}: reason \

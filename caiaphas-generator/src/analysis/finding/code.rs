@@ -98,6 +98,19 @@ impl FindingCode {
         }
     }
 
+    /// Returns whether only a greedy rule has findings with this code, since
+    /// every other rule tries every way through its choices.
+    pub(crate) fn is_greedy_only(self) -> bool {
+        matches!(
+            self,
+            Self::LongerBranchConflict
+                | Self::OptionalFollowConflict
+                | Self::RepeatedFollowConflict
+                | Self::RequiredOptionalSequence
+                | Self::DeadEndRepeatedSequence
+        )
+    }
+
     /// Returns whether an expectation can mark a finding with this code as
     /// intended. Only warnings about the grammar itself can be.
     pub(crate) fn is_expectable(self) -> bool {

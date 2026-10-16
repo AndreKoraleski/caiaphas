@@ -70,7 +70,8 @@ const CASES: &[Case] = &[
                   which can also come after the choice, so a parser \
                   cannot tell which to take",
         help: "make what comes after the choice start differently from \
-               how this branch goes on; if this is intended, write `(* \
+               how this branch goes on, or remove `(* greedy *)` so the \
+               parser tries every way; if this is intended, write `(* \
                expect longer-branch-conflict: reason *)` right before the \
                rule, and the parser takes the longer branch whenever it \
                matches",
@@ -82,7 +83,8 @@ const CASES: &[Case] = &[
         message: "this optional sequence and what comes after it can both \
                   start with 'x', so a parser cannot tell whether to take \
                   it",
-        help: "make what comes after the sequence start differently; if \
+        help: "make what comes after the sequence start differently, or \
+               remove `(* greedy *)` so the parser tries every way; if \
                this is intended, write `(* expect \
                optional-follow-conflict: reason *)` right before the \
                rule, and the parser takes the sequence whenever it \
@@ -96,7 +98,8 @@ const CASES: &[Case] = &[
                   start with 'x', so a parser cannot tell whether to \
                   repeat it again",
         help: "end the repetition with something it cannot start with, or \
-               make what comes after it start differently; if this is \
+               make what comes after it start differently, or remove `(* \
+               greedy *)` so the parser tries every way; if this is \
                intended, write `(* expect repeated-follow-conflict: \
                reason *)` right before the rule, and the parser repeats \
                the sequence as long as it matches, so it extends as far \
@@ -110,7 +113,8 @@ const CASES: &[Case] = &[
                   come after it, so skipping it never leads to a match",
         help: "remove the `[...]` if the sequence is always needed, or \
                make what comes after it start with a character it cannot \
-               take; if this is intended, write `(* expect \
+               take, or remove `(* greedy *)` so the parser tries every \
+               way; if this is intended, write `(* expect \
                required-optional-sequence: reason *)` right before the \
                rule, and the grammar stays as it is",
     },
@@ -122,7 +126,8 @@ const CASES: &[Case] = &[
                   come after it, so nothing after it can ever match",
         help: "move what comes after the repetition before it, so `{'x'}, \
                'x'` becomes `'x', {'x'}`, or make what comes after it \
-               start with a character it cannot take; if this is \
+               start with a character it cannot take, or remove `(* \
+               greedy *)` so the parser tries every way; if this is \
                intended, write `(* expect dead-end-repeated-sequence: \
                reason *)` right before the rule, and the grammar stays as \
                it is",
