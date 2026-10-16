@@ -79,6 +79,7 @@ mod span;
 
 #[doc(hidden)]
 pub mod __private;
+pub mod tutorial;
 
 pub use caiaphas_macros::grammar;
 pub use error::{Error, Expected};
