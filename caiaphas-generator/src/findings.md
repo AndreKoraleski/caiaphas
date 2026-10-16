@@ -20,9 +20,9 @@ end. Write the recursion as a repetition: `expression = term, {'+', term};`.
 ## indirect-left-recursion
 
 Error. A rule can reach itself through other rules before reading anything, as
-`a` does in `a = b, 'x' | 'y'; b = a, 'z';`. Replace the rule it goes through
-with its definition until the recursion is direct, then write it as a
-repetition.
+`a` does in `s = a; a = b, 'x' | 'y'; b = a, 'z';`. Replace the rule it goes
+through with its definition until the recursion is direct, then write it as a
+repetition. Each cycle is reported once, at the first of its rules.
 
 ## unproductive-rule
 
@@ -93,7 +93,7 @@ one of them read something.
 ## unreachable-rule
 
 Warning. No start rule reaches a rule, so no parser uses it. In
-`s = 'x'; a = b; b = [a], 'y';`, `a` and `b` only reach each other. Remove the
+`s = 'x'; a = b; b = 'y', [a];`, `a` and `b` only reach each other. Remove the
 rule, or reference it from a rule a parser uses.
 
 ## unreachable-alternative
@@ -129,7 +129,8 @@ exception so something is left.
 
 Warning. Two rules have names that differ only in case, as `digit` and
 `Digit` do, and those are easy to mistake. Rename one of them, or merge them
-if they mean the same.
+if they mean the same. When both have types, the types would share a name,
+and that stops the build anyway.
 
 ## mixed-class-range
 
