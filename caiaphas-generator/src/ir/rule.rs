@@ -37,6 +37,9 @@ pub(crate) struct Rule {
     pub(crate) expectations: Vec<Expectation>,
     /// Whether a hide leaves the rule out of the generated types.
     pub(crate) hidden: bool,
+    /// Whether the choices written in the rule take their first alternative
+    /// that matches, instead of the one that matches the most.
+    pub(crate) first_match: bool,
     /// The syntax rule it comes from.
     pub(crate) span: Span,
 }

@@ -37,6 +37,7 @@ impl Lowering<'_, '_> {
             expression: self.definitions_list(&syntax_rule.definitions_list),
             expectations: syntax_rule.expectations.clone(),
             hidden: syntax_rule.hidden,
+            first_match: syntax_rule.first_match,
             span: syntax_rule.span,
         }
     }

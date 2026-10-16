@@ -16,6 +16,11 @@
 //! for the grammar, so the rules that use it get no field for it. It suits
 //! rules whose matches nobody reads, such as whitespace between tokens.
 //!
+//! A first match, written `(* first match *)`, makes every choice written in
+//! the rule take the first alternative that matches, in the order written,
+//! instead of the one that matches the most. It suits rules whose order says
+//! which alternative wins, as it does in a PEG.
+//!
 //! Each comment holds one annotation, and a rule can have several. The
 //! standard reads quotes in a comment as terminal strings, so a reason cannot
 //! hold a lone `'` or `"`.
@@ -39,6 +44,9 @@ pub(crate) enum Annotation {
     Expectation(Expectation),
     /// Leaves the rule out of the types generated for the grammar.
     Hide,
+    /// Makes the choices written in the rule take their first alternative
+    /// that matches.
+    FirstMatch,
 }
 
 /// What a comment holds.
@@ -51,6 +59,8 @@ pub(crate) enum Comment {
     MalformedExpectation,
     /// Text that starts with `hide` but holds more than that.
     MalformedHide,
+    /// Text that starts with `first match` but holds more than that.
+    MalformedFirstMatch,
 }
 
 impl Comment {
@@ -66,6 +76,16 @@ impl Comment {
                 Self::Annotation(Annotation::Hide)
             } else {
                 Self::MalformedHide
+            };
+        }
+        let first_match = after_word(content, "first").and_then(|rest| {
+            after_word(rest.trim_start_matches(is_gap), "match")
+        });
+        if let Some(rest) = first_match {
+            return if rest.is_empty() {
+                Self::Annotation(Annotation::FirstMatch)
+            } else {
+                Self::MalformedFirstMatch
             };
         }
         let Some(rest) = after_word(content, "expect") else {
@@ -173,6 +193,8 @@ mod tests {
             "(* see expect below *)",
             "(* hidden for now *)",
             "(* hides the rest *)",
+            "(* first, the header *)",
+            "(* first matching rule *)",
         ] {
             assert_eq!(read(text), Comment::Ordinary, "{text:?}");
         }
@@ -193,6 +215,28 @@ mod tests {
     fn rejects_a_hide_with_more_after_it() {
         for text in ["(* hide whitespace *)", "(* hide: whitespace *)"] {
             assert_eq!(read(text), Comment::MalformedHide, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn reads_a_first_match() {
+        for text in [
+            "(* first match *)",
+            "(*first  match*)",
+            "(*\nfirst\nmatch\n*)",
+        ] {
+            assert_eq!(
+                read(text),
+                Comment::Annotation(Annotation::FirstMatch),
+                "{text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_a_first_match_with_more_after_it() {
+        for text in ["(* first match wins *)", "(* first match: always *)"] {
+            assert_eq!(read(text), Comment::MalformedFirstMatch, "{text:?}");
         }
     }
 

@@ -15,6 +15,8 @@ adheres to [Semantic Versioning][semver].
 - Checks for problems in a grammar, each with a suggestion, which stop the
   build unless an `(* expect code: reason *)` comment marks them as intended.
 - `(* hide *)`, which leaves a rule out of the generated types.
+- `(* first match *)`, which makes the choices of a rule take the first
+  alternative that matches instead of the longest.
 - `Span`, which tells where a rule matched in its input, and `Error`, which
   tells where an input stops matching and what could have come there.
 

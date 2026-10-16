@@ -46,6 +46,9 @@
 //! alternative that matches the most text, and the first written of those that
 //! tie. Optional and repeated sequences take as much as they can.
 //!
+//! The choices of a rule written right after `(* first match *)` take the
+//! first alternative that matches instead, in the order written, as in a PEG.
+//!
 //! # Problems
 //!
 //! Before generating, the macro looks for what would make the parser fail, or

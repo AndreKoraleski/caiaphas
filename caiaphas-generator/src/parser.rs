@@ -71,6 +71,13 @@ pub(crate) fn parse(source: &str) -> (Syntax, Vec<ParseError>) {
                 });
                 continue;
             }
+            Comment::MalformedFirstMatch => {
+                errors.push(ParseError {
+                    kind: ParseErrorKind::MalformedFirstMatch,
+                    span,
+                });
+                continue;
+            }
         };
         let inside = attempts
             .iter()
@@ -87,6 +94,7 @@ pub(crate) fn parse(source: &str) -> (Syntax, Vec<ParseError>) {
                         rule.expectations.push(expectation);
                     }
                     Annotation::Hide => rule.hidden = true,
+                    Annotation::FirstMatch => rule.first_match = true,
                 }
             }
             _ => errors.push(ParseError {
@@ -243,6 +251,8 @@ pub(crate) enum ParseErrorKind {
     MalformedExpectation,
     /// A comment starts with `hide` but holds more than that.
     MalformedHide,
+    /// A comment starts with `first match` but holds more than that.
+    MalformedFirstMatch,
     /// An annotation is not right before a syntax rule.
     AnnotationWithoutRule,
 }
@@ -293,9 +303,12 @@ impl fmt::Display for ParseError {
             ParseErrorKind::MalformedHide => {
                 f.write_str("a rule is hidden with `(* hide *)` alone")
             }
+            ParseErrorKind::MalformedFirstMatch => f.write_str(
+                "a rule takes the first match with `(* first match *)` alone",
+            ),
             ParseErrorKind::AnnotationWithoutRule => f.write_str(
-                "an `expect` or `hide` comment must come right before the \
-                 syntax rule it is about",
+                "an `expect`, `hide` or `first match` comment must come right \
+                 before the syntax rule it is about",
             ),
         }
     }
@@ -677,6 +690,32 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn takes_the_first_match_in_the_rule_after_a_first_match() {
+        let syntax = parse_valid(
+            "s = a, b; (* first match *) a = 'x' | 'xy'; b = 'y';",
+        );
+        let first_match: Vec<bool> = syntax
+            .syntax_rules
+            .iter()
+            .map(|rule| rule.first_match)
+            .collect();
+        assert_eq!(first_match, [false, true, false]);
+    }
+
+    #[test]
+    fn rejects_a_malformed_first_match() {
+        let (syntax, errors) = parse("(* first match now *) a = 'x';");
+        assert!(!syntax.syntax_rules[0].first_match);
+        assert_eq!(
+            errors,
+            [ParseError {
+                kind: ParseErrorKind::MalformedFirstMatch,
+                span: Span { start: 0, end: 21 },
+            }]
+        );
+    }
+
+    #[test]
     fn rejects_a_malformed_hide() {
         let (syntax, errors) = parse("(* hide spaces *) a = 'x';");
         assert!(!syntax.syntax_rules[0].hidden);
@@ -822,9 +861,13 @@ pub(crate) mod tests {
                 "a rule is hidden with `(* hide *)` alone",
             ),
             (
+                error(ParseErrorKind::MalformedFirstMatch),
+                "a rule takes the first match with `(* first match *)` alone",
+            ),
+            (
                 error(ParseErrorKind::AnnotationWithoutRule),
-                "an `expect` or `hide` comment must come right before the \
-                 syntax rule it is about",
+                "an `expect`, `hide` or `first match` comment must come right \
+                 before the syntax rule it is about",
             ),
         ];
         for (error, message) in cases {

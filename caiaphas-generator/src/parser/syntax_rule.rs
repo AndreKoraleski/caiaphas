@@ -20,6 +20,9 @@ pub(crate) struct SyntaxRule {
     /// Whether a hide right before the rule leaves it out of the generated
     /// types.
     pub(crate) hidden: bool,
+    /// Whether a first match right before the rule makes its choices take
+    /// their first alternative that matches.
+    pub(crate) first_match: bool,
     /// From the meta identifier to the terminator, both included.
     pub(crate) span: Span,
 }
@@ -46,6 +49,7 @@ impl SyntaxRule {
             definitions_list,
             expectations: Vec::new(),
             hidden: false,
+            first_match: false,
             span: start.to(end),
         })
     }

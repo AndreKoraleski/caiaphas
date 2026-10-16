@@ -108,6 +108,16 @@ mod tests {
     }
 
     #[test]
+    fn takes_the_first_match_where_a_rule_asks_for_it() {
+        let items = |source| generate(source, "g.ebnf").unwrap().to_string();
+        let longest = items("s = a | b; a = 'x'; b = 'y';");
+        assert!(longest.contains("Expression :: Choice"), "{longest}");
+        let first = items("(* first match *) s = a | b; a = 'x'; b = 'y';");
+        assert!(first.contains("Expression :: First"), "{first}");
+        assert!(!first.contains("Expression :: Choice"), "{first}");
+    }
+
+    #[test]
     fn stops_at_errors() {
         assert_eq!(
             problems("s = a;"),

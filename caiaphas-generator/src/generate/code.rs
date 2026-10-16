@@ -95,7 +95,11 @@ fn written(rule: &Rule) -> String {
 /// `remembers` its matches.
 fn rule_table(rule: &Rule, remembers: bool, facts: &Facts<'_>) -> TokenStream {
     let name = written(rule);
-    let expression = expression(&rule.expression, facts);
+    let tables = Tables {
+        facts,
+        first_match: rule.first_match,
+    };
+    let expression = tables.expression(&rule.expression);
     let hidden = rule.hidden;
     quote! {
         __caiaphas::Rule {
@@ -107,82 +111,103 @@ fn rule_table(rule: &Rule, remembers: bool, facts: &Facts<'_>) -> TokenStream {
     }
 }
 
-/// Returns the table of `expression`, with `facts` about its grammar.
-fn expression(expression: &Expression, facts: &Facts<'_>) -> TokenStream {
-    let table_of = |expression| self::expression(expression, facts);
-    match &expression.kind {
-        ExpressionKind::SingleDefinition(expressions) => {
-            let expressions = expressions.iter().map(table_of);
-            quote! { __caiaphas::Expression::Sequence(&[#(#expressions),*]) }
-        }
-        ExpressionKind::DefinitionsList(expressions) => {
-            let branches =
-                expressions.iter().map(|branch| self::branch(branch, facts));
-            quote! { __caiaphas::Expression::Choice(&[#(#branches),*]) }
-        }
-        ExpressionKind::OptionalSequence(expression) => {
-            let branch = branch(expression, facts);
-            quote! { __caiaphas::Expression::Optional(&#branch) }
-        }
-        ExpressionKind::RepeatedSequence(expression) => {
-            let branch = branch(expression, facts);
-            quote! { __caiaphas::Expression::Repeated(&#branch) }
-        }
-        ExpressionKind::SyntacticFactor {
-            integer,
-            syntactic_primary,
-        } => {
-            let integer = Literal::u32_unsuffixed(*integer);
-            let expression = table_of(syntactic_primary);
-            quote! { __caiaphas::Expression::Times(#integer, &#expression) }
-        }
-        ExpressionKind::SyntacticTerm {
-            syntactic_factor,
-            syntactic_exception,
-        } => {
-            let factor = table_of(syntactic_factor);
-            let exception = table_of(syntactic_exception);
-            quote! { __caiaphas::Expression::Except(&#factor, &#exception) }
-        }
-        ExpressionKind::MetaIdentifier(RuleId(position)) => {
-            let position = Literal::usize_unsuffixed(*position);
-            quote! { __caiaphas::Expression::Rule(#position) }
-        }
-        ExpressionKind::TerminalString(text) => {
-            quote! { __caiaphas::Expression::Text(#text) }
-        }
-        ExpressionKind::SpecialSequence(range) => {
-            let (first, last) = (range.start(), range.end());
-            quote! { __caiaphas::Expression::Range(#first, #last) }
-        }
-        ExpressionKind::EmptySequence => {
-            quote! { __caiaphas::Expression::Empty }
-        }
-    }
+/// Writes the tables of the expressions of one rule.
+struct Tables<'a> {
+    facts: &'a Facts<'a>,
+    /// Whether the rule's choices take their first alternative that matches.
+    first_match: bool,
 }
 
-/// Returns the table of `expression` as a branch a parser can take or not,
-/// with the characters it can start with, so a parser can skip it when the
-/// next character is none of them.
-///
-/// A branch that can match nothing can start anywhere, and a terminal string
-/// or special sequence already fails on its first character, so those are
-/// left as they are.
-fn branch(expression: &Expression, facts: &Facts<'_>) -> TokenStream {
-    let table = self::expression(expression, facts);
-    let checks_itself = matches!(
-        expression.kind,
-        ExpressionKind::TerminalString(_) | ExpressionKind::SpecialSequence(_)
-    );
-    if checks_itself || facts.is_nullable(expression) {
-        return table;
+impl Tables<'_> {
+    /// Returns the table of `expression`.
+    fn expression(&self, expression: &Expression) -> TokenStream {
+        let table_of = |expression| self.expression(expression);
+        match &expression.kind {
+            ExpressionKind::SingleDefinition(expressions) => {
+                let expressions = expressions.iter().map(table_of);
+                quote! {
+                    __caiaphas::Expression::Sequence(&[#(#expressions),*])
+                }
+            }
+            ExpressionKind::DefinitionsList(expressions) => {
+                let branches =
+                    expressions.iter().map(|branch| self.branch(branch));
+                let choice = if self.first_match {
+                    quote! { First }
+                } else {
+                    quote! { Choice }
+                };
+                quote! { __caiaphas::Expression::#choice(&[#(#branches),*]) }
+            }
+            ExpressionKind::OptionalSequence(expression) => {
+                let branch = self.branch(expression);
+                quote! { __caiaphas::Expression::Optional(&#branch) }
+            }
+            ExpressionKind::RepeatedSequence(expression) => {
+                let branch = self.branch(expression);
+                quote! { __caiaphas::Expression::Repeated(&#branch) }
+            }
+            ExpressionKind::SyntacticFactor {
+                integer,
+                syntactic_primary,
+            } => {
+                let integer = Literal::u32_unsuffixed(*integer);
+                let expression = table_of(syntactic_primary);
+                quote! {
+                    __caiaphas::Expression::Times(#integer, &#expression)
+                }
+            }
+            ExpressionKind::SyntacticTerm {
+                syntactic_factor,
+                syntactic_exception,
+            } => {
+                let factor = table_of(syntactic_factor);
+                let exception = table_of(syntactic_exception);
+                quote! {
+                    __caiaphas::Expression::Except(&#factor, &#exception)
+                }
+            }
+            ExpressionKind::MetaIdentifier(RuleId(position)) => {
+                let position = Literal::usize_unsuffixed(*position);
+                quote! { __caiaphas::Expression::Rule(#position) }
+            }
+            ExpressionKind::TerminalString(text) => {
+                quote! { __caiaphas::Expression::Text(#text) }
+            }
+            ExpressionKind::SpecialSequence(range) => {
+                let (first, last) = (range.start(), range.end());
+                quote! { __caiaphas::Expression::Range(#first, #last) }
+            }
+            ExpressionKind::EmptySequence => {
+                quote! { __caiaphas::Expression::Empty }
+            }
+        }
     }
-    let first = facts.first(expression);
-    let ranges = first.ranges().iter().map(|range| {
-        let (first, last) = (range.start(), range.end());
-        quote! { (#first, #last) }
-    });
-    quote! { __caiaphas::Expression::StartsWith(&[#(#ranges),*], &#table) }
+
+    /// Returns the table of `expression` as a branch a parser can take or not,
+    /// with the characters it can start with, so a parser can skip it when the
+    /// next character is none of them.
+    ///
+    /// A branch that can match nothing can start anywhere, and a terminal
+    /// string or special sequence already fails on its first character, so
+    /// those are left as they are.
+    fn branch(&self, expression: &Expression) -> TokenStream {
+        let table = self.expression(expression);
+        let checks_itself = matches!(
+            expression.kind,
+            ExpressionKind::TerminalString(_)
+                | ExpressionKind::SpecialSequence(_)
+        );
+        if checks_itself || self.facts.is_nullable(expression) {
+            return table;
+        }
+        let first = self.facts.first(expression);
+        let ranges = first.ranges().iter().map(|range| {
+            let (first, last) = (range.start(), range.end());
+            quote! { (#first, #last) }
+        });
+        quote! { __caiaphas::Expression::StartsWith(&[#(#ranges),*], &#table) }
+    }
 }
 
 /// Returns the `parse` function of the start rule `rule`, numbered `position`.

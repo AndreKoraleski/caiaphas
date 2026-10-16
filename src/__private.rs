@@ -4,9 +4,11 @@
 //! in any release.
 //!
 //! Each choice takes the branch that matches the most text, and the first
-//! written of those that tie. Optional and repeated sequences take as much as
-//! they can. A rule that a parser can try more than once at the same place
-//! remembers its match there, so trying every branch never matches it twice.
+//! written of those that tie, unless its rule takes the first match, when it
+//! takes the first branch that matches. Optional and repeated sequences take
+//! as much as they can. A rule that a parser can try more than once at the
+//! same place remembers its match there, so trying every branch never matches
+//! it twice.
 //!
 //! A parse notes nothing about why an input might not match. Only when it does
 //! not match is it matched again, noting at each failure what could have been
@@ -48,6 +50,8 @@ pub enum Expression {
     Sequence(&'static [Expression]),
     /// Matches the branch that matches the most.
     Choice(&'static [Expression]),
+    /// Matches the first branch that matches, in the order written.
+    First(&'static [Expression]),
     /// Matches the expression if it can.
     Optional(&'static Expression),
     /// Matches the expression as many times as it can.
@@ -386,6 +390,9 @@ impl<'i> Parser<'i> {
                 }
                 longest
             }
+            Expression::First(expressions) => expressions
+                .iter()
+                .find_map(|expression| self.expression(expression, position)),
             Expression::Optional(expression) => {
                 Some(self.expression(expression, position).unwrap_or(position))
             }
@@ -576,6 +583,37 @@ mod tests {
         let tree = parse(&SHARED, 0, "zy").unwrap();
         assert_eq!(outline(tree.root()), "0(1:z)");
         assert_eq!(tree.nodes.len(), 2);
+    }
+
+    /// `s = item, {item}; (* first match *) item = 'a' | 'ab' | 'b';`
+    static FIRST: Grammar = Grammar {
+        rules: &[
+            Rule {
+                name: "s",
+                expression: Expression::Sequence(&[
+                    Expression::Rule(1),
+                    Expression::Repeated(&Expression::Rule(1)),
+                ]),
+                hidden: false,
+                remembers: false,
+            },
+            Rule {
+                name: "item",
+                expression: Expression::First(&[
+                    Expression::Text("a"),
+                    Expression::Text("ab"),
+                    Expression::Text("b"),
+                ]),
+                hidden: false,
+                remembers: false,
+            },
+        ],
+    };
+
+    #[test]
+    fn takes_the_first_branch_that_matches_where_the_rule_asks() {
+        let tree = parse(&FIRST, 0, "ab").unwrap();
+        assert_eq!(outline(tree.root()), "0(1:a, 1:b)");
     }
 
     /// `word = keyword | name; keyword = 'if'; name = letter, {letter};`
