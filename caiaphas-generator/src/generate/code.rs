@@ -62,7 +62,7 @@ pub(crate) fn module(
             start.then(|| parse(rule, RuleId(position), general[position]));
         let from_str = start.then(|| from_str(&names.types[position]));
         let documentation = format!(
-            " The type of the `{}` rule:\n\n```text\n{}\n```",
+            " The type of the `{}` rule.\n\n```text\n{}\n```",
             name::spaced(rule),
             &source[rule.span.range()],
         );
