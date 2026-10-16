@@ -41,7 +41,15 @@ pub(crate) fn parse(source: &str) -> (Syntax, Vec<ParseError>) {
                 rules.push(rule);
             }
             Err(error) => {
-                parser.errors.push(error);
+                // A token the lexer could not read leaves a gap in the rule,
+                // so an error after it only repeats that one.
+                let after_lex_error = parser.errors.iter().any(|earlier| {
+                    matches!(earlier.kind, ParseErrorKind::Lex(_))
+                        && earlier.span.start >= start
+                });
+                if !after_lex_error {
+                    parser.errors.push(error);
+                }
                 parser.skip_past_terminator();
                 attempts.push(Span {
                     start,
@@ -495,5 +503,12 @@ pub(crate) mod tests {
                 ParseCommentlessSymbolError::NotCommentless('@')
             ))]
         );
+    }
+
+    #[test]
+    fn leaves_out_what_a_token_it_could_not_read_leads_to() {
+        let found = kinds("a = \"x;\nb = 'y';\n");
+        assert_eq!(found.len(), 1);
+        assert!(matches!(found[0], ParseErrorKind::Lex(_)), "{found:?}");
     }
 }
