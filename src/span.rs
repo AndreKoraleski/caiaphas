@@ -5,7 +5,7 @@ use std::{
     hash::{Hash, Hasher},
     iter,
     ops::Range,
-    sync::{Arc, OnceLock},
+    sync::Arc,
 };
 
 /// Where something a parser read is in its input, with the text there.
@@ -22,15 +22,19 @@ pub struct Span {
 #[derive(Debug)]
 pub(crate) struct Input {
     text: Box<str>,
-    /// Where each line starts, found the first time a span asks for its line.
-    line_starts: OnceLock<Vec<usize>>,
+    /// Where each line starts. They are found up front, not when a span first
+    /// asks for its line, so that a span has no interior mutability and a type
+    /// that holds one can key a map.
+    line_starts: Box<[usize]>,
 }
 
 impl Input {
     pub(crate) fn new(text: &str) -> Self {
+        let after_breaks =
+            text.match_indices('\n').map(|(index, _)| index + 1);
         Self {
             text: text.into(),
-            line_starts: OnceLock::new(),
+            line_starts: iter::once(0).chain(after_breaks).collect(),
         }
     }
 
@@ -39,15 +43,10 @@ impl Input {
     }
 
     /// Returns what [`line_and_column`] does for the byte `offset`, reading
-    /// only the line it is on once the line starts are known.
+    /// only the line it is on.
     fn line_and_column(&self, offset: usize) -> (usize, usize) {
-        let line_starts = self.line_starts.get_or_init(|| {
-            let after_breaks =
-                self.text.match_indices('\n').map(|(index, _)| index + 1);
-            iter::once(0).chain(after_breaks).collect()
-        });
-        let line = line_starts.partition_point(|&start| start <= offset);
-        let line_start = line_starts[line - 1];
+        let line = self.line_starts.partition_point(|&start| start <= offset);
+        let line_start = self.line_starts[line - 1];
         (line, self.text[line_start..offset].chars().count() + 1)
     }
 }
