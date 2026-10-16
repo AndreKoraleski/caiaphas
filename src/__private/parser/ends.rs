@@ -160,8 +160,8 @@ impl Ends {
         self
     }
 
-    /// Returns the only end of an expression that has at most one, and that
-    /// the rest of a match goes on from.
+    /// Returns the one end of an expression that has exactly one here. The
+    /// rest of a match goes on from it.
     #[must_use]
     pub fn only(&self) -> usize {
         let ends = self.as_slice();

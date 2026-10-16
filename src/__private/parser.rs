@@ -165,8 +165,9 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         }
     }
 
-    /// Returns where the characters from `position` on that `contains` holds
-    /// for end, and notes each part of the set in `expected` there.
+    /// Returns where the longest run of characters from `position` that
+    /// `contains` holds for ends, and notes each part of the set in `expected`
+    /// there.
     pub fn span(
         &mut self,
         position: usize,
@@ -354,8 +355,8 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         true
     }
 
-    /// Returns the node of `rule` that matched `range`, whose children are the
-    /// nodes matched since `mark`. A hidden rule has no node, so it drops
+    /// Returns the node of `rule` that matched `range`, with the nodes matched
+    /// since `mark` as its children. A hidden rule has no node, so it drops
     /// those nodes.
     fn node(
         &mut self,

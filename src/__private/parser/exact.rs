@@ -19,7 +19,7 @@ pub(super) struct RememberedEnds {
 }
 
 impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
-    /// Returns every place where the characters from `position` on that
+    /// Returns every place where a run of characters from `position` that
     /// `contains` holds for can end, the furthest first, and notes each of
     /// `expected` at the furthest.
     pub fn span_ends(
@@ -234,8 +234,8 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         Some(ends)
     }
 
-    /// Finishes `rule`, whose matches from `start` can end at `ends`,
-    /// remembers them, and returns them.
+    /// Finishes `rule` with the ends its matches from `start` can have, and
+    /// remembers and returns them.
     pub fn finish_ends(
         &mut self,
         rule: &Rule,
@@ -252,8 +252,8 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         ends
     }
 
-    /// Returns the node of `rule` built from `start` up to `end`, whose
-    /// children are the nodes built since.
+    /// Returns the node of `rule` built from `start` up to `end`, with the
+    /// nodes built since as its children.
     pub fn built(
         &mut self,
         rule: &Rule,
