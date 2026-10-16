@@ -3,12 +3,14 @@
 //! alternative that matches the most, so it only has to pick between two when
 //! they tie, and then it takes the one written first.
 //!
-//! Whether two alternatives can match the same text is only told when one of
-//! them matches single characters or a few fixed texts, so other alternatives
-//! are left alone. Alternatives written the same way are left to the duplicate
-//! alternative check, and those that can both match nothing to the nullable
-//! branches check. Rules that take the first match are left alone, since there
-//! the first written alternative is meant to win.
+//! Whether two alternatives can match the same text is told for sure when one
+//! of them matches single characters or a few fixed texts. Otherwise short
+//! texts each may match are tried on both, so a tie found is always real, but
+//! one that needs a longer text can go unreported. Alternatives written the
+//! same way are left to the duplicate alternative check, and those that can
+//! both match nothing to the nullable branches check. Rules that take the
+//! first match are left alone, since there the first written alternative is
+//! meant to win.
 
 use crate::{
     analysis::{
@@ -17,6 +19,7 @@ use crate::{
         finding::{Finding, FindingKind},
         grammar_check::unreachable_alternative,
         matcher,
+        samples::Sampler,
     },
     diagnostic::Label,
     ir::{Expression, ExpressionKind, Grammar, RuleId},
@@ -29,6 +32,7 @@ pub(super) fn check(
     facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
+    let mut sampler = Sampler::new(grammar);
     let longest_match =
         grammar.syntax_rules.iter().filter(|rule| !rule.first_match);
     for rule in longest_match {
@@ -49,7 +53,7 @@ pub(super) fn check(
                     continue;
                 }
                 let tie = alternatives[..index].iter().find_map(|earlier| {
-                    shared(grammar, facts, rule.greedy, earlier, later)
+                    shared(&mut sampler, facts, rule.greedy, earlier, later)
                         .map(|matched| (earlier, matched))
                 });
                 if let Some((earlier, matched)) = tie {
@@ -93,7 +97,7 @@ fn written(grammar: &Grammar, expression: &Expression) -> Option<String> {
 /// Returns what both `earlier` and `later`, written in a rule that is `greedy`
 /// or not, can match, as a message tells it, when it can be told.
 fn shared(
-    grammar: &Grammar,
+    sampler: &mut Sampler<'_>,
     facts: &Facts<'_>,
     greedy: bool,
     earlier: &Expression,
@@ -109,16 +113,31 @@ fn shared(
         let characters = earlier.intersection(&later);
         return (!characters.is_empty()).then(|| characters.described());
     }
-    [(earlier, later), (later, earlier)]
-        .into_iter()
-        .find_map(|(fixed, other)| {
-            matcher::texts(grammar, fixed)?.into_iter().find(|text| {
-                !text.is_empty()
-                    && matcher::matches_all(grammar, other, text, greedy)
-                        == Some(true)
-            })
-        })
-        .map(|text| format!("`{}`", character_set::shown(&text)))
+    if facts
+        .first(earlier)
+        .intersection(&facts.first(later))
+        .is_empty()
+    {
+        return None;
+    }
+    let grammar = sampler.grammar();
+    let matches = |expression, text: &str| {
+        matcher::matches_all(grammar, expression, text, greedy) == Some(true)
+    };
+    // The texts of a branch that only matches a few are all of them, so they
+    // tell for sure.
+    let listed = [(earlier, later), (later, earlier)].into_iter().find_map(
+        |(fixed, other)| Some((matcher::texts(grammar, fixed)?, other)),
+    );
+    let shared = match listed {
+        Some((texts, other)) => texts
+            .into_iter()
+            .find(|text| !text.is_empty() && matches(other, text)),
+        None => sampler.samples(earlier).into_iter().find(|text| {
+            !text.is_empty() && matches(earlier, text) && matches(later, text)
+        }),
+    };
+    shared.map(|text| format!("`{}`", character_set::shown(&text)))
 }
 
 #[cfg(test)]
@@ -188,6 +207,22 @@ mod tests {
         let found = ties("a = 'x', {'x'} | ('xx' | 'y');");
         assert_eq!(found.len(), 1);
         assert!(found[0].0.contains("`xx`"), "{found:?}");
+    }
+
+    #[test]
+    fn finds_a_text_that_two_unbounded_alternatives_match() {
+        let source = "token = number | name; number = digit, {digit}; \
+                      name = (letter | digit), {letter | digit}; \
+                      letter = ? U+0061..U+007A ?; \
+                      digit = ? U+0030..U+0039 ?;";
+        let found = ties(source);
+        assert_eq!(found.len(), 1);
+        assert!(found[0].0.contains("`0`"), "{found:?}");
+        let apart = "token = number | name; number = digit, {digit}; \
+                     name = letter, {letter | digit}; \
+                     letter = ? U+0061..U+007A ?; \
+                     digit = ? U+0030..U+0039 ?;";
+        assert_eq!(ties(apart), []);
     }
 
     #[test]

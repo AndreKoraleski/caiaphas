@@ -15,6 +15,7 @@ mod facts;
 mod finding;
 mod grammar_check;
 mod matcher;
+mod samples;
 
 pub(crate) use character_set::CharacterSet;
 use choice_check::CHOICE_CHECKS;

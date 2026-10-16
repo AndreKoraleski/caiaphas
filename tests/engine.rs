@@ -476,11 +476,13 @@ fn leaves_no_node_of_a_rule_that_did_not_match() {
 }
 
 caiaphas::grammar!(mod ends_apart {
-    "s = a, 'ab' | a, 'b'; a = {'a'};"
+    "(* expect tied-branches: the first wins *)
+     s = a, 'ab' | a, 'b'; a = {'a'};"
 });
 
 caiaphas::grammar!(mod ends_apart_optimized {
-    "s = a, 'ab' | a, 'b'; a = {'a'};"
+    "(* expect tied-branches: the first wins *)
+     s = a, 'ab' | a, 'b'; a = {'a'};"
 }, optimize);
 
 caiaphas::grammar!(mod duplicates_optimized {
