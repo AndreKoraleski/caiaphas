@@ -85,6 +85,7 @@ pub(super) fn structure(
 ) -> TokenStream {
     let name = &names.types[position];
     let this = name::spaced(&grammar.syntax_rules[position]);
+    let display = display(name);
     let field_names: Vec<&Ident> = fields
         .iter()
         .map(|field| &names.fields[field.rule.0])
@@ -158,6 +159,8 @@ pub(super) fn structure(
                 &self.span
             }
         }
+
+        #display
 
         impl __caiaphas::FromNode for #name {
             fn from_node(node: __caiaphas::Node<'_>) -> Self {
@@ -241,6 +244,7 @@ pub(super) fn enumeration(
         }
     }
     let derives = derives(names, position);
+    let display = texts.is_some().then(|| display(name));
     let text = texts.map(|texts| {
         quote! {
             /// Returns the text this rule matched.
@@ -264,6 +268,8 @@ pub(super) fn enumeration(
             #text
         }
 
+        #display
+
         impl __caiaphas::FromNode for #name {
             fn from_node(node: __caiaphas::Node<'_>) -> Self {
                 match node.child() {
@@ -276,6 +282,21 @@ pub(super) fn enumeration(
                         _ => ::core::unreachable!(),
                     },
                 }
+            }
+        }
+    }
+}
+
+/// Returns the implementation that writes the type `name` as the text its rule
+/// matched.
+fn display(name: &Ident) -> TokenStream {
+    quote! {
+        impl ::core::fmt::Display for #name {
+            fn fmt(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(self.text())
             }
         }
     }

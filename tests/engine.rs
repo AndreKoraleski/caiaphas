@@ -520,3 +520,11 @@ fn ends_a_comment_at_the_first_end_its_exception_names() {
     assert_eq!(comment::Comment::parse("/* a */").unwrap().body, " a ");
     assert!(comment::Comment::parse("/* a */ b */").is_err());
 }
+
+#[test]
+fn writes_a_type_as_the_text_its_rule_matched() {
+    let parsed = list::Numbers::parse("12,(3,4)").unwrap();
+    assert_eq!(parsed.to_string(), "12,(3,4)");
+    let word = phrase::Phrase::parse("affy").unwrap().word;
+    assert_eq!(word.to_string(), "af");
+}
