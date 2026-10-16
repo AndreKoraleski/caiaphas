@@ -8,7 +8,9 @@
 //! they can. Each rule remembers its match at every position, so trying every
 //! branch never matches a rule twice in the same place.
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
+
+use rustc_hash::FxHashMap;
 
 use crate::{
     error::{Error, Expected},
@@ -186,8 +188,10 @@ struct Parser<'i> {
     grammar: &'static Grammar,
     input: &'i str,
     nodes: Vec<NodeData>,
-    /// The match of each rule at each position.
-    matches: HashMap<(usize, usize), Match>,
+    /// The match of each rule at each position. The keys are small numbers an
+    /// input cannot pick freely, so a fast hasher that does not resist
+    /// collisions suits them.
+    matches: FxHashMap<(usize, usize), Match>,
     /// The furthest position where something failed to match.
     furthest: usize,
     /// What could have been read at the furthest position.
@@ -203,7 +207,7 @@ impl<'i> Parser<'i> {
             grammar,
             input,
             nodes: Vec::new(),
-            matches: HashMap::new(),
+            matches: FxHashMap::default(),
             furthest: 0,
             expected: Vec::new(),
             reports,
