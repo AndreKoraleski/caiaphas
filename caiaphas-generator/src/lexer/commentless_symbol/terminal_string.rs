@@ -40,6 +40,11 @@ pub(crate) fn length(input: &str) -> Result<usize, ParseTerminalStringError> {
     };
     let mut length = 1;
     loop {
+        // A terminal string cannot hold a line break, so one ends it before
+        // its closing quote.
+        if input[length..].starts_with(['\n', '\r']) {
+            return Err(ParseTerminalStringError::NoClosingQuote);
+        }
         let (character, size) = TerminalCharacter::read_first(
             &input[length..],
             ParseTerminalStringError::NoClosingQuote,
@@ -189,7 +194,7 @@ mod tests {
 
     #[test]
     fn rejects_text_without_a_closing_quote() {
-        for input in ["'", "'abc", "\"abc'", "'abc\""] {
+        for input in ["'", "'abc", "\"abc'", "'abc\"", "'abc\n'", "'a\r\n"] {
             assert_eq!(
                 read(input),
                 Err(ParseTerminalStringError::NoClosingQuote),
@@ -206,7 +211,7 @@ mod tests {
 
     #[test]
     fn rejects_characters_that_are_not_terminal_characters() {
-        for c in ['\t', '\n', '\r', '\0', 'é', '\u{00A0}'] {
+        for c in ['\t', '\0', 'é', '\u{00A0}'] {
             assert_eq!(
                 read(&format!("'a{c}b'")),
                 Err(ParseTerminalStringError::InvalidCharacter(c)),

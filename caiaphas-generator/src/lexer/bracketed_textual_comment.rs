@@ -213,7 +213,7 @@ mod tests {
         assert_eq!(
             length("(* don't\n*)"),
             Err(ParseBracketedTextualCommentError::TerminalString(
-                ParseTerminalStringError::InvalidCharacter('\n')
+                ParseTerminalStringError::NoClosingQuote
             ))
         );
     }
