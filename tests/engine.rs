@@ -600,6 +600,22 @@ fn reads_the_patterns_of_special_sequences() {
     assert!(Assignment::parse("9lives = 1").is_err());
 }
 
+caiaphas::grammar!(mod address {
+    "address = byte, '.', byte, '.', byte, '.', byte;
+     (* hide *) (* as u8 *) byte = ? /\\d+/ ?;"
+});
+
+#[test]
+fn checks_the_text_of_a_hidden_rule_with_its_conversion() {
+    let parsed = address::Address::parse("10.0.0.255").unwrap();
+    assert_eq!(parsed.text(), "10.0.0.255");
+    let error = address::Address::parse("10.0.0.256").unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "expected a byte, found `256` at line 1, column 8"
+    );
+}
+
 #[test]
 fn parses_with_the_type_of_any_rule() {
     let setting: settings::Setting = "port=80".parse().unwrap();

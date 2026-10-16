@@ -120,7 +120,8 @@
 //! - `(* as T *)` makes a rule's type the Rust type `T`, read from its text
 //!   with `FromStr`. `T` is named as where `grammar!` is called, so it can be
 //!   a type of your own, generic or not. Text `T` does not read fails to
-//!   match.
+//!   match, so a rule with `(* hide *)` too keeps no value but still checks
+//!   its text.
 //!
 //! # Errors
 //!

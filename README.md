@@ -178,6 +178,14 @@ named as where `grammar!` is called, such as `String`, `f64`,
 `std::net::Ipv4Addr` or a type of your own, generic or not. Text the type does
 not read fails to match there, as `300` does for a `u8`.
 
+With `(* hide *)` too, a rule keeps no value but still checks its text, so
+`address` here holds no fields and still turns down `10.0.0.256`:
+
+```ebnf
+address = byte, '.', byte, '.', byte, '.', byte;
+(* hide *) (* as u8 *) byte = ? /\d+/ ?;
+```
+
 ## Matching
 
 A grammar can describe the same input in more than one way. In a file name
