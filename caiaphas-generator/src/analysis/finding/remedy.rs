@@ -129,7 +129,7 @@ impl FindingKind {
                 )
             }
             Self::IneffectiveAnnotation { annotation, .. } => {
-                format!("remove the `(* {annotation} *)`")
+                format!("remove the `(* {} *)`", annotation.written())
             }
             Self::SingleCharacterRule { meta_identifier } => format!(
                 "hide it with `(* hide *)` unless a type needs `{}`, since \

@@ -9,7 +9,7 @@ use crate::{
     analysis::{
         exactness::{general_rules, visit_rule_conflicts},
         facts::Facts,
-        finding::{Finding, FindingKind},
+        finding::{Choosing, Finding, FindingKind},
     },
     ir::{ExpressionKind, Grammar, Rule, RuleId},
 };
@@ -35,11 +35,11 @@ pub(super) fn check(
                     reaches_general |= general[read];
                 });
             if !conflicts && !reaches_general {
-                ineffective.push("greedy");
+                ineffective.push(Choosing::Greedy);
             }
         }
         if rule.first_match && !has_alternatives_that_meet(facts, rule) {
-            ineffective.push("first match");
+            ineffective.push(Choosing::FirstMatch);
         }
         for annotation in ineffective {
             findings.push(Finding {

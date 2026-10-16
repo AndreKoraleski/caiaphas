@@ -98,8 +98,7 @@ pub(crate) enum FindingKind {
     /// A `(* greedy *)` or `(* first match *)` changes nothing in its rule.
     IneffectiveAnnotation {
         meta_identifier: MetaIdentifier,
-        /// The annotation, `greedy` or `first match`.
-        annotation: &'static str,
+        annotation: Choosing,
     },
     /// A visible rule only ever matches one character and a repetition reads
     /// it, so every character it matches builds a value of its own.
@@ -127,6 +126,23 @@ pub(crate) enum FindingKind {
     UnexpectableFinding { code: FindingCode },
     /// An expectation finds no finding of its kind in its rule.
     UnfulfilledExpectation { code: FindingCode },
+}
+
+/// An annotation that changes how a rule chooses its way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Choosing {
+    Greedy,
+    FirstMatch,
+}
+
+impl Choosing {
+    /// Returns the annotation as written between `(*` and `*)`.
+    pub(crate) fn written(self) -> &'static str {
+        match self {
+            Self::Greedy => "greedy",
+            Self::FirstMatch => "first match",
+        }
+    }
 }
 
 impl Finding {

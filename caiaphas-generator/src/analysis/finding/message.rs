@@ -3,7 +3,10 @@
 
 use std::fmt::{self, Display};
 
-use crate::{analysis::finding::FindingKind, diagnostic::Severity};
+use crate::{
+    analysis::finding::{Choosing, FindingKind},
+    diagnostic::Severity,
+};
 
 impl fmt::Display for FindingKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -120,16 +123,20 @@ impl fmt::Display for FindingKind {
                 annotation,
             } => {
                 let name = meta_identifier.as_str();
-                let reason = if *annotation == "greedy" {
-                    "a parser can tell each way through it from the next \
-                     character"
-                } else {
-                    "no two of its alternatives can match at the same place"
+                let reason = match annotation {
+                    Choosing::Greedy => {
+                        "a parser can tell each way through it from the next \
+                         character"
+                    }
+                    Choosing::FirstMatch => {
+                        "no two of its alternatives can match at the same \
+                         place"
+                    }
                 };
                 write!(
                     f,
-                    "`(* {annotation} *)` changes nothing in `{name}`, since \
-                     {reason}"
+                    "`(* {} *)` changes nothing in `{name}`, since {reason}",
+                    annotation.written()
                 )
             }
             Self::SingleCharacterRule { meta_identifier } => write!(
