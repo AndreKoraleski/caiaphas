@@ -62,25 +62,25 @@ pub(super) fn covers(
     earlier: &Expression,
     later: &Expression,
 ) -> bool {
-    let single_characters = (
-        facts.single_characters(earlier),
-        facts.single_characters(later),
-    );
     // Alternatives written the same way are left to the duplicate alternative
     // check, outside a rule that takes the first match.
     if earlier.is_written_like(later) {
         return rule.first_match;
     }
-    let every_text = matches!(
-        single_characters,
+    let every_character = matches!(
+        (facts.single_characters(earlier), facts.single_characters(later)),
         (Some(earlier), Some(later)) if later.is_subset(&earlier)
-    ) || has_every_text(grammar, rule.greedy, earlier, later);
-    every_text
-        || rule.first_match
-            && rule.greedy
-            && (facts.always_matches(earlier)
-                || later.rest_after(earlier).is_some()
-                || starts_every_text(grammar, earlier, later))
+    );
+    // A greedy rule that takes the first match takes the earlier alternative
+    // wherever it matches at all.
+    let taken_first = rule.first_match
+        && rule.greedy
+        && (facts.always_matches(earlier)
+            || later.rest_after(earlier).is_some()
+            || starts_every_text(grammar, earlier, later));
+    every_character
+        || has_every_text(grammar, rule.greedy, earlier, later)
+        || taken_first
 }
 
 /// Returns whether `earlier`, written in a rule that is `greedy` or not,
