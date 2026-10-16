@@ -13,7 +13,9 @@
 //! and a rule can have several. The standard reads quotes in a comment as
 //! terminal strings, so a reason cannot hold a lone `'` or `"`.
 
-use crate::span::Span;
+use std::fmt;
+
+use crate::{explain, span::Span, spelling};
 
 /// An expectation that a syntax rule has a finding with a given code.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,16 +51,28 @@ pub(crate) enum Comment {
     /// Holds text for people only.
     Ordinary,
     Annotation(Annotation),
-    /// Text that starts with `expect` but is not written as an expectation.
-    MalformedExpectation,
-    /// Text that starts with `hide` but holds more than that.
-    MalformedHide,
-    /// Text that starts with `first match` but holds more than that.
-    MalformedFirstMatch,
-    /// Text that starts with `greedy` but holds more than that.
-    MalformedGreedy,
-    /// Text that starts with `inline` but holds more than that.
-    MalformedInline,
+    /// Text that reads as an annotation written wrongly.
+    Malformed(Malformed),
+}
+
+/// How an annotation is written wrongly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Malformed {
+    /// An annotation of a few words, such as `hide`, holds more than them.
+    NotAlone(&'static str),
+    /// An expectation has no code.
+    NoCode,
+    /// An expectation has no `:` after its code.
+    NoColon,
+    /// The code of an expectation is not in kebab case, though maybe the
+    /// `similar` one was meant.
+    NotKebabCase { similar: Option<&'static str> },
+    /// An expectation has no reason after its `:`.
+    NoReason,
+    /// An `as` names no type.
+    NoType,
+    /// The comment is one word written almost as the annotation `meant`.
+    Misspelled { meant: &'static str },
 }
 
 impl Comment {
@@ -69,62 +83,178 @@ impl Comment {
             .and_then(|text| text.strip_suffix("*)"))
             .unwrap_or(text)
             .trim_matches(is_gap);
-        if let Some(rest) = after_word(content, "hide") {
-            return if rest.is_empty() {
-                Self::Annotation(Annotation::Hide)
-            } else {
-                Self::MalformedHide
-            };
-        }
         if let Some(rest) = after_word(content, "as") {
             let rest = rest.trim_matches(is_gap);
+            if rest.is_empty() {
+                return Self::Malformed(Malformed::NoType);
+            }
             if is_type(rest) {
                 return Self::Annotation(Annotation::Converts(
                     rest.to_owned(),
                 ));
             }
         }
-        if let Some(rest) = after_word(content, "inline") {
-            return if rest.is_empty() {
-                Self::Annotation(Annotation::Inline)
-            } else {
-                Self::MalformedInline
-            };
-        }
-        if let Some(rest) = after_word(content, "greedy") {
-            return if rest.is_empty() {
-                Self::Annotation(Annotation::Greedy)
-            } else {
-                Self::MalformedGreedy
-            };
-        }
         let first_match = after_word(content, "first").and_then(|rest| {
             after_word(rest.trim_start_matches(is_gap), "match")
         });
-        if let Some(rest) = first_match {
-            return if rest.is_empty() {
-                Self::Annotation(Annotation::FirstMatch)
-            } else {
-                Self::MalformedFirstMatch
-            };
+        let alone = [
+            ("hide", after_word(content, "hide"), Annotation::Hide),
+            ("inline", after_word(content, "inline"), Annotation::Inline),
+            ("greedy", after_word(content, "greedy"), Annotation::Greedy),
+            ("first match", first_match, Annotation::FirstMatch),
+        ];
+        for (name, rest, annotation) in alone {
+            if let Some(rest) = rest {
+                return if rest.is_empty() {
+                    Self::Annotation(annotation)
+                } else {
+                    Self::Malformed(Malformed::NotAlone(name))
+                };
+            }
         }
         let Some(rest) = after_word(content, "expect") else {
-            return Self::Ordinary;
+            return misspelled(content);
         };
-        let Some((code, reason)) = rest.split_once(':') else {
-            return Self::MalformedExpectation;
-        };
-        let code = code.trim_matches(is_gap);
-        let reason = reason.trim_matches(is_gap);
-        if !is_kebab_case(code) || reason.is_empty() {
-            return Self::MalformedExpectation;
+        match expectation(rest, span) {
+            Ok(expectation) => {
+                Self::Annotation(Annotation::Expectation(expectation))
+            }
+            Err(malformed) => Self::Malformed(malformed),
         }
-        Self::Annotation(Annotation::Expectation(Expectation {
-            code: code.to_owned(),
-            reason: reason.to_owned(),
-            span,
-        }))
     }
+}
+
+impl fmt::Display for Malformed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotAlone("hide") => {
+                f.write_str("a rule is hidden with `(* hide *)` alone")
+            }
+            Self::NotAlone("first match") => f.write_str(
+                "a rule takes the first match with `(* first match *)` alone",
+            ),
+            Self::NotAlone(name) => {
+                write!(f, "a rule is made {name} with `(* {name} *)` alone")
+            }
+            Self::NoCode => f.write_str("an expectation names no finding"),
+            Self::NoColon => f.write_str(
+                "an expectation needs a `:` between its code and its reason",
+            ),
+            Self::NotKebabCase { .. } => {
+                f.write_str("the code of an expectation is in kebab case")
+            }
+            Self::NoReason => {
+                f.write_str("an expectation needs a reason after its `:`")
+            }
+            Self::NoType => f.write_str("`(* as *)` names no type"),
+            Self::Misspelled { meant } => write!(
+                f,
+                "this comment reads like `(* {meant} *)` written wrongly"
+            ),
+        }
+    }
+}
+
+impl Malformed {
+    /// Returns how to write the annotation.
+    pub(crate) fn help(self) -> String {
+        const EXAMPLE: &str =
+            "`(* expect tied-branches: a keyword is never a name *)`";
+        match self {
+            Self::NotAlone(name) => format!(
+                "write `(* {name} *)` in a comment of its own, and the rest \
+                 in another"
+            ),
+            Self::NoCode => format!(
+                "name the finding it expects by its code, as in {EXAMPLE}; \
+                 `caiaphas explain` lists every code"
+            ),
+            Self::NoColon => {
+                "write it as `(* expect code: reason *)`".to_owned()
+            }
+            Self::NotKebabCase {
+                similar: Some(similar),
+            } => format!("write `{similar}`"),
+            Self::NotKebabCase { similar: None } => {
+                "write the code in lowercase words joined by `-`, as in \
+                 `tied-branches`"
+                    .to_owned()
+            }
+            Self::NoReason => {
+                format!("say why the finding is intended, as in {EXAMPLE}")
+            }
+            Self::NoType => {
+                "name the Rust type that reads the rule's text, as in \
+                 `(* as u16 *)`"
+                    .to_owned()
+            }
+            Self::Misspelled { meant: "expect" } => {
+                "write `(* expect code: reason *)` if an expectation was \
+                 meant, or more words for an ordinary comment"
+                    .to_owned()
+            }
+            Self::Misspelled { meant } => format!(
+                "write `(* {meant} *)` if that was meant, or more words for \
+                 an ordinary comment"
+            ),
+        }
+    }
+}
+
+/// Returns the expectation written `rest` after `expect` in the comment at
+/// `span`, or how it is written wrongly.
+fn expectation(rest: &str, span: Span) -> Result<Expectation, Malformed> {
+    if rest.trim_matches(is_gap).is_empty() {
+        return Err(Malformed::NoCode);
+    }
+    let (code, reason) = rest.split_once(':').ok_or(Malformed::NoColon)?;
+    let code = code.trim_matches(is_gap);
+    let reason = reason.trim_matches(is_gap);
+    if code.is_empty() {
+        return Err(Malformed::NoCode);
+    }
+    if !is_kebab_case(code) {
+        let similar = explain::similar_code(&kebab_case(code));
+        return Err(Malformed::NotKebabCase { similar });
+    }
+    if reason.is_empty() {
+        return Err(Malformed::NoReason);
+    }
+    Ok(Expectation {
+        code: code.to_owned(),
+        reason: reason.to_owned(),
+        span,
+    })
+}
+
+/// Returns a comment of one word written almost as an annotation as a
+/// misspelling of it, and any other as ordinary.
+fn misspelled(content: &str) -> Comment {
+    const WORDS: &[&str] = &["hide", "inline", "greedy", "expect"];
+    if content.is_empty() || content.contains(is_gap) {
+        return Comment::Ordinary;
+    }
+    match spelling::closest(content, WORDS.iter().copied()) {
+        Some(meant) => Comment::Malformed(Malformed::Misspelled { meant }),
+        None => Comment::Ordinary,
+    }
+}
+
+/// Returns `code` in kebab case, as `TiedBranches` and `tied_branches` both
+/// become `tied-branches`.
+fn kebab_case(code: &str) -> String {
+    let mut kebab = String::new();
+    for c in code.chars() {
+        if c.is_ascii_uppercase() && !kebab.is_empty() && !kebab.ends_with('-')
+        {
+            kebab.push('-');
+        }
+        match c {
+            '_' | ' ' => kebab.push('-'),
+            _ => kebab.push(c.to_ascii_lowercase()),
+        }
+    }
+    kebab
 }
 
 /// Returns what follows `word` at the start of `content` when it is a word of
@@ -258,7 +388,11 @@ mod tests {
     #[test]
     fn rejects_a_hide_with_more_after_it() {
         for text in ["(* hide whitespace *)", "(* hide: whitespace *)"] {
-            assert_eq!(read(text), Comment::MalformedHide, "{text:?}");
+            assert_eq!(
+                read(text),
+                Comment::Malformed(Malformed::NotAlone("hide")),
+                "{text:?}"
+            );
         }
     }
 
@@ -280,7 +414,11 @@ mod tests {
     #[test]
     fn rejects_a_first_match_with_more_after_it() {
         for text in ["(* first match wins *)", "(* first match: always *)"] {
-            assert_eq!(read(text), Comment::MalformedFirstMatch, "{text:?}");
+            assert_eq!(
+                read(text),
+                Comment::Malformed(Malformed::NotAlone("first match")),
+                "{text:?}"
+            );
         }
     }
 
@@ -293,7 +431,10 @@ mod tests {
                 "{text:?}"
             );
         }
-        assert_eq!(read("(* greedy else *)"), Comment::MalformedGreedy);
+        assert_eq!(
+            read("(* greedy else *)"),
+            Comment::Malformed(Malformed::NotAlone("greedy"))
+        );
     }
 
     #[test]
@@ -305,7 +446,10 @@ mod tests {
                 "{text:?}"
             );
         }
-        assert_eq!(read("(* inline group *)"), Comment::MalformedInline);
+        assert_eq!(
+            read("(* inline group *)"),
+            Comment::Malformed(Malformed::NotAlone("inline"))
+        );
     }
 
     #[test]
@@ -324,22 +468,59 @@ mod tests {
         for text in ["(* as such *)", "(* as noted above *)", "(* as 1x *)"] {
             assert_eq!(read(text), Comment::Ordinary, "{text:?}");
         }
+        assert_eq!(read("(* as *)"), Comment::Malformed(Malformed::NoType));
     }
 
     #[test]
-    fn rejects_an_expectation_written_wrongly() {
-        for text in [
-            "(* expect *)",
-            "(* expect tied-branches *)",
-            "(* expect tied-branches: *)",
-            "(* expect : no code *)",
-            "(* expect: no code *)",
-            "(* expect Tied-Branches: case *)",
-            "(* expect tied_branches: underscore *)",
-            "(* expect tied--branches: empty word *)",
-            "(* expect tied branches: space *)",
+    fn tells_how_an_expectation_is_written_wrongly() {
+        let similar = Some("tied-branches");
+        for (text, malformed) in [
+            ("(* expect *)", Malformed::NoCode),
+            ("(* expect : no code *)", Malformed::NoCode),
+            ("(* expect: no code *)", Malformed::NoCode),
+            ("(* expect tied-branches *)", Malformed::NoColon),
+            ("(* expect tied-branches: *)", Malformed::NoReason),
+            (
+                "(* expect Tied-Branches: case *)",
+                Malformed::NotKebabCase { similar },
+            ),
+            (
+                "(* expect TiedBranches: camel *)",
+                Malformed::NotKebabCase { similar },
+            ),
+            (
+                "(* expect tied_branches: underscore *)",
+                Malformed::NotKebabCase { similar },
+            ),
+            (
+                "(* expect tied--branches: empty word *)",
+                Malformed::NotKebabCase { similar },
+            ),
+            (
+                "(* expect tied branches: space *)",
+                Malformed::NotKebabCase { similar },
+            ),
         ] {
-            assert_eq!(read(text), Comment::MalformedExpectation, "{text:?}");
+            assert_eq!(read(text), Comment::Malformed(malformed), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn reads_one_word_written_almost_as_an_annotation_as_a_misspelling() {
+        for (text, meant) in [
+            ("(* hidden *)", "hide"),
+            ("(* Hide *)", "hide"),
+            ("(* inlined *)", "inline"),
+            ("(* greed *)", "greedy"),
+        ] {
+            assert_eq!(
+                read(text),
+                Comment::Malformed(Malformed::Misspelled { meant }),
+                "{text:?}"
+            );
+        }
+        for text in ["(* header *)", "(* TODO *)", "(* hidden for now *)"] {
+            assert_eq!(read(text), Comment::Ordinary, "{text:?}");
         }
     }
 }

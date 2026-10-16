@@ -26,15 +26,9 @@ pub(super) fn attach(
                 }
                 ParseErrorKind::AnnotationWithoutRule
             }
-            Comment::MalformedExpectation => {
-                ParseErrorKind::MalformedExpectation
+            Comment::Malformed(malformed) => {
+                ParseErrorKind::Malformed(malformed)
             }
-            Comment::MalformedHide => ParseErrorKind::MalformedHide,
-            Comment::MalformedFirstMatch => {
-                ParseErrorKind::MalformedFirstMatch
-            }
-            Comment::MalformedGreedy => ParseErrorKind::MalformedGreedy,
-            Comment::MalformedInline => ParseErrorKind::MalformedInline,
         };
         errors.push(ParseError { kind, span });
     }
@@ -77,7 +71,10 @@ fn give(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::{Expected, Syntax, parse, tests::parse_valid};
+    use crate::{
+        annotation::Malformed,
+        parser::{Expected, Syntax, parse, tests::parse_valid},
+    };
 
     fn expectations(syntax: &Syntax) -> Vec<Vec<&str>> {
         syntax
@@ -158,7 +155,9 @@ mod tests {
         assert_eq!(
             errors,
             [ParseError {
-                kind: ParseErrorKind::MalformedFirstMatch,
+                kind: ParseErrorKind::Malformed(Malformed::NotAlone(
+                    "first match"
+                )),
                 span: Span { start: 0, end: 21 },
             }]
         );
@@ -171,7 +170,7 @@ mod tests {
         assert_eq!(
             errors,
             [ParseError {
-                kind: ParseErrorKind::MalformedHide,
+                kind: ParseErrorKind::Malformed(Malformed::NotAlone("hide")),
                 span: Span { start: 0, end: 17 },
             }]
         );
@@ -184,7 +183,7 @@ mod tests {
         assert_eq!(
             errors,
             [ParseError {
-                kind: ParseErrorKind::MalformedExpectation,
+                kind: ParseErrorKind::Malformed(Malformed::NoColon),
                 span: Span { start: 0, end: 23 },
             }]
         );

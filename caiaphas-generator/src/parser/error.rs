@@ -4,6 +4,7 @@
 use std::{error::Error, fmt};
 
 use crate::{
+    annotation::Malformed,
     diagnostic::{Diagnostic, Severity},
     lexer::LexErrorKind,
     span::Span,
@@ -28,16 +29,8 @@ pub(crate) enum ParseErrorKind {
     UnexpectedEnd(Expected),
     /// The source has no syntax rule at all.
     NoSyntaxRule,
-    /// A comment starts with `expect` but is not written as an expectation.
-    MalformedExpectation,
-    /// A comment starts with `hide` but holds more than that.
-    MalformedHide,
-    /// A comment starts with `first match` but holds more than that.
-    MalformedFirstMatch,
-    /// A comment starts with `greedy` but holds more than that.
-    MalformedGreedy,
-    /// A comment starts with `inline` but holds more than that.
-    MalformedInline,
+    /// A comment reads as an annotation written wrongly.
+    Malformed(Malformed),
     /// An annotation is not right before a syntax rule.
     AnnotationWithoutRule,
 }
@@ -84,25 +77,11 @@ impl fmt::Display for ParseError {
             ParseErrorKind::NoSyntaxRule => {
                 f.write_str("the grammar has no rule")
             }
-            ParseErrorKind::MalformedExpectation => f.write_str(
-                "an expectation is written `(* expect code-in-kebab-case: \
-                 reason *)`",
-            ),
-            ParseErrorKind::MalformedHide => {
-                f.write_str("a rule is hidden with `(* hide *)` alone")
-            }
-            ParseErrorKind::MalformedFirstMatch => f.write_str(
-                "a rule takes the first match with `(* first match *)` alone",
-            ),
-            ParseErrorKind::MalformedGreedy => {
-                f.write_str("a rule is made greedy with `(* greedy *)` alone")
-            }
-            ParseErrorKind::MalformedInline => {
-                f.write_str("a rule is made inline with `(* inline *)` alone")
-            }
+            ParseErrorKind::Malformed(malformed) => malformed.fmt(f),
             ParseErrorKind::AnnotationWithoutRule => f.write_str(
-                "an `expect`, `hide`, `first match`, `greedy` or `inline` \
-                 comment must come right before the syntax rule it is about",
+                "an `expect`, `hide`, `first match`, `greedy`, `inline` or \
+                 `as` comment must come right before the syntax rule it is \
+                 about",
             ),
         }
     }
@@ -129,6 +108,7 @@ impl From<ParseError> for Diagnostic {
         }
         let help = match &error.kind {
             ParseErrorKind::Lex(kind) => kind.help(),
+            ParseErrorKind::Malformed(malformed) => Some(malformed.help()),
             ParseErrorKind::UnexpectedToken(Expected::Separator) => Some(
                 "separate the items of a sequence with `,`, as in `'x', 'y'`"
                     .to_owned(),
@@ -204,30 +184,36 @@ mod tests {
                 "the grammar has no rule",
             ),
             (
-                error(ParseErrorKind::MalformedExpectation),
-                "an expectation is written `(* expect code-in-kebab-case: \
-                 reason *)`",
+                error(ParseErrorKind::Malformed(Malformed::NoColon)),
+                "an expectation needs a `:` between its code and its reason",
             ),
             (
-                error(ParseErrorKind::MalformedHide),
+                error(ParseErrorKind::Malformed(Malformed::NotAlone("hide"))),
                 "a rule is hidden with `(* hide *)` alone",
             ),
             (
-                error(ParseErrorKind::MalformedFirstMatch),
+                error(ParseErrorKind::Malformed(Malformed::NotAlone(
+                    "first match",
+                ))),
                 "a rule takes the first match with `(* first match *)` alone",
             ),
             (
-                error(ParseErrorKind::MalformedGreedy),
+                error(ParseErrorKind::Malformed(Malformed::NotAlone(
+                    "greedy",
+                ))),
                 "a rule is made greedy with `(* greedy *)` alone",
             ),
             (
-                error(ParseErrorKind::MalformedInline),
-                "a rule is made inline with `(* inline *)` alone",
+                error(ParseErrorKind::Malformed(Malformed::Misspelled {
+                    meant: "hide",
+                })),
+                "this comment reads like `(* hide *)` written wrongly",
             ),
             (
                 error(ParseErrorKind::AnnotationWithoutRule),
-                "an `expect`, `hide`, `first match`, `greedy` or `inline` \
-                 comment must come right before the syntax rule it is about",
+                "an `expect`, `hide`, `first match`, `greedy`, `inline` or \
+                 `as` comment must come right before the syntax rule it is \
+                 about",
             ),
         ];
         for (error, message) in cases {
