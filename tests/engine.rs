@@ -377,3 +377,15 @@ fn fails_where_a_type_does_not_read_the_text() {
     );
     assert_eq!(bytes::Pair::parse("2555").unwrap().byte, [255, 5]);
 }
+
+caiaphas::grammar!(mod nested {
+    "outer = inner | 'y'; inner = number | word;
+     (* as i64 *) number = '1'; word = 'x';"
+});
+
+#[test]
+fn leaves_out_the_text_of_an_enum_that_holds_one_without_it() {
+    use nested::{Inner, Outer};
+    assert_eq!(Outer::parse("1").unwrap(), Outer::Inner(Inner::Number(1)));
+    assert_eq!(Outer::parse("y").unwrap(), Outer::Y);
+}

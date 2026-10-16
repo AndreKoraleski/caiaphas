@@ -26,6 +26,8 @@ struct Names {
     values: Vec<Option<TokenStream>>,
     /// Whether each rule's type can derive `Eq` and `Hash`.
     hashable: Vec<bool>,
+    /// Whether each rule's type has `text()`.
+    textual: Vec<bool>,
 }
 
 /// Returns the items of the module that parses `grammar`, whose source is
@@ -46,6 +48,7 @@ pub(crate) fn module(
         fields: written_names.map(name::field_name).collect(),
         values: grammar.syntax_rules.iter().map(value_type).collect(),
         hashable: hashable(shapes),
+        textual: textual(shapes),
     };
     let facts = Facts::new(matched);
     let general = general_rules(&facts);
@@ -137,6 +140,33 @@ fn hashable(shapes: &[Option<Shape>]) -> Vec<bool> {
         }
     }
     hashable
+}
+
+/// Returns whether the type of each rule has `text()`. A converted rule's type
+/// does not, and an enum has it when every type it holds has it.
+fn textual(shapes: &[Option<Shape>]) -> Vec<bool> {
+    let mut textual: Vec<bool> = shapes
+        .iter()
+        .map(|shape| !matches!(shape, Some(Shape::Converted(_))))
+        .collect();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for (position, shape) in shapes.iter().enumerate() {
+            let Some(shape @ Shape::Enum(_)) = shape else {
+                continue;
+            };
+            if textual[position]
+                && shape::held(shape)
+                    .iter()
+                    .any(|&RuleId(rule)| !textual[rule])
+            {
+                textual[position] = false;
+                changed = true;
+            }
+        }
+    }
+    textual
 }
 
 /// Returns the `parse` function of the start rule `rule_id`, written `rule`.

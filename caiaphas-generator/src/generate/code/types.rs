@@ -200,7 +200,8 @@ pub(super) fn enumeration(
                     #variant(#ty)
                 });
                 if let Some(value) = &names.values[held] {
-                    // A value has no text, so neither does the enum.
+                    // A value has no text, so neither does the enum, nor one
+                    // that holds it.
                     texts = None;
                     by_rule.push(quote! {
                         #index => Self::#variant(
@@ -209,6 +210,9 @@ pub(super) fn enumeration(
                         )
                     });
                 } else {
+                    if !names.textual[held] {
+                        texts = None;
+                    }
                     if let Some(texts) = &mut texts {
                         texts.push(
                             quote! { Self::#variant(inner) => inner.text() },
