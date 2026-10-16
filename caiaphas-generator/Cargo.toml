@@ -11,6 +11,8 @@ repository.workspace = true
 
 [dependencies]
 annotate-snippets.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
 
 [lints]
 workspace = true

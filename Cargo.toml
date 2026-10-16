@@ -12,6 +12,8 @@ repository = "https://github.com/AndreKoraleski/caiaphas"
 
 [workspace.dependencies]
 annotate-snippets = "0.12.16"
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
 
 [package]
 name = "caiaphas"

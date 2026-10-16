@@ -17,6 +17,7 @@ mod annotation;
 mod compile;
 mod diagnostic;
 mod dictionary;
+mod generate;
 mod ir;
 mod lexer;
 mod parser;
