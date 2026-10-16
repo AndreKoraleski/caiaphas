@@ -231,21 +231,10 @@ impl FunctionWriter<'_> {
                 syntactic_factor,
                 syntactic_exception,
             } => {
-                let excluded =
-                    self.facts.single_characters(syntactic_exception);
-                if let (Some((characters, expected)), Some(excluded)) =
-                    (self.characters(syntactic_factor), excluded)
+                if let Some(code) =
+                    self.set_except(syntactic_factor, syntactic_exception)
                 {
-                    let excludes = contains(&excluded);
-                    let includes = contains(&characters);
-                    return quote! {
-                        parser.set_except(
-                            position,
-                            #includes,
-                            #excludes,
-                            &[#(#expected),*],
-                        )
-                    };
+                    return code;
                 }
                 let factor = self.expression(syntactic_factor);
                 let exception = self.expression(syntactic_exception);
@@ -336,6 +325,26 @@ impl FunctionWriter<'_> {
             expected.extend(parts);
         }
         set_code(&characters, &expected)
+    }
+
+    /// Returns the code of `factor` without `exception` as one set, when both
+    /// only ever match one character and the factor builds no node.
+    fn set_except(
+        &self,
+        factor: &Expression,
+        exception: &Expression,
+    ) -> Option<TokenStream> {
+        let (characters, expected) = self.characters(factor)?;
+        let excludes = contains(&self.facts.single_characters(exception)?);
+        let includes = contains(&characters);
+        Some(quote! {
+            parser.set_except(
+                position,
+                #includes,
+                #excludes,
+                &[#(#expected),*],
+            )
+        })
     }
 
     /// Returns the code of `expression` when it only ever matches one
