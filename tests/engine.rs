@@ -135,3 +135,11 @@ fn matches_the_same_when_optimized() {
         assert_eq!(plain, optimized, "{input:?}");
     }
 }
+
+caiaphas::grammar!(mod inline { "inline = 'x', {'y'};" });
+
+#[test]
+fn parses_a_grammar_written_in_the_macro() {
+    assert_eq!(inline::Inline::parse("xyy").unwrap().text(), "xyy");
+    assert!(inline::Inline::parse("y").is_err());
+}

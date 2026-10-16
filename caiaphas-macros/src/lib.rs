@@ -5,24 +5,32 @@ use std::{env, fs, path::Path};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    Attribute, Ident, LitStr, Token, Visibility,
+    Attribute, Ident, LitStr, Token, Visibility, braced,
     parse::{Parse, ParseStream},
     parse_macro_input,
 };
 
-/// What `grammar!` is called with: the module to generate and the file of the
-/// grammar it parses.
+/// What `grammar!` is called with: the module to generate, the grammar it
+/// parses, and how to generate it.
 struct Input {
     attributes: Vec<Attribute>,
     visibility: Visibility,
     name: Ident,
-    path: LitStr,
+    source: Source,
     /// Whether the suggestions about the grammar stop the build, which
-    /// `suggest` after the path asks for.
+    /// `suggest` after the grammar asks for.
     suggest: bool,
     /// Whether the parser matches the grammar rearranged, which `optimize`
-    /// after the path asks for.
+    /// after the grammar asks for.
     optimize: bool,
+}
+
+/// Where `grammar!` finds the grammar.
+enum Source {
+    /// The path of a file from the root of the crate, written after `=`.
+    File(LitStr),
+    /// The grammar itself, written as a string between braces.
+    Inline(LitStr),
 }
 
 impl Parse for Input {
@@ -31,8 +39,19 @@ impl Parse for Input {
         let visibility = input.parse()?;
         input.parse::<Token![mod]>()?;
         let name = input.parse()?;
-        input.parse::<Token![=]>()?;
-        let path = input.parse()?;
+        let source = if input.parse::<Option<Token![=]>>()?.is_some() {
+            Source::File(input.parse()?)
+        } else {
+            let body;
+            braced!(body in input);
+            let grammar = body.parse()?;
+            if !body.is_empty() {
+                return Err(
+                    body.error("expected only the grammar as a string")
+                );
+            }
+            Source::Inline(grammar)
+        };
         let (mut suggest, mut optimize) = (false, false);
         while input.parse::<Option<Token![,]>>()?.is_some() {
             let flag: Ident = input.parse()?;
@@ -50,24 +69,31 @@ impl Parse for Input {
             attributes,
             visibility,
             name,
-            path,
+            source,
             suggest,
             optimize,
         })
     }
 }
 
-/// Generates a module that parses the grammar in a file, with a type for each
-/// of its rules.
+/// Generates a module that parses a grammar, with a type for each of its
+/// rules.
 ///
 /// It takes the module's attributes and visibility, its name and the path of
-/// the grammar from the root of the crate:
+/// the grammar's file from the root of the crate:
 ///
 /// ```text
 /// caiaphas::grammar!(pub mod json = "grammars/json.ebnf");
 /// ```
 ///
-/// With `suggest` after the path, every change that would make the parser
+/// A short grammar can be written in the macro instead, as a string between
+/// braces:
+///
+/// ```text
+/// caiaphas::grammar!(pub mod pair { "pair = 'x', ',', 'y';" });
+/// ```
+///
+/// With `suggest` after the grammar, every change that would make the parser
 /// faster stops the build, as a problem in the grammar does:
 ///
 /// ```text
@@ -89,67 +115,86 @@ pub fn grammar(input: TokenStream) -> TokenStream {
         attributes,
         visibility,
         name,
-        path,
+        source,
         suggest,
         optimize,
     } = parse_macro_input!(input as Input);
-    let relative = path.value();
-    // A grammar's path is relative to the root of the crate that uses it,
-    // unlike the path of `include_str!`, which is relative to the file.
-    let root = env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
-    let file = Path::new(&root).join(&relative);
-    let source = match fs::read_to_string(&file) {
-        Ok(source) => source,
-        Err(error) => {
-            let message = format!("cannot read `{relative}`: {error}");
-            return syn::Error::new(path.span(), message)
-                .into_compile_error()
-                .into();
+    // The literal every problem points at, the grammar, the name rendered
+    // problems give it, and the file to rebuild after, if any.
+    let (literal, grammar, label, file) = match source {
+        Source::File(path) => {
+            let relative = path.value();
+            // A grammar's path is relative to the root of the crate that uses
+            // it, unlike the path of `include_str!`, which is relative to the
+            // file.
+            let root = env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
+            let file = Path::new(&root).join(&relative);
+            let grammar = match fs::read_to_string(&file) {
+                Ok(grammar) => grammar,
+                Err(error) => {
+                    let message = format!("cannot read `{relative}`: {error}");
+                    return syn::Error::new(path.span(), message)
+                        .into_compile_error()
+                        .into();
+                }
+            };
+            (path, grammar, relative, Some(file))
+        }
+        Source::Inline(text) => {
+            let grammar = text.value();
+            (text, grammar, format!("mod {name}"), None)
         }
     };
     let errors = |problems: Vec<String>| -> TokenStream {
         problems
             .into_iter()
             .map(|problem| {
-                syn::Error::new(path.span(), problem).into_compile_error()
+                syn::Error::new(literal.span(), problem).into_compile_error()
             })
             .collect::<proc_macro2::TokenStream>()
             .into()
     };
     let options = caiaphas_generator::Options { optimize };
-    let module =
-        match caiaphas_generator::generate(&source, &relative, options) {
-            Ok(module) if suggest && !module.suggestions.is_empty() => {
-                return errors(module.suggestions);
-            }
-            Ok(module) => module,
-            Err(problems) => return errors(problems),
-        };
+    let module = match caiaphas_generator::generate(&grammar, &label, options)
+    {
+        Ok(module) if suggest && !module.suggestions.is_empty() => {
+            return errors(module.suggestions);
+        }
+        Ok(module) => module,
+        Err(problems) => return errors(problems),
+    };
     let documentation = (!attributes
         .iter()
         .any(|attribute| attribute.path().is_ident("doc")))
     .then(|| {
-        let documentation =
-            format!(" The parser and types of the grammar in `{relative}`.");
+        let documentation = match &file {
+            Some(_) => {
+                format!(" The parser and types of the grammar in `{label}`.")
+            }
+            None => " The parser and types of a grammar.".to_owned(),
+        };
         quote! { #[doc = #documentation] }
     });
     let suggestions = (!module.suggestions.is_empty()).then(|| {
         let documentation = format!(
-            "\n # Suggestions\n\n These changes to `{relative}` would make \
-             its parser faster:\n\n```text\n{}\n```",
+            "\n # Suggestions\n\n These changes to the grammar would make its \
+             parser faster:\n\n```text\n{}\n```",
             module.suggestions.join("\n")
         );
         quote! { #[doc = #documentation] }
     });
-    // Including the grammar's bytes makes Cargo rebuild when it changes.
-    let tracked = file.to_string_lossy();
+    // Including a grammar file's bytes makes Cargo rebuild when it changes.
+    let tracked = file.map(|file| {
+        let file = file.to_string_lossy().into_owned();
+        quote! { const _: &[u8] = ::core::include_bytes!(#file); }
+    });
     let items = module.items;
     quote! {
         #documentation
         #(#attributes)*
         #suggestions
         #visibility mod #name {
-            const _: &[u8] = ::core::include_bytes!(#tracked);
+            #tracked
 
             #items
         }
@@ -161,15 +206,34 @@ pub fn grammar(input: TokenStream) -> TokenStream {
 mod tests {
     use super::*;
 
+    fn file(input: &Input) -> Option<String> {
+        match &input.source {
+            Source::File(path) => Some(path.value()),
+            Source::Inline(_) => None,
+        }
+    }
+
     #[test]
     fn reads_the_module_and_the_path() {
         let input: Input =
             syn::parse_str("#[doc = \"x\"] pub mod json = \"json.ebnf\";")
                 .unwrap();
         assert_eq!(input.name, "json");
-        assert_eq!(input.path.value(), "json.ebnf");
+        assert_eq!(file(&input).as_deref(), Some("json.ebnf"));
         assert_eq!(input.attributes.len(), 1);
         assert!(!input.suggest);
+    }
+
+    #[test]
+    fn reads_a_grammar_written_in_the_macro() {
+        let input: Input =
+            syn::parse_str("mod pair { \"pair = 'x';\" }, optimize").unwrap();
+        let Source::Inline(grammar) = &input.source else {
+            panic!("the grammar is inline");
+        };
+        assert_eq!(grammar.value(), "pair = 'x';");
+        assert!(input.optimize);
+        assert!(syn::parse_str::<Input>("mod pair { \"a\" \"b\" }").is_err());
     }
 
     #[test]
@@ -182,7 +246,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_every_flag_after_the_path() {
+    fn reads_every_flag_after_the_grammar() {
         let input: Input =
             syn::parse_str("mod json = \"j\", optimize, suggest;").unwrap();
         assert!(input.suggest && input.optimize);
