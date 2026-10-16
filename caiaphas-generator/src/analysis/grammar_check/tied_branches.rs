@@ -12,6 +12,7 @@
 
 use crate::{
     analysis::{
+        character_set,
         facts::Facts,
         finding::{Finding, FindingKind},
         grammar_check::unreachable_alternative,
@@ -117,7 +118,7 @@ fn shared(
                         == Some(true)
             })
         })
-        .map(|text| format!("`{}`", text.escape_debug()))
+        .map(|text| format!("`{}`", character_set::shown(&text)))
 }
 
 #[cfg(test)]

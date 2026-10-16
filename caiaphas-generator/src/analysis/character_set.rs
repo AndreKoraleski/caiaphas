@@ -168,7 +168,7 @@ impl CharacterSet {
     pub(crate) fn described(&self) -> String {
         let shown = |c: char| match c {
             '`' => "`` ` ``".to_owned(),
-            _ => format!("`{}`", c.escape_debug()),
+            _ => format!("`{}`", shown(&c.to_string())),
         };
         let count = self.ranges.len();
         let mut described = String::new();
@@ -191,9 +191,26 @@ impl CharacterSet {
     }
 }
 
+/// Returns `text` with the characters that do not print escaped, so a tab
+/// reads `\t`, as the errors of a parser show it.
+pub(crate) fn shown(text: &str) -> String {
+    text.chars()
+        .map(|c| match c {
+            '"' | '\'' | '\\' => c.to_string(),
+            _ => c.escape_debug().to_string(),
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shows_quotes_as_they_are_and_escapes_what_does_not_print() {
+        assert_eq!(shown("\"a'\\\t"), "\"a'\\\\t");
+        assert_eq!(CharacterSet::single('"').described(), "`\"`");
+    }
 
     fn set(ranges: &[RangeInclusive<char>]) -> CharacterSet {
         ranges.iter().fold(CharacterSet::default(), |set, range| {
