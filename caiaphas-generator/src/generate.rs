@@ -98,7 +98,14 @@ pub struct Report {
 pub fn check(source: &str, path: &str) -> Report {
     let (grammar, mut diagnostics) = compile(source, false);
     if let Some(grammar) = grammar {
-        diagnostics.extend(clashes(&grammar, &shape::shapes(&grammar)));
+        let clashes = clashes(&grammar, &shape::shapes(&grammar));
+        // Types that would share a name already tell what a warning about
+        // their names differing only in case would.
+        diagnostics.retain(|diagnostic| {
+            diagnostic.code != Some("case-only-names")
+                || !clashes.iter().any(|clash| clash.span == diagnostic.span)
+        });
+        diagnostics.extend(clashes);
     }
     Report {
         findings: diagnostics
@@ -321,6 +328,14 @@ mod tests {
         let report = check("s = a;", "g.ebnf");
         assert!(report.stops_build);
         assert!(report.findings[0].starts_with("error: `a` is not defined"));
+    }
+
+    #[test]
+    fn checks_names_that_differ_in_case_once_when_their_types_clash() {
+        let report =
+            check("s = digit, Digit; digit = '0'; Digit = '1';", "g.ebnf");
+        assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
+        assert!(report.findings[0].starts_with("error: the types of"));
     }
 
     #[test]
