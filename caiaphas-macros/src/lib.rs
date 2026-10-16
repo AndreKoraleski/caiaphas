@@ -20,6 +20,9 @@ struct Input {
     /// Whether the suggestions about the grammar stop the build, which
     /// `suggest` after the path asks for.
     suggest: bool,
+    /// Whether the parser matches the grammar rearranged, which `optimize`
+    /// after the path asks for.
+    optimize: bool,
 }
 
 impl Parse for Input {
@@ -30,14 +33,16 @@ impl Parse for Input {
         let name = input.parse()?;
         input.parse::<Token![=]>()?;
         let path = input.parse()?;
-        let suggest = input.parse::<Option<Token![,]>>()?.is_some();
-        if suggest {
+        let (mut suggest, mut optimize) = (false, false);
+        while input.parse::<Option<Token![,]>>()?.is_some() {
             let flag: Ident = input.parse()?;
-            if flag != "suggest" {
-                return Err(syn::Error::new(
-                    flag.span(),
-                    "expected `suggest`",
-                ));
+            match flag.to_string().as_str() {
+                "suggest" => suggest = true,
+                "optimize" => optimize = true,
+                _ => {
+                    let message = "expected `suggest` or `optimize`";
+                    return Err(syn::Error::new(flag.span(), message));
+                }
             }
         }
         input.parse::<Option<Token![;]>>()?;
@@ -47,6 +52,7 @@ impl Parse for Input {
             name,
             path,
             suggest,
+            optimize,
         })
     }
 }
@@ -68,6 +74,14 @@ impl Parse for Input {
 /// caiaphas::grammar!(pub mod json = "grammars/json.ebnf", suggest);
 /// ```
 ///
+/// With `optimize`, the parser matches the grammar rearranged wherever that
+/// keeps its types the same, such as with a start that alternatives share
+/// written once, and those suggestions are left out:
+///
+/// ```text
+/// caiaphas::grammar!(pub mod json = "grammars/json.ebnf", optimize);
+/// ```
+///
 /// The crate documentation of `caiaphas` tells what the module holds.
 #[proc_macro]
 pub fn grammar(input: TokenStream) -> TokenStream {
@@ -77,6 +91,7 @@ pub fn grammar(input: TokenStream) -> TokenStream {
         name,
         path,
         suggest,
+        optimize,
     } = parse_macro_input!(input as Input);
     let relative = path.value();
     // A grammar's path is relative to the root of the crate that uses it,
@@ -101,17 +116,15 @@ pub fn grammar(input: TokenStream) -> TokenStream {
             .collect::<proc_macro2::TokenStream>()
             .into()
     };
-    let module = match caiaphas_generator::generate(
-        &source,
-        &relative,
-        caiaphas_generator::Options::default(),
-    ) {
-        Ok(module) if suggest && !module.suggestions.is_empty() => {
-            return errors(module.suggestions);
-        }
-        Ok(module) => module,
-        Err(problems) => return errors(problems),
-    };
+    let options = caiaphas_generator::Options { optimize };
+    let module =
+        match caiaphas_generator::generate(&source, &relative, options) {
+            Ok(module) if suggest && !module.suggestions.is_empty() => {
+                return errors(module.suggestions);
+            }
+            Ok(module) => module,
+            Err(problems) => return errors(problems),
+        };
     let documentation = (!attributes
         .iter()
         .any(|attribute| attribute.path().is_ident("doc")))
@@ -164,6 +177,14 @@ mod tests {
         let input: Input =
             syn::parse_str("mod json = \"json.ebnf\", suggest").unwrap();
         assert!(input.suggest);
+        assert!(!input.optimize);
         assert!(syn::parse_str::<Input>("mod json = \"j\", hint").is_err());
+    }
+
+    #[test]
+    fn reads_every_flag_after_the_path() {
+        let input: Input =
+            syn::parse_str("mod json = \"j\", optimize, suggest;").unwrap();
+        assert!(input.suggest && input.optimize);
     }
 }

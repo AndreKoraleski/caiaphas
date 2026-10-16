@@ -10,6 +10,8 @@ caiaphas::grammar!(mod hidden = "tests/grammars/hidden.ebnf");
 caiaphas::grammar!(mod going_back = "tests/grammars/going_back.ebnf");
 caiaphas::grammar!(mod shared = "tests/grammars/shared.ebnf");
 caiaphas::grammar!(mod letter_x = "tests/grammars/letter_x.ebnf");
+caiaphas::grammar!(mod starts = "tests/grammars/starts.ebnf");
+caiaphas::grammar!(mod optimized = "tests/grammars/starts.ebnf", optimize);
 
 #[test]
 fn builds_the_tree_of_an_input() {
@@ -121,4 +123,15 @@ fn takes_out_a_character_without_expecting_anything_else() {
         parse("bq").unwrap_err().to_string(),
         "expected `x`, found `q` at line 1, column 2"
     );
+}
+
+#[test]
+fn matches_the_same_when_optimized() {
+    for input in ["zx", "zzy", "w", "zq", "z", ""] {
+        let plain = starts::Starts::parse(input)
+            .map(|parsed| parsed.item.map(|item| item.text().to_owned()));
+        let optimized = optimized::Starts::parse(input)
+            .map(|parsed| parsed.item.map(|item| item.text().to_owned()));
+        assert_eq!(plain, optimized, "{input:?}");
+    }
 }
