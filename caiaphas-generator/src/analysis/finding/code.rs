@@ -55,6 +55,7 @@ finding_codes! {
     EmptyRule => "empty-rule",
     ExhaustiveException => "exhaustive-exception",
     CaseOnlyNames => "case-only-names",
+    MixedClassRange => "mixed-class-range",
     SingleCharacterRule => "single-character-rule",
     SharedStart => "shared-start",
     NondeterministicChoice => "nondeterministic-choice",
@@ -91,6 +92,7 @@ impl FindingCode {
             | Self::EmptyRule
             | Self::ExhaustiveException
             | Self::CaseOnlyNames
+            | Self::MixedClassRange
             | Self::UnfulfilledExpectation => Severity::Warning,
             Self::SingleCharacterRule
             | Self::SharedStart
@@ -146,6 +148,7 @@ impl FindingCode {
             | Self::EmptyRule
             | Self::ExhaustiveException
             | Self::CaseOnlyNames
+            | Self::MixedClassRange
             | Self::SingleCharacterRule
             | Self::SharedStart => Some("the grammar stays as it is"),
             Self::NondeterministicChoice => {

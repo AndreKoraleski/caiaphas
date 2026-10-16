@@ -222,6 +222,17 @@ const CASES: &[Case] = &[
                grammar stays as it is",
     },
     Case {
+        source: "s = ? U+0041..U+007A ?;",
+        code: FindingCode::MixedClassRange,
+        severity: Severity::Warning,
+        message: "this range from `A` to `z` also takes '['..='`', though \
+                  they are neither letters nor digits",
+        help: "split it into a range for each kind of character, such as `? \
+               U+0041..U+005A ? | ? U+0061..U+007A ?` for the letters; if \
+               this is intended, write `(* expect mixed-class-range: reason \
+               *)` right before the rule, and the grammar stays as it is",
+    },
+    Case {
         source: "number = digit, {digit}; digit = ? U+0030..U+0039 ?;",
         code: FindingCode::SingleCharacterRule,
         severity: Severity::Suggestion,

@@ -78,6 +78,13 @@ pub(crate) enum FindingKind {
         meta_identifier: MetaIdentifier,
         other: MetaIdentifier,
     },
+    /// A special sequence goes from a letter or digit to one of another kind,
+    /// so it also takes the characters between the kinds.
+    MixedClassRange {
+        first: char,
+        last: char,
+        between: CharacterSet,
+    },
     /// A visible rule only ever matches one character and a repetition reads
     /// it, so every character it matches builds a value of its own.
     SingleCharacterRule { meta_identifier: MetaIdentifier },

@@ -101,6 +101,11 @@ impl FindingKind {
                 meta_identifier.as_str(),
                 other.as_str()
             ),
+            Self::MixedClassRange { .. } => {
+                "split it into a range for each kind of character, such as \
+                 `? U+0041..U+005A ? | ? U+0061..U+007A ?` for the letters"
+                    .to_owned()
+            }
             Self::SingleCharacterRule { meta_identifier } => format!(
                 "hide it with `(* hide *)` unless a type needs `{}`, since \
                  the rules that read it keep its text",
@@ -237,6 +242,15 @@ impl fmt::Display for FindingKind {
                  mistake",
                 meta_identifier.as_str(),
                 other.as_str()
+            ),
+            Self::MixedClassRange {
+                first,
+                last,
+                between,
+            } => write!(
+                f,
+                "this range from `{first}` to `{last}` also takes {between}, \
+                 though they are neither letters nor digits"
             ),
             Self::SingleCharacterRule { meta_identifier } => write!(
                 f,
