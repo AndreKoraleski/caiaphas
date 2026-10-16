@@ -129,13 +129,7 @@ fn finds_every_problem_with_an_ambiguous_expression_grammar() {
         summary(source),
         [
             left_recursion.clone(),
-            "expression, '+', expression: this alternative starts and ends \
-             with `expression`, so it can group either way []"
-                .to_owned(),
             left_recursion,
-            "expression, '*', expression: this alternative starts and ends \
-             with `expression`, so it can group either way []"
-                .to_owned(),
             "expression, '*', expression: another branch can start with every \
              character this one can [\"expression, '+', expression\"]"
                 .to_owned(),

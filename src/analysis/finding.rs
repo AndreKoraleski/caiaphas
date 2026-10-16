@@ -48,9 +48,6 @@ pub(crate) enum FindingKind {
     /// A repeated sequence takes every character that can come after it, so
     /// nothing after it can ever match.
     DeadEndRepeatedSequence,
-    /// An alternative starts and ends with its own rule, so it can group
-    /// either way.
-    AmbiguousRecursion { meta_identifier: MetaIdentifier },
     /// Every character a branch can start with, another branch of the same
     /// choice can start with too.
     ShadowedBranch,
@@ -96,7 +93,6 @@ pub(crate) enum FindingCode {
     RepeatedFollowConflict,
     RequiredOptionalSequence,
     DeadEndRepeatedSequence,
-    AmbiguousRecursion,
     ShadowedBranch,
     AmbiguousNullableBranches,
     UnreachableRule,
@@ -112,7 +108,7 @@ pub(crate) enum FindingCode {
 
 impl FindingCode {
     /// Every code, so a name can be looked up.
-    pub(crate) const ALL: [Self; 21] = [
+    pub(crate) const ALL: [Self; 20] = [
         Self::LeftRecursion,
         Self::IndirectLeftRecursion,
         Self::UnproductiveRule,
@@ -122,7 +118,6 @@ impl FindingCode {
         Self::RepeatedFollowConflict,
         Self::RequiredOptionalSequence,
         Self::DeadEndRepeatedSequence,
-        Self::AmbiguousRecursion,
         Self::ShadowedBranch,
         Self::AmbiguousNullableBranches,
         Self::UnreachableRule,
@@ -147,7 +142,6 @@ impl FindingCode {
             Self::RepeatedFollowConflict => "repeated-follow-conflict",
             Self::RequiredOptionalSequence => "required-optional-sequence",
             Self::DeadEndRepeatedSequence => "dead-end-repeated-sequence",
-            Self::AmbiguousRecursion => "ambiguous-recursion",
             Self::ShadowedBranch => "shadowed-branch",
             Self::AmbiguousNullableBranches => "ambiguous-nullable-branches",
             Self::UnreachableRule => "unreachable-rule",
@@ -180,7 +174,6 @@ impl FindingCode {
             | Self::RepeatedFollowConflict
             | Self::RequiredOptionalSequence
             | Self::DeadEndRepeatedSequence
-            | Self::AmbiguousRecursion
             | Self::ShadowedBranch
             | Self::AmbiguousNullableBranches
             | Self::UnreachableRule
@@ -219,7 +212,6 @@ impl FindingCode {
             ),
             Self::RequiredOptionalSequence
             | Self::DeadEndRepeatedSequence
-            | Self::AmbiguousRecursion
             | Self::UnreachableRule
             | Self::IneffectiveException
             | Self::EmptyRule
@@ -262,7 +254,6 @@ impl FindingKind {
             Self::DeadEndRepeatedSequence => {
                 FindingCode::DeadEndRepeatedSequence
             }
-            Self::AmbiguousRecursion { .. } => FindingCode::AmbiguousRecursion,
             Self::ShadowedBranch => FindingCode::ShadowedBranch,
             Self::AmbiguousNullableBranches => {
                 FindingCode::AmbiguousNullableBranches
@@ -355,15 +346,6 @@ impl FindingKind {
                  'x'` becomes `'x', {'x'}`, or make what comes after it start \
                  with a character it cannot take"
                     .to_owned()
-            }
-            Self::AmbiguousRecursion { meta_identifier } => {
-                let name = meta_identifier.as_str();
-                format!(
-                    "replace one end with a rule that does not start with \
-                     `{name}`, so `{name} = {name}, '+', {name} | 'n';` \
-                     becomes `{name} = {name}, '+', term | term;` to group \
-                     from the left"
-                )
             }
             Self::ShadowedBranch => {
                 "remove this branch if the other already matches what it \
@@ -472,12 +454,6 @@ impl fmt::Display for Finding {
             FindingKind::DeadEndRepeatedSequence => f.write_str(
                 "this repeated sequence takes every character that can come \
                  after it, so nothing after it can ever match",
-            ),
-            FindingKind::AmbiguousRecursion { meta_identifier } => write!(
-                f,
-                "this alternative starts and ends with `{}`, so it can group \
-                 either way",
-                meta_identifier.as_str()
             ),
             FindingKind::ShadowedBranch => f.write_str(
                 "another branch can start with every character this one can",
@@ -669,18 +645,6 @@ mod tests {
                    intended, write `(* expect dead-end-repeated-sequence: \
                    reason *)` right before the rule, and the grammar stays as \
                    it is",
-        },
-        Case {
-            source: "e = e, '+', e | 'n';",
-            code: FindingCode::AmbiguousRecursion,
-            severity: Severity::Warning,
-            message: "this alternative starts and ends with `e`, so it can \
-                      group either way",
-            help: "replace one end with a rule that does not start with `e`, \
-                   so `e = e, '+', e | 'n';` becomes `e = e, '+', term | \
-                   term;` to group from the left; if this is intended, write \
-                   `(* expect ambiguous-recursion: reason *)` right before \
-                   the rule, and the grammar stays as it is",
         },
         Case {
             source: "a = ? U+0061..U+007A ? | 'x';",

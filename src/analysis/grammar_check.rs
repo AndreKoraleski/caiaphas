@@ -1,7 +1,6 @@
 //! Grammar checks read the whole grammar at once, such as the checks about
 //! recursion.
 
-mod ambiguous_recursion;
 mod case_only_names;
 mod duplicate_alternative;
 mod empty_rule;
@@ -23,7 +22,6 @@ pub(super) type GrammarCheck = fn(&Grammar, &Facts<'_>, &mut Vec<Finding>);
 /// Every grammar check. A new one goes in its own file and in this list.
 pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     left_recursion::check,
-    ambiguous_recursion::check,
     unproductive_rule::check,
     unreachable_rule::check,
     indirect_left_recursion::check,
