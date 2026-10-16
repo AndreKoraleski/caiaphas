@@ -19,17 +19,21 @@ use crate::{
 /// where those that `general` marks try every way through them.
 ///
 /// Every other rule that one of those reads remembers its matches, since it is
-/// read once to tell where it ends and again to build its node.
+/// read once to tell where it ends and again to build its node. One of those
+/// that a greedy rule reads also gets a function that takes one way.
 pub(crate) fn functions(facts: &Facts<'_>, general: &[bool]) -> TokenStream {
     let grammar: &Grammar = facts.grammar();
     let mut remembers = revisited_rules(facts);
-    for (rule, &general) in grammar.syntax_rules.iter().zip(general) {
-        if general {
-            rule.expression
-                .visit_meta_identifiers(&mut |RuleId(read), _| {
+    let mut committed = vec![false; general.len()];
+    for (rule, &is_general) in grammar.syntax_rules.iter().zip(general) {
+        rule.expression
+            .visit_meta_identifiers(&mut |RuleId(read), _| {
+                if is_general {
                     remembers[read] = true;
-                });
-        }
+                } else {
+                    committed[read] |= general[read];
+                }
+            });
     }
     let functions =
         grammar
@@ -37,20 +41,23 @@ pub(crate) fn functions(facts: &Facts<'_>, general: &[bool]) -> TokenStream {
             .iter()
             .enumerate()
             .map(|(position, rule)| {
+                let rule_id = RuleId(position);
                 let writer = FunctionWriter {
                     facts,
                     first_match: rule.first_match,
                 };
-                if general[position] {
-                    ExactWriter { writer, general }
-                        .functions(RuleId(position), rule)
-                } else {
-                    writer.function(
-                        RuleId(position),
+                if !general[position] {
+                    return writer.function(
+                        rule_id,
                         rule,
                         remembers[position],
-                    )
+                    );
                 }
+                let writer = ExactWriter { writer, general };
+                let committing = committed[position]
+                    .then(|| writer.committed(rule_id, rule));
+                let functions = writer.functions(rule_id, rule);
+                quote! { #functions #committing }
             });
     quote! { #(#functions)* }
 }

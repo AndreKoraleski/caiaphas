@@ -40,6 +40,9 @@ pub(crate) struct Rule {
     /// Whether a `(* first match *)` right before the rule makes it take the
     /// first match.
     pub(crate) first_match: bool,
+    /// Whether a `(* greedy *)` right before the rule makes it take each way
+    /// through it as it comes to it.
+    pub(crate) greedy: bool,
     /// The syntax rule it comes from.
     pub(crate) span: Span,
 }

@@ -21,6 +21,12 @@
 //! instead of the one that matches the most. It suits rules whose order says
 //! which alternative wins, as it does in a PEG.
 //!
+//! A greedy, written `(* greedy *)`, makes the rule take each way through it
+//! as it comes to it, even where the rest of the input needs another, so its
+//! parser never tries another way. It suits rules where taking the most at
+//! each step is what the grammar means, such as the `else` of a nested `if`,
+//! and keeps their parser fast.
+//!
 //! Each comment holds one annotation, and a rule can have several. The
 //! standard reads quotes in a comment as terminal strings, so a reason cannot
 //! hold a lone `'` or `"`.
@@ -47,6 +53,8 @@ pub(crate) enum Annotation {
     /// Makes the choices written in the rule take their first alternative that
     /// matches.
     FirstMatch,
+    /// Makes the rule take each way through it as it comes to it.
+    Greedy,
 }
 
 /// What a comment holds.
@@ -61,6 +69,8 @@ pub(crate) enum Comment {
     MalformedHide,
     /// Text that starts with `first match` but holds more than that.
     MalformedFirstMatch,
+    /// Text that starts with `greedy` but holds more than that.
+    MalformedGreedy,
 }
 
 impl Comment {
@@ -76,6 +86,13 @@ impl Comment {
                 Self::Annotation(Annotation::Hide)
             } else {
                 Self::MalformedHide
+            };
+        }
+        if let Some(rest) = after_word(content, "greedy") {
+            return if rest.is_empty() {
+                Self::Annotation(Annotation::Greedy)
+            } else {
+                Self::MalformedGreedy
             };
         }
         let first_match = after_word(content, "first").and_then(|rest| {
@@ -238,6 +255,18 @@ mod tests {
         for text in ["(* first match wins *)", "(* first match: always *)"] {
             assert_eq!(read(text), Comment::MalformedFirstMatch, "{text:?}");
         }
+    }
+
+    #[test]
+    fn reads_a_greedy() {
+        for text in ["(* greedy *)", "(*greedy*)", "(*\n  greedy\n*)"] {
+            assert_eq!(
+                read(text),
+                Comment::Annotation(Annotation::Greedy),
+                "{text:?}"
+            );
+        }
+        assert_eq!(read("(* greedy else *)"), Comment::MalformedGreedy);
     }
 
     #[test]

@@ -1,0 +1,15 @@
+(* A word, then `fy`, where a greedy name takes every letter it can. *)
+phrase = word, 'fy';
+(* expect tied-branches: a keyword wins over a name with the same text *)
+word = keyword | name;
+keyword = 'if';
+(* greedy *)
+(* expect dead-end-repeated-sequence: a name takes the `f` of `fy` *)
+name = letter, {letter};
+(* hide *)
+letter = ? U+0061..U+007A ?;
+(* A sentence that takes each way as it comes, around a pair whose word
+   leaves its `f`. *)
+(* greedy *)
+sentence = pair, ';';
+pair = word, 'f';

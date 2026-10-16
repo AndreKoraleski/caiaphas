@@ -38,6 +38,7 @@ impl Lowering<'_, '_> {
             expectations: syntax_rule.expectations.clone(),
             hidden: syntax_rule.hidden,
             first_match: syntax_rule.first_match,
+            greedy: syntax_rule.greedy,
             span: syntax_rule.span,
         }
     }

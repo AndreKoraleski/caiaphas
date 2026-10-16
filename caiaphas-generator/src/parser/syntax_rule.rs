@@ -22,6 +22,8 @@ pub(crate) struct SyntaxRule {
     pub(crate) hidden: bool,
     /// Whether a `(* first match *)` comes right before the rule.
     pub(crate) first_match: bool,
+    /// Whether a `(* greedy *)` comes right before the rule.
+    pub(crate) greedy: bool,
     /// From the meta identifier to the terminator, both included.
     pub(crate) span: Span,
 }
@@ -49,6 +51,7 @@ impl SyntaxRule {
             expectations: Vec::new(),
             hidden: false,
             first_match: false,
+            greedy: false,
             span: start.to(end),
         })
     }

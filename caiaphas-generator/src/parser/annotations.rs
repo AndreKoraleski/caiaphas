@@ -33,6 +33,7 @@ pub(super) fn attach(
             Comment::MalformedFirstMatch => {
                 ParseErrorKind::MalformedFirstMatch
             }
+            Comment::MalformedGreedy => ParseErrorKind::MalformedGreedy,
         };
         errors.push(ParseError { kind, span });
     }
@@ -64,6 +65,7 @@ fn give(
             }
             Annotation::Hide => rule.hidden = true,
             Annotation::FirstMatch => rule.first_match = true,
+            Annotation::Greedy => rule.greedy = true,
         }
     }
     true

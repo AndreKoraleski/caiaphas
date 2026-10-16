@@ -22,12 +22,17 @@ use crate::{
 /// tries every way through them. Those are the rules with a choice that a
 /// parser taking one way as it comes can get wrong, and every rule that
 /// reaches one, since only what comes after a rule tells which way the rest of
-/// the input needs.
+/// the input needs. A greedy rule takes each way as it comes anyway, so it is
+/// never one, and a rule is not one for what it reaches only through greedy
+/// rules.
 pub(crate) fn general_rules(facts: &Facts<'_>) -> Vec<bool> {
     let rules = &facts.grammar().syntax_rules;
     let mut inexact = Vec::new();
     let mut callers = vec![Vec::new(); rules.len()];
     for (position, rule) in rules.iter().enumerate() {
+        if rule.greedy {
+            continue;
+        }
         let mut exact = true;
         facts.walk_rule(RuleId(position), &mut |expression, after| {
             exact &= is_exact(facts, rule.first_match, expression, after);
@@ -238,6 +243,16 @@ mod tests {
         let source = "s = word, ' '; word = keyword | name; keyword = 'if'; \
                       name = letter, {letter}; letter = ? U+0061..U+007A ?;";
         assert_eq!(general(source), [false; 5]);
+    }
+
+    #[test]
+    fn leaves_a_greedy_rule_and_what_reaches_it_through_one() {
+        let source = "s = word, 'fy'; word = keyword | name; keyword = 'if'; \
+                      (* greedy *) name = letter, {letter}; \
+                      letter = ? U+0061..U+007A ?;";
+        assert_eq!(general(source), [true, true, false, false, false]);
+        let source = "(* greedy *) s = a, 'x'; a = {'x'}, 'x';";
+        assert_eq!(general(source), [false, true]);
     }
 
     #[test]

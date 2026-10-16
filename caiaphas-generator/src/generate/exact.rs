@@ -98,6 +98,33 @@ impl ExactWriter<'_> {
         }
     }
 
+    /// Returns the function of `rule` that a greedy rule reads. It takes the
+    /// end `rule` prefers and builds the node of its match up to there.
+    pub(super) fn committed(
+        &self,
+        rule_id: RuleId,
+        rule: &Rule,
+    ) -> TokenStream {
+        let function = matching::function_name(rule_id);
+        let ends = ends_name(rule_id);
+        let node = if rule.hidden {
+            quote! { ::core::option::Option::None }
+        } else {
+            let build = build_name(rule_id);
+            quote! { #build(parser, position, end) }
+        };
+        quote! {
+            fn #function<const REPORTS: bool>(
+                parser: &mut __caiaphas::Parser<'_, REPORTS>,
+                position: usize,
+            ) -> __caiaphas::Match {
+                let end = #ends(parser, position).first()?;
+                let node = #node;
+                ::core::option::Option::Some((end, node))
+            }
+        }
+    }
+
     /// Returns the code that tells where `expression` can end.
     ///
     /// The ends of a rule that takes the first match come in the order of the

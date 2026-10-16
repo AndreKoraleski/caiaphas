@@ -240,3 +240,18 @@ fn gives_each_part_the_most_text_the_rest_leaves() {
     let runs: Vec<&str> = parsed.run.iter().map(twice::Run::text).collect();
     assert_eq!(runs, ["ab", "a"]);
 }
+
+caiaphas::grammar!(mod greedy = "tests/grammars/greedy.ebnf");
+
+#[test]
+fn takes_each_way_as_it_comes_in_a_greedy_rule() {
+    let parse = |input| greedy::Phrase::parse(input).map(|parsed| parsed.word);
+    assert!(matches!(parse("iffy"), Ok(greedy::Word::Keyword(_))));
+    assert_eq!(
+        parse("affy").unwrap_err().to_string(),
+        "expected `fy`, found the end of the input at line 1, column 5"
+    );
+    let sentence = greedy::Sentence::parse("iff;").unwrap();
+    assert!(matches!(sentence.pair.word, greedy::Word::Keyword(_)));
+    assert!(greedy::Sentence::parse("aff;").is_err());
+}
