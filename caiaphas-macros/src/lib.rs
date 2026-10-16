@@ -17,8 +17,8 @@ struct Input {
     visibility: Visibility,
     name: Ident,
     source: Source,
-    /// Whether the suggestions about the grammar stop the build, which
-    /// `suggest` after the grammar asks for.
+    /// Whether the suggestions about the grammar stop the build. `suggest`
+    /// after the grammar asks for that.
     suggest: bool,
     /// Whether the parser matches the grammar rearranged, as `optimize` after
     /// the grammar asks.
