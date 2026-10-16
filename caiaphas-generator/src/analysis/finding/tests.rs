@@ -232,6 +232,16 @@ const CASES: &[Case] = &[
                *)` right before the rule, and the grammar stays as it is",
     },
     Case {
+        source: "(* greedy *) s = {'x'}, 'y';",
+        code: FindingCode::IneffectiveAnnotation,
+        severity: Severity::Warning,
+        message: "`(* greedy *)` changes nothing in `s`, since a parser can \
+                  tell each way through it from the next character",
+        help: "remove the `(* greedy *)`; if this is intended, write `(* \
+               expect ineffective-annotation: reason *)` right before the \
+               rule, and the grammar stays as it is",
+    },
+    Case {
         source: "number = digit, {digit}; digit = ? U+0030..U+0039 ?;",
         code: FindingCode::SingleCharacterRule,
         severity: Severity::Suggestion,

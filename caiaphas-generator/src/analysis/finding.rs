@@ -85,6 +85,12 @@ pub(crate) enum FindingKind {
         last: char,
         between: CharacterSet,
     },
+    /// A `(* greedy *)` or `(* first match *)` changes nothing in its rule.
+    IneffectiveAnnotation {
+        meta_identifier: MetaIdentifier,
+        /// The annotation, `greedy` or `first match`.
+        annotation: &'static str,
+    },
     /// A visible rule only ever matches one character and a repetition reads
     /// it, so every character it matches builds a value of its own.
     SingleCharacterRule { meta_identifier: MetaIdentifier },

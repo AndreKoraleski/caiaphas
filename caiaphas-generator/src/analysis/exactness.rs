@@ -36,19 +36,27 @@ pub(crate) fn visit_conflicts(
     visit: &mut impl FnMut(Conflict),
 ) {
     for (position, rule) in facts.grammar().syntax_rules.iter().enumerate() {
-        if rule.greedy {
-            continue;
+        if !rule.greedy {
+            visit_rule_conflicts(facts, RuleId(position), visit);
         }
-        let rule_id = RuleId(position);
-        facts.walk_rule(rule_id, &mut |expression, after| {
-            let first_match = rule.first_match;
-            if let Some(conflict) =
-                conflict(facts, rule_id, first_match, expression, after)
-            {
-                visit(conflict);
-            }
-        });
     }
+}
+
+/// Calls `visit` with each conflict of the rule `rule_id`, greedy or not.
+pub(crate) fn visit_rule_conflicts(
+    facts: &Facts<'_>,
+    rule_id: RuleId,
+    visit: &mut impl FnMut(Conflict),
+) {
+    let RuleId(position) = rule_id;
+    let first_match = facts.grammar().syntax_rules[position].first_match;
+    facts.walk_rule(rule_id, &mut |expression, after| {
+        if let Some(conflict) =
+            conflict(facts, rule_id, first_match, expression, after)
+        {
+            visit(conflict);
+        }
+    });
 }
 
 /// Returns which rules of the grammar `facts` answers about try every way

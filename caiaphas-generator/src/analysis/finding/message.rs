@@ -106,6 +106,9 @@ impl FindingKind {
                  `? U+0041..U+005A ? | ? U+0061..U+007A ?` for the letters"
                     .to_owned()
             }
+            Self::IneffectiveAnnotation { annotation, .. } => {
+                format!("remove the `(* {annotation} *)`")
+            }
             Self::SingleCharacterRule { meta_identifier } => format!(
                 "hide it with `(* hide *)` unless a type needs `{}`, since \
                  the rules that read it keep its text",
@@ -252,6 +255,23 @@ impl fmt::Display for FindingKind {
                 "this range from `{first}` to `{last}` also takes {between}, \
                  though they are neither letters nor digits"
             ),
+            Self::IneffectiveAnnotation {
+                meta_identifier,
+                annotation,
+            } => {
+                let name = meta_identifier.as_str();
+                let reason = if *annotation == "greedy" {
+                    "a parser can tell each way through it from the next \
+                     character"
+                } else {
+                    "no two of its alternatives can match at the same place"
+                };
+                write!(
+                    f,
+                    "`(* {annotation} *)` changes nothing in `{name}`, since \
+                     {reason}"
+                )
+            }
             Self::SingleCharacterRule { meta_identifier } => write!(
                 f,
                 "`{}` only ever matches one character, and a repetition reads \
