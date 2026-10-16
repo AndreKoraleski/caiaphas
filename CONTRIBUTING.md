@@ -10,7 +10,7 @@ Run these before CI so you don't have to do a round trip.
 cargo test
 cargo clippy --all-targets -- -D warnings
 cargo fmt --all --check
-cargo doc --no-deps
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
 ```
 
 CI also treats any warning from `cargo doc` as an error, runs the tests on beta
@@ -29,7 +29,8 @@ Anything a user of the crate would notice gets an entry under `Unreleased` in
 ## Releasing
 
 1. Move the entries under `Unreleased` in `CHANGELOG.md` to a new version.
-2. Raise `version` in `Cargo.toml` and commit.
+2. Raise the version with `cargo set-version X.Y.Z` from cargo-edit, and
+   commit. It also moves the exact pins between the crates.
 3. Tag the commit with an annotated tag, then push the commit and the tag.
 
    ```sh
