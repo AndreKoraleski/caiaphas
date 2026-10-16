@@ -19,7 +19,10 @@ pub(super) fn attach(
 ) {
     for &span in comments {
         let kind = match Comment::read(&source[span.range()], span) {
-            Comment::Ordinary => continue,
+            Comment::Ordinary => {
+                document(source, span, attempts, rules);
+                continue;
+            }
             Comment::Annotation(annotation) => {
                 if give(annotation, span, attempts, rules) {
                     continue;
@@ -31,6 +34,40 @@ pub(super) fn attach(
             }
         };
         errors.push(ParseError { kind, span });
+    }
+}
+
+/// Gives the text of the ordinary comment at `span` of `source` to the rule it
+/// touches, with nothing but gaps and comments between them and no empty line,
+/// so a comment set apart, such as a header, stays a comment.
+fn document(
+    source: &str,
+    span: Span,
+    attempts: &[Span],
+    rules: &mut [SyntaxRule],
+) {
+    let Some(next) = attempts.iter().find(|rule| rule.start >= span.end)
+    else {
+        return;
+    };
+    let between = &source[span.end..next.start];
+    // The lines wholly between the two are those past the comment's own line
+    // and before the rule's, and none of them can be empty.
+    let lines: Vec<&str> = between.split('\n').collect();
+    let inner = lines
+        .get(1..lines.len().saturating_sub(1))
+        .unwrap_or_default();
+    if inner.iter().any(|line| line.trim().is_empty()) {
+        return;
+    }
+    let Some(rule) = rules.iter_mut().find(|rule| rule.span == *next) else {
+        return;
+    };
+    let text = &source[span.start + 2..span.end - 2];
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    let text = lines.join("\n").trim().to_owned();
+    if !text.is_empty() {
+        rule.comments.push(text);
     }
 }
 
@@ -224,5 +261,15 @@ mod tests {
                 span: Span { start: 9, end: 19 },
             }]
         );
+    }
+
+    #[test]
+    fn gives_a_rule_the_comments_that_touch_it() {
+        let syntax = parse_valid(
+            "(* A header. *)\n\n(* A greeting,\n   to say. *)\n\
+             (* hide *)\ngreeting = 'hi';",
+        );
+        assert_eq!(syntax.syntax_rules[0].comments, ["A greeting,\nto say."]);
+        assert!(syntax.syntax_rules[0].hidden);
     }
 }

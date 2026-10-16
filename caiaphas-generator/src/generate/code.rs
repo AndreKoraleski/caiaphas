@@ -6,6 +6,8 @@
 
 mod types;
 
+use std::fmt::Write;
+
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
@@ -62,8 +64,15 @@ pub(crate) fn module(
         let parse =
             start.then(|| parse(rule, RuleId(position), general[position]));
         let from_str = start.then(|| from_str(&names.types[position]));
+        let comments = rule.comments.iter().fold(
+            String::new(),
+            |mut comments, comment| {
+                let _ = write!(comments, " {comment}\n\n");
+                comments
+            },
+        );
         let documentation = format!(
-            " The type of the `{}` rule.\n\n```text\n{}\n```",
+            "{comments} The type of the `{}` rule.\n\n```text\n{}\n```",
             name::spaced(rule),
             &source[rule.span.range()],
         );

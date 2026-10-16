@@ -49,6 +49,9 @@ pub(crate) struct Rule {
     /// The Rust type an `(* as T *)` right before the rule makes its type,
     /// read from the text it matched.
     pub(crate) converts_to: Option<String>,
+    /// The text of each comment right before the rule that is no annotation.
+    /// The docs of the rule's type start with them.
+    pub(crate) comments: Vec<String>,
     /// The syntax rule it comes from.
     pub(crate) span: Span,
 }

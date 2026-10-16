@@ -28,6 +28,8 @@ pub(crate) struct SyntaxRule {
     pub(crate) inline: bool,
     /// The Rust type an `(* as T *)` right before the rule names, if any.
     pub(crate) converts_to: Option<String>,
+    /// The text of each comment right before the rule that is no annotation.
+    pub(crate) comments: Vec<String>,
     /// From the meta identifier to the terminator, both included.
     pub(crate) span: Span,
 }
@@ -61,6 +63,7 @@ impl SyntaxRule {
             greedy: false,
             inline: false,
             converts_to: None,
+            comments: Vec::new(),
             span: start.to(end),
         })
     }
