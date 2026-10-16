@@ -86,12 +86,18 @@
 //! - Any other rule becomes a struct. A field holds `T`, `Option<T>`, `Vec<T>`
 //!   or `[T; N]`, as many times as the rule can hold it, and a type that could
 //!   contain itself holds itself in a `Box`.
+//! - A struct has one field for each rule it holds, wherever it holds it, so
+//!   in `sum = term, {'+', term};` every `term` is in one `Vec<Term>`. A
+//!   repeated group with a rule of its own keeps each of its matches together:
+//!   `sum = term, {addition}; addition = '+', term;`.
 //! - Every struct has `text()` and `span()`, and a rule that only ever matches
-//!   one character also has `char()`.
+//!   one character also has `char()`. A type with `text()` displays as that
+//!   text.
 //! - `(* hide *)` gives a rule no type and no field, and `(* inline *)` gives
 //!   it no type, with each rule that holds it holding what it holds instead.
 //! - `(* as T *)` makes a rule's type the Rust type `T`, read from its text
-//!   with `FromStr`. Text `T` does not read fails to match.
+//!   with `FromStr`. `T` is named as where `grammar!` is called, so it can be
+//!   a type of your own. Text `T` does not read fails to match.
 //!
 //! # Errors
 //!
