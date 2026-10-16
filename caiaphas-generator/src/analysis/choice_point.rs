@@ -71,8 +71,8 @@ pub(crate) fn choice_points(facts: &Facts<'_>) -> Vec<ChoicePoint> {
 /// matches.
 ///
 /// They are the rules inside a choice point whose branches can start alike,
-/// each rule that can match nothing and then be tried again right away, as
-/// `b` can in `a = b, b;`, and every rule those reach.
+/// each rule that can match nothing and then be tried again right away, as `b`
+/// can in `a = b, b;`, and every rule those reach.
 pub(crate) fn revisited_rules(facts: &Facts<'_>) -> Vec<bool> {
     let mut starts = Vec::new();
     visit_choice_points(facts, &mut |expression, choice_point| {

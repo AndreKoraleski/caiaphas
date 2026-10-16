@@ -131,8 +131,7 @@ struct Matcher<'a> {
     steps: usize,
     /// How many more levels matching can nest.
     depth: usize,
-    /// Whether the choices being matched take their first branch that
-    /// matches.
+    /// Whether the choices being matched take their first branch that matches.
     first_match: bool,
 }
 

@@ -6,10 +6,10 @@ use crate::{
     span::Span,
 };
 
-/// Gives each annotation in the `comments` of `source` to the rule right
-/// after it in `rules`, where `attempts` tells where each rule the parser
-/// tried to read is, and adds an error for each annotation that is malformed
-/// or comes before no rule.
+/// Gives each annotation in the `comments` of `source` to the rule right after
+/// it in `rules`, where `attempts` tells where each rule the parser tried to
+/// read is, and adds an error for each annotation that is malformed or comes
+/// before no rule.
 pub(super) fn attach(
     source: &str,
     comments: &[Span],
@@ -39,8 +39,8 @@ pub(super) fn attach(
 }
 
 /// Gives `annotation`, written at `span`, to the rule right after it, and
-/// returns whether there is a rule right after it. A rule the parser could
-/// not read is left out with its annotations.
+/// returns whether there is a rule right after it. A rule the parser could not
+/// read is left out with its annotations.
 fn give(
     annotation: Annotation,
     span: Span,
