@@ -175,7 +175,7 @@ fn occurrences(
         }
         ExpressionKind::SingleDefinition(expressions) => {
             expressions.iter().fold(Vec::new(), |held, expression| {
-                combine(held, of(expression), |first, second| Occurrences {
+                combine(&held, &of(expression), |first, second| Occurrences {
                     least: first.least.saturating_add(second.least).min(MANY),
                     most: first.most.saturating_add(second.most).min(MANY),
                 })
@@ -185,7 +185,7 @@ fn occurrences(
             .iter()
             .map(of)
             .reduce(|held, other| {
-                combine(held, other, |first, second| Occurrences {
+                combine(&held, &other, |first, second| Occurrences {
                     least: first.least.min(second.least),
                     most: first.most.max(second.most),
                 })
@@ -223,8 +223,8 @@ fn occurrences(
 /// with `merge` giving the count of a rule from both counts, where a rule that
 /// one does not hold counts as held no times.
 fn combine(
-    first: Vec<(RuleId, Occurrences)>,
-    second: Vec<(RuleId, Occurrences)>,
+    first: &[(RuleId, Occurrences)],
+    second: &[(RuleId, Occurrences)],
     merge: impl Fn(Occurrences, Occurrences) -> Occurrences,
 ) -> Vec<(RuleId, Occurrences)> {
     let none = Occurrences { least: 0, most: 0 };
@@ -235,9 +235,9 @@ fn combine(
     };
     let mut all: Vec<(RuleId, Occurrences)> = first
         .iter()
-        .map(|&(rule, count)| (rule, merge(count, count_in(&second, rule))))
+        .map(|&(rule, count)| (rule, merge(count, count_in(second, rule))))
         .collect();
-    for &(rule, count) in &second {
+    for &(rule, count) in second {
         if !first.iter().any(|&(other, _)| other == rule) {
             all.push((rule, merge(none, count)));
         }

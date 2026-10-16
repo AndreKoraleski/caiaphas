@@ -96,6 +96,6 @@ mod tests {
         let mut sorted = starts.clone();
         sorted.sort_unstable();
         assert_eq!(starts, sorted);
-        assert!(!starts.is_empty());
+        assert_ne!(starts, []);
     }
 }

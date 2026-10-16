@@ -100,11 +100,7 @@ impl ExactWriter<'_> {
 
     /// Returns the function of `rule` that a greedy rule reads. It takes the
     /// end `rule` prefers and builds the node of its match up to there.
-    pub(super) fn committed(
-        &self,
-        rule_id: RuleId,
-        rule: &Rule,
-    ) -> TokenStream {
+    pub(super) fn committed(rule_id: RuleId, rule: &Rule) -> TokenStream {
         let function = matching::function_name(rule_id);
         let ends = ends_name(rule_id);
         let node = if rule.hidden {
@@ -142,7 +138,7 @@ impl ExactWriter<'_> {
                 quote! {
                     {
                         let ends = #ends::one(position);
-                        #(let ends = parser.then(ends, #steps);)*
+                        #(let ends = parser.then(&ends, #steps);)*
                         ends
                     }
                 }

@@ -62,21 +62,25 @@ impl Span {
     }
 
     /// Returns the text the span covers.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.input.as_str()[self.start..self.end]
     }
 
     /// Returns the byte offsets in the input that the span covers.
+    #[must_use]
     pub fn range(&self) -> Range<usize> {
         self.start..self.end
     }
 
     /// Returns the line the span starts on, counted from 1.
+    #[must_use]
     pub fn line(&self) -> usize {
         self.input.line_and_column(self.start).0
     }
 
     /// Returns the column the span starts at, counted in characters from 1.
+    #[must_use]
     pub fn column(&self) -> usize {
         self.input.line_and_column(self.start).1
     }

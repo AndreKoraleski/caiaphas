@@ -50,27 +50,32 @@ impl Error {
     }
 
     /// Returns the byte offset in the input where the error is.
+    #[must_use]
     pub fn offset(&self) -> usize {
         self.offset
     }
 
     /// Returns the line the error is on, counted from 1.
+    #[must_use]
     pub fn line(&self) -> usize {
         self.line
     }
 
     /// Returns the column the error is at, counted in characters from 1.
+    #[must_use]
     pub fn column(&self) -> usize {
         self.column
     }
 
     /// Returns what could have come where the error is, in order.
+    #[must_use]
     pub fn expected(&self) -> &[Expected] {
         &self.expected
     }
 
     /// Returns the character found where the error is, or `None` at the end of
     /// the input.
+    #[must_use]
     pub fn found(&self) -> Option<char> {
         self.found
     }

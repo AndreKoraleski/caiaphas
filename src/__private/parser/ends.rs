@@ -44,10 +44,12 @@ impl Default for Ends {
 
 impl Ends {
     /// Returns no ends, as of an expression that does not match.
+    #[must_use]
     pub fn none() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn one(end: usize) -> Self {
         let mut ends = Self::none();
         ends.add(end);
@@ -66,6 +68,7 @@ impl Ends {
         }
     }
 
+    #[must_use]
     pub fn contains(&self, end: usize) -> bool {
         match &self.0 {
             Held::Many {
@@ -76,6 +79,7 @@ impl Ends {
     }
 
     /// Returns the end a parser prefers, if any.
+    #[must_use]
     pub fn first(&self) -> Option<usize> {
         self.as_slice().first().copied()
     }
@@ -149,6 +153,7 @@ impl Ends {
     }
 
     /// Returns the ends with the end of the most text first.
+    #[must_use]
     pub fn longest_first(mut self) -> Self {
         let ends = match &mut self.0 {
             Held::Few { count, ends } => &mut ends[..*count],
@@ -160,6 +165,7 @@ impl Ends {
 
     /// Returns the only end of an expression that has at most one, and that
     /// the rest of a match goes on from.
+    #[must_use]
     pub fn only(&self) -> usize {
         let ends = self.as_slice();
         debug_assert_eq!(ends.len(), 1, "the expression has one end");
@@ -207,7 +213,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     /// `ends` and then of what `step` prefers.
     pub fn then(
         &mut self,
-        ends: Ends,
+        ends: &Ends,
         mut step: impl FnMut(&mut Self, usize) -> Ends,
     ) -> Ends {
         if let &[end] = ends.as_slice() {
@@ -229,7 +235,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         mut step: impl FnMut(&mut Self, usize) -> Ends,
     ) -> Ends {
         for _ in 0..count {
-            ends = self.then(ends, &mut step);
+            ends = self.then(&ends, &mut step);
         }
         ends
     }
@@ -371,7 +377,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     /// what they are part of make sure there is one.
     pub fn choose(
         &mut self,
-        candidates: Ends,
+        candidates: &Ends,
         mut leads: impl FnMut(&mut Self, usize) -> bool,
     ) -> usize {
         candidates

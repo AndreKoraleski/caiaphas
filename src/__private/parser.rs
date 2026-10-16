@@ -87,6 +87,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     }
 
     /// Returns the character at `position`, if the input goes on there.
+    #[must_use]
     pub fn character(&self, position: usize) -> Option<char> {
         self.input[position..].chars().next()
     }
@@ -188,6 +189,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
 
     /// Returns how many nodes have been matched, to go back to with
     /// [`Parser::truncate`] when what comes next does not match.
+    #[must_use]
     pub fn mark(&self) -> usize {
         self.matched.len()
     }
@@ -229,6 +231,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     }
 
     /// Starts to match a rule at `position`.
+    #[must_use]
     pub fn start_rule(&self, position: usize) -> RuleStart {
         let noted_before = if REPORTS && self.furthest == position {
             self.expected.len()
@@ -316,6 +319,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     /// Returns a parser of the input up to `end`, for an exception. An
     /// exception only reads what its factor matched, and its failures tell
     /// nothing about why the input does not match.
+    #[must_use]
     pub fn within(&self, end: usize) -> Parser<'i, false> {
         Parser::new(&self.input[..end])
     }

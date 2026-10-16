@@ -158,9 +158,10 @@ fn set_code(
 
 /// Returns the closure that tells whether a character is one of `characters`.
 fn contains(characters: &CharacterSet) -> TokenStream {
-    match pattern(characters) {
-        Some(pattern) => quote! { |c| ::core::matches!(c, #pattern) },
-        None => quote! { |_| false },
+    if let Some(pattern) = pattern(characters) {
+        quote! { |c| ::core::matches!(c, #pattern) }
+    } else {
+        quote! { |_| false }
     }
 }
 

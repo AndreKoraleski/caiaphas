@@ -57,7 +57,7 @@ fn repetition_reading(grammar: &Grammar, rule_id: RuleId) -> Option<Span> {
         };
         let mut reads = false;
         body.visit_meta_identifiers(&mut |target, _| {
-            reads |= target == rule_id
+            reads |= target == rule_id;
         });
         if reads && found.is_none() {
             found = Some(expression.span);

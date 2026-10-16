@@ -144,22 +144,18 @@ impl Lowering<'_, '_> {
                 self.definitions_list(list).kind
             }
             SyntacticPrimaryKind::MetaIdentifier(meta_identifier) => {
-                match self.index.get(meta_identifier) {
-                    Some(rule_id) => ExpressionKind::MetaIdentifier(rule_id),
-                    None => {
-                        self.errors.push(DictionaryError {
-                            kind:
-                                DictionaryErrorKind::UndefinedMetaIdentifier {
-                                    meta_identifier: meta_identifier.clone(),
-                                    similar: self
-                                        .index
-                                        .similar(meta_identifier),
-                                },
-                            span: syntactic_primary.span,
-                        });
-                        // Stands in for the missing rule, so lowering goes on.
-                        ExpressionKind::EmptySequence
-                    }
+                if let Some(rule_id) = self.index.get(meta_identifier) {
+                    ExpressionKind::MetaIdentifier(rule_id)
+                } else {
+                    self.errors.push(DictionaryError {
+                        kind: DictionaryErrorKind::UndefinedMetaIdentifier {
+                            meta_identifier: meta_identifier.clone(),
+                            similar: self.index.similar(meta_identifier),
+                        },
+                        span: syntactic_primary.span,
+                    });
+                    // Stands in for the missing rule, so lowering goes on.
+                    ExpressionKind::EmptySequence
                 }
             }
             SyntacticPrimaryKind::TerminalString(string) => {

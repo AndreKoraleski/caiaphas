@@ -86,7 +86,10 @@ missing_debug_implementations = "warn" # C-DEBUG
 # non_ascii_idents = "warn"
 
 [workspace.lints.clippy]
-# pedantic = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# A rule's annotations are flags, and code generation is long matches.
+struct_excessive_bools = "allow"
+too_many_lines = "allow"
 # missing_errors_doc = "warn"    # C-FAILURE, part of pedantic
 # missing_panics_doc = "warn"    # C-FAILURE, part of pedantic
 cargo_common_metadata = "warn" # C-METADATA

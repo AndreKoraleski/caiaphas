@@ -341,7 +341,7 @@ fn describes_every_kind_of_finding() {
 fn turns_a_finding_into_a_diagnostic() {
     let finding =
         crate::analysis::tests::findings("a = ['x'] | ['y'];").remove(0);
-    assert!(!finding.labels.is_empty());
+    assert_ne!(finding.labels, []);
     assert_eq!(
         Diagnostic::from(finding.clone()),
         Diagnostic {

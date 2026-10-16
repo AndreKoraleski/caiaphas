@@ -5,6 +5,7 @@
 const FINDINGS: &str = include_str!("findings.md");
 
 /// Returns the explanation of the finding with `code`, if there is one.
+#[must_use]
 pub fn explain(code: &str) -> Option<String> {
     let heading = format!("## {code}");
     let mut lines = FINDINGS.lines().skip_while(|line| *line != heading);

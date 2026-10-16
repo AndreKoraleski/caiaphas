@@ -59,7 +59,7 @@ pub(crate) fn functions(facts: &Facts<'_>, general: &[bool]) -> TokenStream {
                 }
                 let writer = ExactWriter { writer, general };
                 let committing = committed[position]
-                    .then(|| writer.committed(rule_id, rule));
+                    .then(|| ExactWriter::committed(rule_id, rule));
                 let functions = writer.functions(rule_id, rule);
                 quote! { #functions #committing }
             });

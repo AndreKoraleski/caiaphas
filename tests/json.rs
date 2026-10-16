@@ -25,7 +25,10 @@ fn parses_a_document_into_the_types_of_its_rules() {
         panic!("{tags:?}");
     };
     assert_eq!(number.integer.text(), "1");
-    assert_eq!(number.exponent.as_ref().map(|e| e.text()), Some("e3"));
+    assert_eq!(
+        number.exponent.as_ref().map(json::Exponent::text),
+        Some("e3")
+    );
 }
 
 #[test]

@@ -96,6 +96,7 @@ pub struct Report {
 
 /// Returns every problem and suggestion about the grammar `source`, rendered
 /// with `path` naming the grammar's file, without generating its module.
+#[must_use]
 pub fn check(source: &str, path: &str) -> Report {
     let (grammar, mut diagnostics) = compile(source, false);
     if let Some(grammar) = grammar {

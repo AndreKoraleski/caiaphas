@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn leaves_out_a_greedy_rule_and_a_choice_the_next_character_decides() {
-        assert!(choices("(* greedy *) s = {'x'}, 'x';").is_empty());
-        assert!(choices("s = {'x'}, 'y';").is_empty());
+        assert_eq!(choices("(* greedy *) s = {'x'}, 'x';"), []);
+        assert_eq!(choices("s = {'x'}, 'y';"), []);
     }
 }

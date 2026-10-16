@@ -31,6 +31,7 @@ impl Tree {
         }
     }
 
+    #[must_use]
     pub fn root(&self) -> Node<'_> {
         Node {
             tree: self,
@@ -64,15 +65,18 @@ impl<'t> Node<'t> {
     }
 
     /// Returns the number of the rule this node matched.
+    #[must_use]
     pub fn rule(&self) -> usize {
         self.data().rule as usize
     }
 
+    #[must_use]
     pub fn span(&self) -> Span {
         let data = self.data();
         Span::new(Arc::clone(&self.tree.input), data.start..data.end)
     }
 
+    #[must_use]
     pub fn text(&self) -> &'t str {
         let data = self.data();
         &self.tree.input.as_str()[data.start..data.end]
@@ -87,12 +91,14 @@ impl<'t> Node<'t> {
     }
 
     /// Returns the only rule matched inside this one, if any.
+    #[must_use]
     pub fn child(&self) -> Option<Node<'t>> {
         self.children().next()
     }
 
     /// Returns the rule numbered `rule` matched inside this one. The grammar
     /// makes sure it is there.
+    #[must_use]
     pub fn one<T: FromNode>(&self, rule: usize) -> T {
         self.optional(rule)
             .expect("the grammar always matches this rule here")
@@ -107,6 +113,7 @@ impl<'t> Node<'t> {
 
     /// Returns the `N` times the rule numbered `rule` matched inside this one,
     /// in order. The grammar makes sure there are that many.
+    #[must_use]
     pub fn array<T: FromNode, const N: usize>(&self, rule: usize) -> [T; N] {
         self.many(rule).try_into().unwrap_or_else(|_| {
             panic!("the grammar always matches this rule {N} times here")

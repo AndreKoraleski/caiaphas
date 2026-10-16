@@ -71,14 +71,11 @@ pub(crate) fn length(input: &str) -> Result<usize, ParseSpecialSequenceError> {
 fn parse_range(
     content: &str,
 ) -> Result<RangeInclusive<char>, ParseSpecialSequenceError> {
-    let (start, end) = match content.split_once("..") {
-        Some((start, end)) => {
-            (parse_code_point(start)?, parse_code_point(end)?)
-        }
-        None => {
-            let c = parse_code_point(content)?;
-            (c, c)
-        }
+    let (start, end) = if let Some((start, end)) = content.split_once("..") {
+        (parse_code_point(start)?, parse_code_point(end)?)
+    } else {
+        let c = parse_code_point(content)?;
+        (c, c)
     };
     if start > end {
         return Err(ParseSpecialSequenceError::ReversedRange(start, end));

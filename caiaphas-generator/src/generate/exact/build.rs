@@ -74,7 +74,7 @@ impl ExactWriter<'_> {
                         for left in (0..#integer).rev() {
                             let candidates = step(parser, position);
                             let next = parser.choose(
-                                candidates,
+                                &candidates,
                                 |parser, next| {
                                     let ends = __caiaphas::Ends::one(next);
                                     let ends = parser.times(ends, left, step);

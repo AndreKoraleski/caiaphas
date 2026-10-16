@@ -54,15 +54,12 @@ fn misuse() -> ExitCode {
 
 /// Prints what the finding with `code` means. Fails when no finding has it.
 fn explain(code: &str) -> ExitCode {
-    match caiaphas_generator::explain(code) {
-        Some(explanation) => {
-            println!("{explanation}");
-            ExitCode::SUCCESS
-        }
-        None => {
-            eprintln!("error: `{code}` is not the code of any finding");
-            ExitCode::FAILURE
-        }
+    if let Some(explanation) = caiaphas_generator::explain(code) {
+        println!("{explanation}");
+        ExitCode::SUCCESS
+    } else {
+        eprintln!("error: `{code}` is not the code of any finding");
+        ExitCode::FAILURE
     }
 }
 

@@ -66,7 +66,7 @@ pub(crate) fn module(
                     &names,
                     position,
                     fields,
-                    quote! { #parse #character },
+                    &quote! { #parse #character },
                     &documentation,
                 )
             }
@@ -75,7 +75,7 @@ pub(crate) fn module(
                 &names,
                 position,
                 variants,
-                parse,
+                parse.as_ref(),
                 &documentation,
             ),
         };
@@ -175,7 +175,7 @@ fn structure(
     names: &Names,
     position: usize,
     fields: &[Field],
-    methods: TokenStream,
+    methods: &TokenStream,
     documentation: &str,
 ) -> TokenStream {
     let name = &names.types[position];
@@ -277,7 +277,7 @@ fn enumeration(
     names: &Names,
     position: usize,
     variants: &[Variant],
-    parse: Option<TokenStream>,
+    parse: Option<&TokenStream>,
     documentation: &str,
 ) -> TokenStream {
     let name = &names.types[position];
