@@ -8,6 +8,8 @@ Reads ISO/IEC 14977 EBNF grammars for caiaphas, finds their problems and \
 generates their parsers"""
 license.workspace = true
 repository.workspace = true
+keywords = ["ebnf", "grammar", "parser-generator", "codegen", "iso-14977"]
+categories = ["parsing", "development-tools::build-utils"]
 
 [dependencies]
 annotate-snippets.workspace = true
