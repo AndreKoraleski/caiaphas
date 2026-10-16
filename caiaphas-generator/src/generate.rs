@@ -109,12 +109,23 @@ mod tests {
     }
 
     #[test]
-    fn takes_the_first_match_where_a_rule_asks_for_it() {
-        let items = |source| generate(source, "g.ebnf").unwrap().to_string();
-        let longest = items("s = a | b; a = 'x'; b = 'y';");
+    fn takes_the_longest_match_unless_a_rule_asks_for_the_first() {
+        let items =
+            |source: String| generate(&source, "g.ebnf").unwrap().to_string();
+        let rules = "a = 'x'; b = 'x', 'y';";
+        let longest = items(format!("s = a | b; {rules}"));
         assert!(longest.contains("longest"), "{longest}");
-        let first = items("(* first match *) s = a | b; a = 'x'; b = 'y';");
+        let first = items(format!("(* first match *) s = b | a; {rules}"));
         assert!(!first.contains("longest"), "{first}");
+    }
+
+    #[test]
+    fn stops_at_the_one_branch_that_can_match_where_branches_start_apart() {
+        let items = generate("s = a | b; a = 'x'; b = 'y';", "g.ebnf")
+            .unwrap()
+            .to_string();
+        assert!(items.contains("found"), "{items}");
+        assert!(!items.contains("longest"), "{items}");
     }
 
     #[test]

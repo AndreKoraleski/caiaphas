@@ -120,6 +120,29 @@ impl FunctionWriter<'_> {
                         })()
                     };
                 }
+                if self.apart(expressions) {
+                    // A parse that only matches stops at the one branch that
+                    // matches. One that finds out why an input does not match
+                    // tries the rest too, for what they note.
+                    return quote! {
+                        {
+                            let mut found: ::core::option::Option<usize> =
+                                #none;
+                            #(
+                                if REPORTS || found.is_none() {
+                                    let start = parser.mark();
+                                    match #branches {
+                                        #some(end) if found.is_none() => {
+                                            found = #some(end);
+                                        }
+                                        _ => parser.truncate(start),
+                                    }
+                                }
+                            )*
+                            found
+                        }
+                    };
+                }
                 quote! {
                     {
                         let mark = parser.mark();
@@ -256,6 +279,20 @@ impl FunctionWriter<'_> {
             }
             ExpressionKind::EmptySequence => quote! { #some(position) },
         }
+    }
+
+    /// Returns whether at most one of `alternatives` can match at any place,
+    /// since none can match nothing and no two can start with the same
+    /// character. The one that matches is then the longest.
+    fn apart(&self, alternatives: &[Expression]) -> bool {
+        let mut seen = CharacterSet::default();
+        alternatives.iter().all(|alternative| {
+            let first = self.facts.first(alternative);
+            let apart = !self.facts.is_nullable(alternative)
+                && seen.intersection(&first).is_empty();
+            seen = seen.union(&first);
+            apart
+        })
     }
 
     /// Returns the code of each of `alternatives` as a branch, with each run
