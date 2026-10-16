@@ -123,15 +123,24 @@ pub struct Circle { pub size: u32 }
 pub struct Square { pub size: [u32; 2] }
 ```
 
-* A rule whose alternatives are each another rule or a word becomes an enum,
-  and any other rule a struct.
+* A rule whose alternatives are each another rule or a word, such as
+  `'true'`, becomes an enum, and any other rule a struct.
+* A type is named in upper camel case and a field in snake case, so
+  `syntax rule` gives `SyntaxRule` and `syntax_rule`. A word Rust keeps, such
+  as `type`, becomes `r#type`, and `self` and `span` become `self_` and
+  `span_`.
 * A field holds `T`, `Option<T>` for `[a]`, `Vec<T>` for `{a}`, or `[T; N]`
   when the rule always holds it `N` times. A type that could contain itself
   holds itself in a `Box`.
 * Every struct gives the text it matched with `text()`, and where with
-  `span()`. A rule that only ever matches one character also has `char()`.
+  `span()`. An enum has `text()` too, unless a variant holds an `(* as T *)`
+  value. A type with `text()` displays as that text, and a rule that only
+  ever matches one character also has `char()`.
+* Two values are equal when they matched the same way at the same place, since
+  each holds where it matched.
 * The type of a start rule has `parse` and implements `FromStr`. A start rule
-  is one that no other rule uses.
+  is one that no other rule uses, so a grammar whose top rule recurs needs
+  one more above it, such as `calculation = expression;`.
 
 ## Annotations
 
