@@ -17,5 +17,5 @@ mod parser;
 mod span;
 mod spelling;
 
-pub use explain::{explain, findings};
+pub use explain::{codes, explain, findings, similar_code};
 pub use generate::{Module, Options, Report, check, generate};
