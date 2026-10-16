@@ -95,6 +95,7 @@ impl fmt::Display for Expected {
             Self::Range(first, last) if first == last => {
                 write!(f, "`{}`", Shown(&first.to_string()))
             }
+            Self::Range('\0', char::MAX) => f.write_str("any character"),
             Self::Range(first, last) => write!(
                 f,
                 "a character from `{}` to `{}`",
@@ -113,16 +114,17 @@ impl fmt::Display for Expected {
     }
 }
 
-/// Shows text with its control characters escaped, so a tab reads `\t`.
+/// Shows text with the characters that do not print escaped, so a tab reads
+/// `\t` and the last code point `\u{10ffff}`.
 struct Shown<'a>(&'a str);
 
 impl fmt::Display for Shown<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for c in self.0.chars() {
-            if c.is_control() {
-                write!(f, "{}", c.escape_debug())?;
-            } else {
+            if matches!(c, '"' | '\'' | '\\') {
                 f.write_char(c)?;
+            } else {
+                write!(f, "{}", c.escape_debug())?;
             }
         }
         Ok(())
@@ -242,6 +244,25 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "expected `\\n`, found `\\t` at line 1, column 1"
+        );
+    }
+
+    #[test]
+    fn escapes_what_does_not_print_and_names_every_character() {
+        let error = Error::new(
+            "\u{301}",
+            0,
+            vec![
+                Expected::Range('#', char::MAX),
+                Expected::Range('\0', char::MAX),
+                Expected::Text("\"\\'"),
+            ],
+            None,
+        );
+        assert_eq!(
+            error.to_string(),
+            "expected `\"\\'`, any character or a character from `#` to \
+             `\\u{10ffff}`, found `\\u{301}` at line 1, column 1"
         );
     }
 
