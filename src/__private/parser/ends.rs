@@ -87,10 +87,8 @@ impl Ends {
 
     /// Adds `end` after the others, unless it is there already.
     pub fn add(&mut self, end: usize) {
-        if self.contains(end) {
-            return;
-        }
         match &mut self.0 {
+            Held::Few { count, ends } if ends[..*count].contains(&end) => {}
             Held::Few { count, ends } if *count < FEW_ENDS => {
                 ends[*count] = end;
                 *count += 1;
@@ -105,6 +103,13 @@ impl Ends {
                 };
             }
             Held::Many { ends, seen } => {
+                let there = match seen {
+                    Some(seen) => seen.contains(&end),
+                    None => ends.contains(&end),
+                };
+                if there {
+                    return;
+                }
                 ends.push(end);
                 match seen {
                     Some(seen) => {
@@ -121,6 +126,10 @@ impl Ends {
 
     /// Adds each of `other` after these, in its order.
     pub fn extend(&mut self, other: Self) {
+        if self.as_slice().is_empty() {
+            *self = other;
+            return;
+        }
         for &end in other.as_slice() {
             self.add(end);
         }
@@ -201,6 +210,9 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         ends: Ends,
         mut step: impl FnMut(&mut Self, usize) -> Ends,
     ) -> Ends {
+        if let &[end] = ends.as_slice() {
+            return step(self, end);
+        }
         let mut after = Ends::none();
         for &end in ends.as_slice() {
             after.extend(step(self, end));
