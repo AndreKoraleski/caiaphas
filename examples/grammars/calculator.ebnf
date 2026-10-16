@@ -1,0 +1,25 @@
+(* Arithmetic on numbers, where `*` and `/` bind closer than `+` and `-`, and
+   spaces may follow any token. *)
+calculation = ws, sum;
+sum = product, {addition};
+addition = additive, product;
+additive = plus | minus;
+product = factor, {multiplication};
+multiplication = multiplicative, factor;
+multiplicative = times | over;
+factor = number | group;
+group = open, sum, close;
+number = digits, ws;
+digits = digit, {digit}, ['.', digit, {digit}];
+plus = '+', ws;
+minus = '-', ws;
+times = '*', ws;
+over = '/', ws;
+(* hide *)
+open = '(', ws;
+(* hide *)
+close = ')', ws;
+(* hide *)
+digit = ? U+0030..U+0039 ?;
+(* hide *)
+ws = {' '};
