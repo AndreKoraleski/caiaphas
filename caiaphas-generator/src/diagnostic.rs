@@ -12,6 +12,9 @@ pub(crate) enum Severity {
     Error,
     /// The parser works, but may not do what the grammar means.
     Warning,
+    /// The parser works and does what the grammar means, but the grammar could
+    /// be written so it is faster. A suggestion never stops the build.
+    Suggestion,
 }
 
 /// A label points at another place a diagnostic involves.
@@ -41,6 +44,7 @@ impl Diagnostic {
         let level = match self.severity {
             Severity::Error => Level::ERROR,
             Severity::Warning => Level::WARNING,
+            Severity::Suggestion => Level::INFO,
         };
         let title = level.no_name().primary_title(&self.message);
         let snippet = Snippet::source(source)

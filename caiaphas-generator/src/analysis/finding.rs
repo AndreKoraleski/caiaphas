@@ -79,6 +79,9 @@ pub(crate) enum FindingKind {
         meta_identifier: MetaIdentifier,
         other: MetaIdentifier,
     },
+    /// A visible rule only ever matches one character and a repetition reads
+    /// it, so every character it matches builds a value of its own.
+    SingleCharacterRule { meta_identifier: MetaIdentifier },
     /// An expectation names no kind of finding.
     UnknownExpectation { code: String },
     /// An expectation names a kind of finding that cannot be intended, such as
@@ -204,6 +207,11 @@ impl FindingKind {
                 meta_identifier.as_str(),
                 other.as_str()
             ),
+            Self::SingleCharacterRule { meta_identifier } => format!(
+                "hide it with `(* hide *)` unless a type needs `{}`, since \
+                 the rules that read it keep its text",
+                meta_identifier.as_str()
+            ),
             Self::UnknownExpectation { .. } => {
                 "write the code a finding reports, such as \
                  `repeated-follow-conflict`"
@@ -322,6 +330,12 @@ impl fmt::Display for FindingKind {
                  mistake",
                 meta_identifier.as_str(),
                 other.as_str()
+            ),
+            Self::SingleCharacterRule { meta_identifier } => write!(
+                f,
+                "`{}` only ever matches one character, and a repetition reads \
+                 it, so every character it matches builds a value of its own",
+                meta_identifier.as_str()
             ),
             Self::UnknownExpectation { code } => {
                 write!(f, "`{code}` is not the code of any finding")

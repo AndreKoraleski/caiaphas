@@ -22,6 +22,7 @@ use crate::{
 ///
 /// Warnings stop it too unless the grammar expects them, so a generated parser
 /// always does what its grammar means, or what the grammar says it intends.
+/// Suggestions never stop it.
 ///
 /// # Errors
 ///
@@ -33,7 +34,9 @@ pub fn generate(source: &str, path: &str) -> Result<TokenStream, Vec<String>> {
             .map(|diagnostic| diagnostic.render(path, source))
             .collect()
     };
-    let (grammar, diagnostics) = compile(source);
+    let (grammar, mut diagnostics) = compile(source);
+    diagnostics
+        .retain(|diagnostic| diagnostic.severity != Severity::Suggestion);
     let Some(grammar) = grammar.filter(|_| diagnostics.is_empty()) else {
         return Err(render(diagnostics));
     };
@@ -126,6 +129,12 @@ mod tests {
             .to_string();
         assert!(items.contains("found"), "{items}");
         assert!(!items.contains("longest"), "{items}");
+    }
+
+    #[test]
+    fn generates_a_grammar_that_only_has_suggestions() {
+        let source = "number = digit, {digit}; digit = ? U+0030..U+0039 ?;";
+        assert!(generate(source, "g.ebnf").is_ok());
     }
 
     #[test]

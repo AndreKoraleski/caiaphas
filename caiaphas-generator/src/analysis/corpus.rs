@@ -1,14 +1,16 @@
-//! A corpus of realistic grammars, with every finding the analysis should
+//! A corpus of realistic grammars, with every problem the analysis should
 //! report about each, to catch checks that report too much or too little.
+//! Suggestions are left out, since they are not problems.
 
-use crate::{analysis::tests::findings, span::Span};
+use crate::{analysis::tests::findings, diagnostic::Severity, span::Span};
 
-/// Returns each finding about `source` as the text it points at, its message
-/// and the text each of its labels points at.
+/// Returns each problem found in `source` as the text it points at, its
+/// message and the text each of its labels points at.
 fn summary(source: &str) -> Vec<String> {
     let text = |span: Span| &source[span.range()];
     findings(source)
         .into_iter()
+        .filter(|finding| finding.kind.severity() != Severity::Suggestion)
         .map(|finding| {
             let labels: Vec<&str> = finding
                 .labels

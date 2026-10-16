@@ -55,6 +55,7 @@ finding_codes! {
     EmptyRule => "empty-rule",
     ExhaustiveException => "exhaustive-exception",
     CaseOnlyNames => "case-only-names",
+    SingleCharacterRule => "single-character-rule",
     UnknownExpectation => "unknown-expectation",
     UnexpectableFinding => "unexpectable-finding",
     UnfulfilledExpectation => "unfulfilled-expectation",
@@ -89,6 +90,7 @@ impl FindingCode {
             | Self::ExhaustiveException
             | Self::CaseOnlyNames
             | Self::UnfulfilledExpectation => Severity::Warning,
+            Self::SingleCharacterRule => Severity::Suggestion,
         }
     }
 
@@ -126,7 +128,8 @@ impl FindingCode {
             | Self::IneffectiveException
             | Self::EmptyRule
             | Self::ExhaustiveException
-            | Self::CaseOnlyNames => Some("the grammar stays as it is"),
+            | Self::CaseOnlyNames
+            | Self::SingleCharacterRule => Some("the grammar stays as it is"),
             Self::LeftRecursion
             | Self::IndirectLeftRecursion
             | Self::UnproductiveRule

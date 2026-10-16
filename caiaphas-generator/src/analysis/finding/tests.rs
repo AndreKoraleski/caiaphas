@@ -217,6 +217,18 @@ const CASES: &[Case] = &[
                grammar stays as it is",
     },
     Case {
+        source: "number = digit, {digit}; digit = ? U+0030..U+0039 ?;",
+        code: FindingCode::SingleCharacterRule,
+        severity: Severity::Suggestion,
+        message: "`digit` only ever matches one character, and a repetition \
+                  reads it, so every character it matches builds a value of \
+                  its own",
+        help: "hide it with `(* hide *)` unless a type needs `digit`, since \
+               the rules that read it keep its text; if this is intended, \
+               write `(* expect single-character-rule: reason *)` right \
+               before the rule, and the grammar stays as it is",
+    },
+    Case {
         source: "(* expect no-such-finding: none *) a = 'x';",
         code: FindingCode::UnknownExpectation,
         severity: Severity::Error,

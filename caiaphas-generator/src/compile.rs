@@ -24,7 +24,7 @@ pub(crate) fn compile(source: &str) -> (Option<Grammar>, Vec<Diagnostic>) {
     let diagnostics = diagnostics(analyse(&grammar));
     let grammar = diagnostics
         .iter()
-        .all(|diagnostic| diagnostic.severity == Severity::Warning)
+        .all(|diagnostic| diagnostic.severity != Severity::Error)
         .then_some(grammar);
     (grammar, diagnostics)
 }
