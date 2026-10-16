@@ -477,11 +477,28 @@ fn reads_a_converted_character_with_its_type_wherever_it_is() {
     assert!(converted_character::S::parse("ax").is_err());
 }
 
+caiaphas::grammar!(mod statement {
+    "statement = name, ' = ', name;
+     name = letters - keyword;
+     (* hide *) letters = letter, {letter};
+     (* hide *) keyword = 'let' | 'if';
+     (* hide *) letter = ? U+0061..U+007A ?;"
+});
+
 caiaphas::grammar!(mod hidden_ranges {
     "pair = 'x', (tail | single);
      (* hide *) tail = ? U+0061..U+007A ?, '!';
      (* hide *) single = ? U+0030..U+0039 ? | ',';"
 });
+
+#[test]
+fn tells_where_an_exception_took_a_match_away() {
+    let error = statement::Statement::parse("let = x").unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "expected a name, found `let` at line 1, column 1"
+    );
+}
 
 #[test]
 fn calls_a_hidden_rule_of_character_ranges_by_its_name() {

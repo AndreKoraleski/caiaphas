@@ -310,7 +310,12 @@ impl FunctionWriter<'_> {
                             let parser = &mut within;
                             #exception
                         } == #some(end);
-                        if excluded { #none } else { #some(end) }
+                        if excluded {
+                            parser.excluded(&RULE, position, end);
+                            #none
+                        } else {
+                            #some(end)
+                        }
                     })()
                 }
             }

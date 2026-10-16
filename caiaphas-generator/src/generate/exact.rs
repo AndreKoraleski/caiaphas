@@ -207,9 +207,15 @@ impl ExactWriter<'_> {
                     {
                         let mut ends = #factor;
                         ends.retain(|end| {
-                            let mut within = parser.within(end);
-                            let parser = &mut within;
-                            !(#exception).contains(end)
+                            let excluded = {
+                                let mut within = parser.within(end);
+                                let parser = &mut within;
+                                (#exception).contains(end)
+                            };
+                            if excluded {
+                                parser.excluded(&RULE, position, end);
+                            }
+                            !excluded
                         });
                         ends
                     }

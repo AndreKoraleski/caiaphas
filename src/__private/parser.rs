@@ -205,9 +205,22 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         if self.input[position..end].parse::<T>().is_ok() {
             return true;
         }
+        self.reject(rule, position, end);
+        false
+    }
+
+    /// Notes `rule` as expected at `position`, with the text from there to
+    /// `end` as what was found, since an exception took that match away.
+    pub fn excluded(&mut self, rule: &Rule, position: usize, end: usize) {
+        self.reject(rule, position, end);
+    }
+
+    /// Notes `rule` as expected at `position`, with the text from there to
+    /// `end` as what was found, since something took its match there away.
+    fn reject(&mut self, rule: &Rule, position: usize, end: usize) {
         // A failure inside text a rule matched in full tells how far the match
-        // could go, not why the input does not match, so the type that did not
-        // read the text tells it instead.
+        // could go, not why the input does not match, so what took the match
+        // away tells it instead.
         if REPORTS && self.furthest <= end {
             if self.furthest > position {
                 self.furthest = position;
@@ -218,7 +231,6 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
             self.rejected =
                 Some(self.rejected.map_or(end, |most| most.max(end)));
         }
-        false
     }
 
     /// Returns how many nodes have been matched, to go back to with
