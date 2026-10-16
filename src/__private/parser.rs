@@ -56,9 +56,10 @@ pub struct RuleStart {
     position: usize,
     /// How many nodes were matched before the rule.
     mark: usize,
-    /// How much was noted as expected at the furthest position before the
-    /// rule.
-    noted_before: usize,
+    /// The furthest position where something failed before the rule.
+    furthest: usize,
+    /// How much was noted as expected there before the rule.
+    noted: usize,
 }
 
 impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
@@ -266,15 +267,11 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     /// Starts to match a rule at `position`.
     #[must_use]
     pub fn start_rule(&self, position: usize) -> RuleStart {
-        let noted_before = if REPORTS && self.furthest == position {
-            self.expected.len()
-        } else {
-            0
-        };
         RuleStart {
             position,
             mark: self.matched.len(),
-            noted_before,
+            furthest: self.furthest,
+            noted: self.expected.len(),
         }
     }
 
@@ -302,24 +299,40 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         found
     }
 
-    /// Tells what `rule`, started at `start`, could not read where it starts
-    /// as the rule itself, unless it is hidden. Returns whether it did.
+    /// Replaces what `rule` noted where it starts with the rule itself, and
+    /// returns whether it did. A start rule and a hidden rule leave what they
+    /// noted as it is, since their name would say less.
     fn note_rule(&mut self, rule: &Rule, start: RuleStart) -> bool {
-        if !REPORTS
+        if !REPORTS {
+            return false;
+        }
+        // What a quiet rule could not read never tells why the input does not
+        // match, even where the rule ends.
+        if rule.quiet {
+            if self.furthest == start.furthest {
+                self.expected.truncate(start.noted);
+            } else {
+                self.expected.clear();
+            }
+            return false;
+        }
+        let noted_before = if start.furthest == start.position {
+            start.noted
+        } else {
+            0
+        };
+        if rule.start
             || self.furthest != start.position
-            || self.expected.len() <= start.noted_before
+            || self.expected.len() <= noted_before
         {
             return false;
         }
         // A hidden rule leaves what it could not read for the rule around it
-        // to tell, unless it is quiet.
-        if rule.quiet {
-            self.expected.truncate(start.noted_before);
-        }
+        // to tell.
         if rule.hidden {
             return false;
         }
-        self.expected.truncate(start.noted_before);
+        self.expected.truncate(noted_before);
         self.expected.push(Expected::Rule(rule.name));
         true
     }

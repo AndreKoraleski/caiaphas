@@ -53,3 +53,21 @@ fn keeps_where_each_rule_matched() {
     assert_eq!(second.span().as_str(), "22");
     assert_eq!((second.span().line(), second.span().column()), (3, 3));
 }
+
+#[test]
+fn leaves_whitespace_out_of_what_could_have_come() {
+    let error = Json::parse("{\"a\": 1 ]").unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "expected `,` or `}`, found `]` at line 1, column 9"
+    );
+}
+
+#[test]
+fn calls_what_failed_at_the_start_by_the_rule_inside_the_start_rule() {
+    let error = Json::parse("tru").unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "expected a value, found `t` at line 1, column 1"
+    );
+}

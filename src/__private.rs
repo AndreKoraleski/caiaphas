@@ -33,14 +33,17 @@ pub struct Rule {
     /// Whether the rule is left out of the tree and of errors, along with what
     /// it matches.
     pub hidden: bool,
-    /// Whether what the rule could not read where it starts goes unsaid, as
-    /// for whitespace that can match nothing.
+    /// Whether what the rule could not read goes unsaid, as for whitespace
+    /// that can match nothing.
     pub quiet: bool,
     /// Whether the rule's node stands for its children in the tree, so the
     /// rule around it holds them instead.
     pub inline: bool,
     /// Whether the rule remembers its match at each position.
     pub remembers: bool,
+    /// Whether no other rule uses the rule, so errors never call a whole input
+    /// by its name.
+    pub start: bool,
 }
 
 /// The function that matches a rule at a position.

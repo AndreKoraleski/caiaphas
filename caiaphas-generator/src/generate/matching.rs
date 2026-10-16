@@ -92,6 +92,7 @@ impl FunctionWriter<'_> {
         let name = name::spaced(rule);
         let (hidden, inline) = (rule.hidden, rule.inline);
         let quiet = hidden && self.facts.is_nullable(&rule.expression);
+        let start = self.facts.grammar().start_syntax_rules.contains(&rule_id);
         quote! {
             const RULE: __caiaphas::Rule = __caiaphas::Rule {
                 number: #number,
@@ -100,6 +101,7 @@ impl FunctionWriter<'_> {
                 quiet: #quiet,
                 inline: #inline,
                 remembers: #remembers,
+                start: #start,
             };
         }
     }
