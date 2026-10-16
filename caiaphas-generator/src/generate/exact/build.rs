@@ -121,8 +121,7 @@ impl ExactWriter<'_> {
 
     /// Returns the code that adds the nodes of `steps`, matched one after
     /// another from `position` to `end`. Each step takes the first end it
-    /// prefers that the steps after it can go on from to `end`, up to the last
-    /// step that builds a node.
+    /// prefers that the steps after it can go on from to `end`.
     fn build_steps(&self, steps: &[Expression]) -> TokenStream {
         let Some(last) =
             steps.iter().rposition(|step| self.builds_nodes(step))
@@ -132,9 +131,52 @@ impl ExactWriter<'_> {
         let parts: Vec<Ident> = (0..steps.len())
             .map(|index| format_ident!("part_{index}"))
             .collect();
-        // Which steps have their closure read, as where they can end or as
-        // part of what comes after a step that chooses.
-        let mut read = vec![false; steps.len()];
+        // Up to the last step that builds a node, steps that each have one end
+        // go on from it without choosing.
+        let chained = (last + 1).min(steps.len() - 1);
+        if steps[..chained].iter().all(|step| self.has_one_end(step)) {
+            return self.build_chain(steps, &parts, last);
+        }
+        let closures = steps.iter().zip(&parts).map(|(step, part)| {
+            let closure = self.part(step);
+            quote! { let #part = parser.part(#closure); }
+        });
+        let builds = steps.iter().enumerate().filter_map(|(index, step)| {
+            let build = self.build(step);
+            if build.is_empty() {
+                return None;
+            }
+            let start = index.checked_sub(1).map(|before| {
+                let before = Literal::usize_unsuffixed(before);
+                quote! { let position = split[#before]; }
+            });
+            let index = Literal::usize_unsuffixed(index);
+            Some(quote! {
+                {
+                    #start
+                    let end = split[#index];
+                    #build
+                }
+            })
+        });
+        quote! {
+            {
+                #(#closures)*
+                let split = parser.split(&[#(&#parts),*], position, end);
+                #(#builds)*
+            }
+        }
+    }
+
+    /// Returns the code that adds the nodes of `steps` up to the step `last`,
+    /// when each step before it has one end.
+    fn build_chain(
+        &self,
+        steps: &[Expression],
+        parts: &[Ident],
+        last: usize,
+    ) -> TokenStream {
+        let mut closures = Vec::new();
         let mut code = Vec::new();
         for (index, step) in steps.iter().enumerate().take(last + 1) {
             let build = self.build(step);
@@ -142,26 +184,9 @@ impl ExactWriter<'_> {
                 code.push(build);
                 break;
             }
-            read[index] = true;
             let part = &parts[index];
-            let middle = if self.has_one_end(step) {
-                quote! { #part(parser, position).only() }
-            } else {
-                let rest = &parts[index + 1..];
-                for later in &mut read[index + 1..] {
-                    *later = true;
-                }
-                quote! {
-                    {
-                        let candidates = #part(parser, position);
-                        parser.choose(candidates, |parser, middle| {
-                            let ends = __caiaphas::Ends::one(middle);
-                            #(let ends = parser.then(ends, #rest);)*
-                            ends.contains(end)
-                        })
-                    }
-                }
-            };
+            let closure = self.part(step);
+            closures.push(quote! { let #part = parser.part(#closure); });
             // Only the steps up to the last that builds a node read where the
             // step before them ends.
             let next =
@@ -175,20 +200,11 @@ impl ExactWriter<'_> {
                 }
             });
             code.push(quote! {
-                let middle = #middle;
+                let middle = #part(parser, position).only();
                 #build
                 #next
             });
         }
-        let closures = steps
-            .iter()
-            .zip(&parts)
-            .zip(&read)
-            .filter(|(_, read)| **read)
-            .map(|((step, part), _)| {
-                let closure = self.part(step);
-                quote! { let #part = parser.part(#closure); }
-            });
         quote! {
             {
                 #(#closures)*

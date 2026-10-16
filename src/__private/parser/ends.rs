@@ -158,6 +158,10 @@ impl Ends {
     }
 }
 
+/// What tells where a step of a sequence can end from where it starts.
+pub type Step<'s, 'i, const REPORTS: bool> =
+    &'s dyn Fn(&mut Parser<'i, REPORTS>, usize) -> Ends;
+
 /// Where a rule's matches at a position can end, and whether the rule was
 /// noted as expected there.
 #[derive(Debug, Clone)]
@@ -166,7 +170,7 @@ pub(super) struct RememberedEnds {
     noted: bool,
 }
 
-impl<const REPORTS: bool> Parser<'_, REPORTS> {
+impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     /// Returns every place where the characters from `position` on that
     /// `contains` holds for can end, the furthest first, and notes each of
     /// `expected` at the furthest.
@@ -249,6 +253,60 @@ impl<const REPORTS: bool> Parser<'_, REPORTS> {
             }
         }
         ends
+    }
+
+    /// Returns where each of `steps`, taken one after another from `position`
+    /// to `end`, ends in the way a parser prefers, where each step takes the
+    /// first end it prefers that the steps after it can go on from to `end`.
+    pub fn split(
+        &mut self,
+        steps: &[Step<'_, 'i, REPORTS>],
+        position: usize,
+        end: usize,
+    ) -> Vec<usize> {
+        let mut split = Vec::with_capacity(steps.len());
+        let mut failed = FxHashSet::default();
+        let found = self.leads(steps, position, end, &mut failed, &mut split);
+        debug_assert!(found, "the steps lead to `end`");
+        split
+    }
+
+    /// Returns whether `steps` can go on from `start` to `end`, adding where
+    /// each ends in the way a parser prefers to `split`. `failed` holds how
+    /// many steps were left, and where, for each try that could not.
+    fn leads(
+        &mut self,
+        steps: &[Step<'_, 'i, REPORTS>],
+        start: usize,
+        end: usize,
+        failed: &mut FxHashSet<(usize, usize)>,
+        split: &mut Vec<usize>,
+    ) -> bool {
+        let Some((step, rest)) = steps.split_first() else {
+            return start == end;
+        };
+        if failed.contains(&(steps.len(), start)) {
+            return false;
+        }
+        let candidates = step(self, start);
+        if rest.is_empty() {
+            let found = candidates.contains(end);
+            if found {
+                split.push(end);
+            }
+            return found;
+        }
+        for candidate in
+            candidates.iter().filter(|&candidate| candidate <= end)
+        {
+            split.push(candidate);
+            if self.leads(rest, candidate, end, failed, split) {
+                return true;
+            }
+            split.pop();
+        }
+        failed.insert((steps.len(), start));
+        false
     }
 
     /// Returns where each round ends in the way through rounds of `round` from
