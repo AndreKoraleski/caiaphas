@@ -218,7 +218,7 @@ pub(super) enum SingleCharacterSearch {
 /// of the rules it references first.
 ///
 /// A recursive rule gets no answer, and neither does any rule that references
-/// one.
+/// one. Nor does a converted rule, since its type can reject a character.
 pub(super) fn rule_single_characters(
     rules: &[Rule],
     states: &mut [SingleCharacterSearch],
@@ -228,6 +228,10 @@ pub(super) fn rule_single_characters(
         SingleCharacterSearch::Known(characters) => return characters.clone(),
         SingleCharacterSearch::Visiting => return None,
         SingleCharacterSearch::Unvisited => {}
+    }
+    if rules[position].converts_to.is_some() {
+        states[position] = SingleCharacterSearch::Known(None);
+        return None;
     }
     states[position] = SingleCharacterSearch::Visiting;
     let characters = single_characters_with(

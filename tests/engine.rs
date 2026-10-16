@@ -465,3 +465,14 @@ fn builds_the_same_nodes_with_the_grammar_rearranged() {
     assert_eq!(optimized.a.text(), plain.a.text());
     assert!(duplicates_optimized::S::parse("x").is_ok());
 }
+
+caiaphas::grammar!(mod converted_character {
+    "s = {c}, 'x';
+     (* hide *) (* as u8 *) c = ? U+0030..U+0039 ? | 'a';"
+});
+
+#[test]
+fn reads_a_converted_character_with_its_type_wherever_it_is() {
+    assert!(converted_character::S::parse("12x").is_ok());
+    assert!(converted_character::S::parse("ax").is_err());
+}
