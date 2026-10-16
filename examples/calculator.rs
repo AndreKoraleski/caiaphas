@@ -53,11 +53,7 @@ fn product(product: &Product) -> f64 {
 
 fn factor(factor: &Factor) -> f64 {
     match factor {
-        Factor::Number(number) => number
-            .digits
-            .text()
-            .parse()
-            .expect("the grammar only matches numbers Rust reads"),
+        Factor::Number(number) => number.digits,
         Factor::Group(group) => sum(&group.sum),
     }
 }

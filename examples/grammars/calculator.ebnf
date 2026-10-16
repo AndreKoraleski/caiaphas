@@ -10,6 +10,7 @@ multiplicative = times | over;
 factor = number | group;
 group = open, sum, close;
 number = digits, ws;
+(* as f64 *)
 digits = digit, {digit}, ['.', digit, {digit}];
 plus = '+', ws;
 minus = '-', ws;
