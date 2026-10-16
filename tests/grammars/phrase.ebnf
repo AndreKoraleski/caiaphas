@@ -1,0 +1,9 @@
+(* A word, then `fy`, where a name could take the `f` that `fy` needs. *)
+phrase = word, 'fy';
+(* expect tied-branches: a keyword wins over a name with the same text *)
+word = keyword | name;
+keyword = 'if';
+(* expect dead-end-repeated-sequence: a name leaves the `f` of `fy` *)
+name = letter, {letter};
+(* hide *)
+letter = ? U+0061..U+007A ?;

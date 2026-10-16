@@ -9,6 +9,7 @@ mod choice_check;
 mod choice_point;
 #[cfg(test)]
 mod corpus;
+mod exactness;
 mod expectations;
 mod facts;
 mod finding;
@@ -18,6 +19,7 @@ mod matcher;
 pub(crate) use character_set::CharacterSet;
 use choice_check::CHOICE_CHECKS;
 pub(crate) use choice_point::revisited_rules;
+pub(crate) use exactness::general_rules;
 pub(crate) use facts::Facts;
 pub(crate) use finding::Finding;
 use grammar_check::GRAMMAR_CHECKS;

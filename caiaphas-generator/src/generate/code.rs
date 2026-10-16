@@ -8,9 +8,9 @@ use proc_macro2::{Ident, Literal, TokenStream};
 use quote::quote;
 
 use crate::{
-    analysis::Facts,
+    analysis::{Facts, general_rules},
     generate::{
-        matching, name,
+        exact, matching, name,
         shape::{Count, Field, Shape, Variant},
     },
     ir::{Grammar, Rule, RuleId},
@@ -39,14 +39,16 @@ pub(crate) fn module(
         types: written_names.clone().map(name::type_name).collect(),
         fields: written_names.map(name::field_name).collect(),
     };
-    let functions = matching::functions(&Facts::new(matched));
+    let facts = Facts::new(matched);
+    let general = general_rules(&facts);
+    let functions = matching::functions(&facts, &general);
     let types = shapes.iter().enumerate().filter_map(|(position, shape)| {
         let shape = shape.as_ref()?;
         let rule = &grammar.syntax_rules[position];
         let parse = grammar
             .start_syntax_rules
             .contains(&RuleId(position))
-            .then(|| parse(rule, position));
+            .then(|| parse(rule, RuleId(position), general[position]));
         let documentation = format!(
             " The type of the `{}` rule:\n\n```text\n{}\n```",
             name::spaced(rule),
@@ -80,20 +82,37 @@ pub(crate) fn module(
     }
 }
 
-/// Returns the `parse` function of the start rule `rule`, numbered `position`.
-fn parse(rule: &Rule, position: usize) -> TokenStream {
+/// Returns the `parse` function of the start rule `rule_id`, written `rule`.
+/// With `general`, it tries every way through the rule.
+fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
     let documentation = format!(
         " Returns the `{}` that all of `input` matches, or where `input` \
          stops matching it.",
         name::spaced(rule)
     );
-    let function = matching::function_name(RuleId(position));
+    let parse = if general {
+        let (ends, build) =
+            (exact::ends_name(rule_id), exact::build_name(rule_id));
+        quote! {
+            __caiaphas::parse_by_ends(
+                input,
+                #ends::<false>,
+                #build::<false>,
+                #ends::<true>,
+            )
+        }
+    } else {
+        let function = matching::function_name(rule_id);
+        quote! {
+            __caiaphas::parse(input, #function::<false>, #function::<true>)
+        }
+    };
     quote! {
         #[doc = #documentation]
         pub fn parse(
             input: &str,
         ) -> ::core::result::Result<Self, ::caiaphas::Error> {
-            __caiaphas::parse(input, #function::<false>, #function::<true>)
+            #parse
                 .map(|tree| {
                     <Self as __caiaphas::FromNode>::from_node(tree.root())
                 })

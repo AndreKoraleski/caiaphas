@@ -8,6 +8,7 @@ caiaphas::grammar!(mod marked = "tests/grammars/marked.ebnf");
 caiaphas::grammar!(mod items = "tests/grammars/items.ebnf");
 caiaphas::grammar!(mod hidden = "tests/grammars/hidden.ebnf");
 caiaphas::grammar!(mod going_back = "tests/grammars/going_back.ebnf");
+caiaphas::grammar!(mod phrase = "tests/grammars/phrase.ebnf");
 caiaphas::grammar!(mod shared = "tests/grammars/shared.ebnf");
 caiaphas::grammar!(mod letter_x = "tests/grammars/letter_x.ebnf");
 caiaphas::grammar!(mod starts = "tests/grammars/starts.ebnf");
@@ -79,14 +80,36 @@ fn leaves_out_a_rule_that_tried_to_read_nothing() {
 }
 
 #[test]
-fn takes_the_first_branch_that_matches_where_the_rule_asks() {
-    let parsed = items::Items::parse("a;ab").unwrap();
-    let texts: Vec<&str> = parsed.item.iter().map(items::Item::text).collect();
-    assert_eq!(texts, ["a", "ab"]);
-    let error = items::Items::parse("abb").unwrap_err();
+fn takes_the_first_branch_after_which_the_rest_matches_where_the_rule_asks() {
+    fn texts(input: &str) -> Vec<String> {
+        let parsed = items::Items::parse(input).unwrap();
+        parsed
+            .item
+            .iter()
+            .map(|item| item.text().to_owned())
+            .collect()
+    }
+    assert_eq!(texts("a;ab"), ["a", "ab"]);
+    assert_eq!(texts("abb;ab"), ["abb", "ab"]);
+    let error = items::Items::parse("ac").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "expected `;` or the end of the input, found `b` at line 1, column 3"
+        "expected `;`, `b` or the end of the input, found `c` at line 1, \
+         column 2"
+    );
+}
+
+#[test]
+fn leaves_what_the_rest_of_the_input_needs() {
+    let parse = |input| phrase::Phrase::parse(input).map(|parsed| parsed.word);
+    assert!(matches!(parse("iffy"), Ok(phrase::Word::Keyword(_))));
+    let Ok(phrase::Word::Name(name)) = parse("affy") else {
+        panic!("a name matches `af`");
+    };
+    assert_eq!(name.text(), "af");
+    assert_eq!(
+        parse("if").unwrap_err().to_string(),
+        "expected `fy`, found the end of the input at line 1, column 3"
     );
 }
 

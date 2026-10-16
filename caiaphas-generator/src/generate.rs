@@ -2,6 +2,7 @@
 //! types of its rules.
 
 mod code;
+mod exact;
 mod matching;
 mod name;
 mod rearrange;

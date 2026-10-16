@@ -11,24 +11,47 @@ use quote::{format_ident, quote};
 
 use crate::{
     analysis::{CharacterSet, Facts, revisited_rules},
-    generate::name,
+    generate::{exact::ExactWriter, name},
     ir::{Expression, ExpressionKind, Grammar, Rule, RuleId},
 };
 
-/// Returns the function of every rule of the grammar `facts` answers about.
-pub(crate) fn functions(facts: &Facts<'_>) -> TokenStream {
+/// Returns the functions of every rule of the grammar `facts` answers about,
+/// where those that `general` marks try every way through them.
+///
+/// Every other rule that one of those reads remembers its matches, since it is
+/// read once to tell where it ends and again to build its node.
+pub(crate) fn functions(facts: &Facts<'_>, general: &[bool]) -> TokenStream {
     let grammar: &Grammar = facts.grammar();
-    let revisited = revisited_rules(facts);
+    let mut remembers = revisited_rules(facts);
+    for (rule, &general) in grammar.syntax_rules.iter().zip(general) {
+        if general {
+            rule.expression
+                .visit_meta_identifiers(&mut |RuleId(read), _| {
+                    remembers[read] = true;
+                });
+        }
+    }
     let functions =
-        grammar.syntax_rules.iter().zip(revisited).enumerate().map(
-            |(position, (rule, remembers))| {
-                FunctionWriter {
+        grammar
+            .syntax_rules
+            .iter()
+            .enumerate()
+            .map(|(position, rule)| {
+                let writer = FunctionWriter {
                     facts,
                     first_match: rule.first_match,
+                };
+                if general[position] {
+                    ExactWriter { writer, general }
+                        .functions(RuleId(position), rule)
+                } else {
+                    writer.function(
+                        RuleId(position),
+                        rule,
+                        remembers[position],
+                    )
                 }
-                .function(RuleId(position), rule, remembers)
-            },
-        );
+            });
     quote! { #(#functions)* }
 }
 
@@ -38,10 +61,10 @@ pub(crate) fn function_name(RuleId(position): RuleId) -> Ident {
 }
 
 /// Writes the function of one rule.
-struct FunctionWriter<'a> {
-    facts: &'a Facts<'a>,
+pub(super) struct FunctionWriter<'a> {
+    pub(super) facts: &'a Facts<'a>,
     /// Whether the rule's choices take their first alternative that matches.
-    first_match: bool,
+    pub(super) first_match: bool,
 }
 
 impl FunctionWriter<'_> {
@@ -329,7 +352,7 @@ impl FunctionWriter<'_> {
 
     /// Returns the code of `factor` without `exception` as one set, when both
     /// only ever match one character and the factor builds no node.
-    fn set_except(
+    pub(super) fn set_except(
         &self,
         factor: &Expression,
         exception: &Expression,
@@ -350,7 +373,10 @@ impl FunctionWriter<'_> {
     /// Returns the code of `expression` when it only ever matches one
     /// character and builds no node, as one set unless it is a terminal string
     /// or special sequence, which already check one character.
-    fn single(&self, expression: &Expression) -> Option<TokenStream> {
+    pub(super) fn single(
+        &self,
+        expression: &Expression,
+    ) -> Option<TokenStream> {
         let (characters, expected) = self.characters(expression)?;
         Some(match expression.kind {
             ExpressionKind::TerminalString(_)
@@ -364,7 +390,7 @@ impl FunctionWriter<'_> {
     /// Returns the pattern of the characters `expression` matches and what a
     /// parser notes as expected where it fails, when it only ever matches one
     /// character and builds no node.
-    fn set_parts(
+    pub(super) fn set_parts(
         &self,
         expression: &Expression,
     ) -> Option<(TokenStream, Vec<TokenStream>)> {
@@ -469,7 +495,7 @@ fn contains(characters: &CharacterSet) -> TokenStream {
 }
 
 /// Returns the pattern that matches every character of `characters`, if any.
-fn pattern(characters: &CharacterSet) -> Option<TokenStream> {
+pub(super) fn pattern(characters: &CharacterSet) -> Option<TokenStream> {
     let ranges = characters.ranges().iter().map(|range| {
         let (first, last) = (range.start(), range.end());
         if first == last {

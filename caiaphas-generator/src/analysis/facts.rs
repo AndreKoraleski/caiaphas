@@ -20,6 +20,8 @@ pub(crate) struct Facts<'a> {
     productive: OnceCell<Vec<bool>>,
     /// The characters each rule can start with.
     first: OnceCell<Vec<CharacterSet>>,
+    /// The characters the matches of each rule can hold after their first.
+    inner: OnceCell<Vec<CharacterSet>>,
     /// What can come right after each rule.
     follow: OnceCell<Vec<Follow>>,
     /// The single characters of each rule.
@@ -34,6 +36,7 @@ impl<'a> Facts<'a> {
             always_matching: OnceCell::new(),
             productive: OnceCell::new(),
             first: OnceCell::new(),
+            inner: OnceCell::new(),
             follow: OnceCell::new(),
             single_characters: OnceCell::new(),
         }
@@ -77,6 +80,16 @@ impl<'a> Facts<'a> {
             self.first_rules(),
             self.single_character_rules(),
         )
+    }
+
+    /// Returns the characters a match of `expression` can hold after its first
+    /// character.
+    ///
+    /// It counts the first character of every expression after the first of a
+    /// sequence, even where those before it can match nothing, so it can only
+    /// tell too many characters, never too few.
+    pub(crate) fn inner(&self, expression: &Expression) -> CharacterSet {
+        inner(expression, self, self.inner_rules())
     }
 
     /// Returns the characters `expression` matches, when it only ever matches
@@ -301,6 +314,14 @@ impl<'a> Facts<'a> {
         })
     }
 
+    fn inner_rules(&self) -> &[CharacterSet] {
+        self.inner.get_or_init(|| {
+            self.fixed_point(CharacterSet::default(), |expression, sets| {
+                inner(expression, self, sets)
+            })
+        })
+    }
+
     fn single_character_rules(&self) -> &[Option<CharacterSet>] {
         self.single_characters.get_or_init(|| {
             let rules = &self.grammar.syntax_rules;
@@ -486,6 +507,56 @@ fn first(
     }
 }
 
+/// Returns what [`Facts::inner`] does, given the same for each rule in
+/// `rules`.
+fn inner(
+    expression: &Expression,
+    facts: &Facts<'_>,
+    rules: &[CharacterSet],
+) -> CharacterSet {
+    let inner = |expression| inner(expression, facts, rules);
+    match &expression.kind {
+        ExpressionKind::TerminalString(string) => string
+            .chars()
+            .skip(1)
+            .fold(CharacterSet::default(), |set, character| {
+                set.union(&CharacterSet::single(character))
+            }),
+        ExpressionKind::SingleDefinition(expressions) => expressions
+            .iter()
+            .enumerate()
+            .fold(CharacterSet::default(), |set, (index, expression)| {
+                let set = set.union(&inner(expression));
+                if index == 0 {
+                    set
+                } else {
+                    set.union(&facts.first(expression))
+                }
+            }),
+        ExpressionKind::DefinitionsList(expressions) => expressions
+            .iter()
+            .fold(CharacterSet::default(), |set, expression| {
+                set.union(&inner(expression))
+            }),
+        ExpressionKind::OptionalSequence(expression)
+        | ExpressionKind::SyntacticTerm {
+            syntactic_factor: expression,
+            ..
+        } => inner(expression),
+        ExpressionKind::RepeatedSequence(expression)
+        | ExpressionKind::SyntacticFactor {
+            syntactic_primary: expression,
+            ..
+        } => inner(expression).union(&facts.first(expression)),
+        ExpressionKind::MetaIdentifier(RuleId(position)) => {
+            rules[*position].clone()
+        }
+        ExpressionKind::SpecialSequence(_) | ExpressionKind::EmptySequence => {
+            CharacterSet::default()
+        }
+    }
+}
+
 /// What is known so far about the single characters of a rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum SingleCharacterSearch {
@@ -643,6 +714,20 @@ mod tests {
         let facts = Facts::new(&grammar);
         assert_eq!(facts.first(rule(&grammar, 0)).to_string(), "'x'..='z'");
         assert_eq!(facts.first(rule(&grammar, 1)).to_string(), "'y'..='z'");
+    }
+
+    #[test]
+    fn finds_what_matches_can_hold_after_their_first_character() {
+        let grammar = build_valid(
+            "s = 'xyz' | a, b | {'q'}; a = ? U+0061..U+0063 ?; b = 'w', 'v';",
+        );
+        let facts = Facts::new(&grammar);
+        assert_eq!(
+            facts.inner(rule(&grammar, 0)).to_string(),
+            "'q', 'v'..='w', 'y'..='z'"
+        );
+        assert_eq!(facts.inner(rule(&grammar, 1)).to_string(), "");
+        assert_eq!(facts.inner(rule(&grammar, 2)).to_string(), "'v'");
     }
 
     #[test]
