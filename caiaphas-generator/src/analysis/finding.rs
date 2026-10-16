@@ -84,8 +84,9 @@ pub(crate) enum FindingKind {
     UnfulfilledExpectation { code: FindingCode },
 }
 
-/// Defines [`FindingCode`], its [`ALL`](FindingCode::ALL) and the name of each
-/// code from one list, so `ALL` cannot miss a code.
+/// Defines [`FindingCode`], its [`ALL`](FindingCode::ALL), the name of each
+/// code and the code of each [`FindingKind`] from one list, so `ALL` cannot
+/// miss a code. Each code has the name of its kind.
 macro_rules! finding_codes {
     ($($code:ident => $name:literal,)*) => {
         /// The kind of a finding without its details, which an expectation
@@ -102,6 +103,14 @@ macro_rules! finding_codes {
             pub(crate) fn name(self) -> &'static str {
                 match self {
                     $(Self::$code => $name,)*
+                }
+            }
+        }
+
+        impl FindingKind {
+            pub(crate) fn code(&self) -> FindingCode {
+                match self {
+                    $(Self::$code { .. } => FindingCode::$code,)*
                 }
             }
         }
@@ -211,54 +220,6 @@ impl FindingCode {
 }
 
 impl FindingKind {
-    pub(crate) fn code(&self) -> FindingCode {
-        match self {
-            Self::LeftRecursion { .. } => FindingCode::LeftRecursion,
-            Self::IndirectLeftRecursion { .. } => {
-                FindingCode::IndirectLeftRecursion
-            }
-            Self::UnproductiveRule { .. } => FindingCode::UnproductiveRule,
-            Self::NullableRepeatedSequence => {
-                FindingCode::NullableRepeatedSequence
-            }
-            Self::TiedBranches { .. } => FindingCode::TiedBranches,
-            Self::LongerBranchConflict { .. } => {
-                FindingCode::LongerBranchConflict
-            }
-            Self::OptionalFollowConflict { .. } => {
-                FindingCode::OptionalFollowConflict
-            }
-            Self::RepeatedFollowConflict { .. } => {
-                FindingCode::RepeatedFollowConflict
-            }
-            Self::RequiredOptionalSequence => {
-                FindingCode::RequiredOptionalSequence
-            }
-            Self::DeadEndRepeatedSequence => {
-                FindingCode::DeadEndRepeatedSequence
-            }
-            Self::AmbiguousNullableBranches => {
-                FindingCode::AmbiguousNullableBranches
-            }
-            Self::UnreachableRule { .. } => FindingCode::UnreachableRule,
-            Self::UnreachableAlternative => {
-                FindingCode::UnreachableAlternative
-            }
-            Self::DuplicateAlternative => FindingCode::DuplicateAlternative,
-            Self::IneffectiveException => FindingCode::IneffectiveException,
-            Self::EmptyRule { .. } => FindingCode::EmptyRule,
-            Self::ExhaustiveException => FindingCode::ExhaustiveException,
-            Self::CaseOnlyNames { .. } => FindingCode::CaseOnlyNames,
-            Self::UnknownExpectation { .. } => FindingCode::UnknownExpectation,
-            Self::UnexpectableFinding { .. } => {
-                FindingCode::UnexpectableFinding
-            }
-            Self::UnfulfilledExpectation { .. } => {
-                FindingCode::UnfulfilledExpectation
-            }
-        }
-    }
-
     pub(crate) fn severity(&self) -> Severity {
         self.code().severity()
     }
