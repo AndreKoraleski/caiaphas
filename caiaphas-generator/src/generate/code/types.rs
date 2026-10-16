@@ -144,7 +144,7 @@ pub(super) fn structure(
                 #[doc = #documentations]
                 pub #field_names: #types,
             )*
-            span: ::caiaphas::Span,
+            span: __caiaphas::TextSpan,
         }
 
         impl #name {
@@ -152,12 +152,12 @@ pub(super) fn structure(
 
             /// Returns the text this rule matched.
             pub fn text(&self) -> &str {
-                self.span.as_str()
+                self.span.0.as_str()
             }
 
             /// Returns where this rule matched in its input.
             pub fn span(&self) -> &::caiaphas::Span {
-                &self.span
+                &self.span.0
             }
         }
 
@@ -167,7 +167,7 @@ pub(super) fn structure(
             fn from_node(node: __caiaphas::Node<'_>) -> Self {
                 Self {
                     #(#field_names: #builds,)*
-                    span: node.span(),
+                    span: __caiaphas::TextSpan(node.span()),
                 }
             }
         }

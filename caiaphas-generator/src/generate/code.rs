@@ -243,7 +243,7 @@ fn character() -> TokenStream {
     quote! {
         /// Returns the one character this rule matched.
         pub fn char(&self) -> char {
-            match self.span.as_str().chars().next() {
+            match self.span.0.as_str().chars().next() {
                 ::core::option::Option::Some(character) => character,
                 ::core::option::Option::None => ::core::unreachable!(),
             }

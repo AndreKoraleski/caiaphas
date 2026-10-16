@@ -1,8 +1,8 @@
 # caiaphas
 
-[![CI][ci-badge]][ci]
-[![crates.io][crates-badge]][crates]
-[![docs.rs][docs-badge]][docs]
+[CI][ci]
+[crates.io][crates]
+[docs.rs][docs]
 
 EBNF parser generator for Rust that detects grammar ambiguities and suggests
 fixes
@@ -40,7 +40,7 @@ cargo add caiaphas
 
 ## Tutorial
 
-The [tutorial] goes from a first grammar to the checks caiaphas runs, and its
+The [tutorial][tutorial] goes from a first grammar to the checks caiaphas runs, and its
 examples run as tests. The [examples](#examples) are whole programs.
 
 ## Overview
@@ -80,19 +80,19 @@ if let Value::Object(object) = &document.value {
 Each rule ends with `;` or `.`, and whitespace is text like any other. A hidden
 rule, such as `ws` in the [overview](#overview), keeps it out of the types.
 
-| Written              | Matches                                 |
-|----------------------|-----------------------------------------|
-| `'if'` or `"if"`     | that text                               |
-| `a, b`               | `a`, then `b`                           |
-| `a \| b`             | `a` or `b`                              |
-| `[a]`                | `a`, or nothing                         |
-| `{a}`                | `a` any number of times, or nothing     |
-| `(a \| b), c`        | a group, as in arithmetic               |
-| `3 * a`              | `a` three times                         |
-| `a - b`              | what `a` matches but `b` does not       |
-| `? U+00E9 ?`         | the character `é`                       |
-| `? U+0061..U+007A ?` | any character from `a` to `z`           |
-| `(* note *)`         | nothing, as a comment                   |
+| Written                | Matches                               |
+| ---------------------- | ------------------------------------- |
+| `'if'` or `"if"`   | that text                             |
+| `a, b`               | `a`, then `b`                     |
+| `a \| b`              | `a` or `b`                        |
+| `[a]`                | `a`, or nothing                     |
+| `{a}`                | `a` any number of times, or nothing |
+| `(a \| b), c`         | a group, as in arithmetic             |
+| `3 * a`              | `a` three times                     |
+| `a - b`              | what `a` matches but `b` does not |
+| `? U+00E9 ?`         | the character `é`                  |
+| `? U+0061..U+007A ?` | any character from `a` to `z`     |
+| `(* note *)`         | nothing, as a comment                 |
 
 The standard's other spellings work too: `/` or `!` for `|`, `(/ /)` for
 `[ ]` and `(: :)` for `{ }`.
@@ -136,8 +136,8 @@ pub struct Square { pub size: [u32; 2] }
   `span()`. An enum has `text()` too, unless a variant holds an `(* as T *)`
   value. A type with `text()` displays as that text, and a rule that only
   ever matches one character also has `char()`.
-* A struct holds where it matched, so two are equal only when they matched at
-  the same place.
+* Two matches are equal, and hash alike, when they matched the same text,
+  wherever they matched it.
 * The type of a start rule has `parse` and implements `FromStr`. A start rule
   is one that no other rule uses, so a grammar whose top rule recurs needs
   one more above it, such as `calculation = expression;`.
@@ -146,13 +146,13 @@ pub struct Square { pub size: [u32; 2] }
 
 A comment right before a rule can tell caiaphas more about it.
 
-| Annotation                  | Effect                                         |
-|-----------------------------|------------------------------------------------|
+| Annotation                    | Effect                                         |
+| ----------------------------- | ---------------------------------------------- |
 | `(* hide *)`                | no type and no field, as for whitespace        |
 | `(* inline *)`              | no type: rules that hold it hold what it holds |
-| `(* as u16 *)`              | the type is `u16`, read from the rule's text   |
-| `(* first match *)`         | how the rule chooses, see [Matching](#matching)|
-| `(* greedy *)`              | how the rule chooses, see [Matching](#matching)|
+| `(* as u16 *)`              | the type is `u16`, read from the rule's text |
+| `(* first match *)`         | how the rule chooses, see [Matching](#matching) |
+| `(* greedy *)`              | how the rule chooses, see [Matching](#matching) |
 | `(* expect code: reason *)` | marks a warning or suggestion as intended      |
 
 `(* as T *)` takes any type with `FromStr`, `Debug`, `Clone` and `PartialEq`,
@@ -199,12 +199,11 @@ fix.
   (* expect tied-branches: a keyword is never a name *)
   word = keyword | name;
   ```
-
 * A suggestion, such as `nondeterministic-choice`, does not stop the build
   unless the `suggest` flag asks it to. The docs of the generated module list
   them.
 
-The [findings] page lists every code.
+The [findings][findings] page lists every code.
 
 ## Errors
 
@@ -258,11 +257,11 @@ caiaphas explain tied-branches
 
 ## Examples
 
-| Example                              | Shows                                       |
-|--------------------------------------|---------------------------------------------|
-| [calculator](examples/calculator.rs) | enums, repetitions, recursion and `f64`s    |
+| Example                             | Shows                                       |
+| ----------------------------------- | ------------------------------------------- |
+| [calculator](examples/calculator.rs) | enums, repetitions, recursion and `f64`s  |
 | [json](examples/json.rs)             | a whole format, read from standard input    |
-| [ini](examples/ini.rs)               | lines, hidden rules and `(* as String *)`   |
+| [ini](examples/ini.rs)               | lines, hidden rules and `(* as String *)` |
 
 ```sh
 cargo run --example calculator -- "1.5 + 2 * (3 - 4)"

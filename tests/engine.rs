@@ -321,6 +321,19 @@ fn names_a_variant_after_an_inline_rule_that_holds_one_rule() {
 }
 
 #[test]
+fn compares_and_hashes_matches_by_their_text() {
+    let parsed = list::Numbers::parse("12,(3),12").unwrap().list;
+    let [first, second, third] = &parsed.item[..] else {
+        panic!("the list has three items");
+    };
+    assert_eq!(first, third);
+    assert_ne!(first, second);
+    let distinct: std::collections::HashSet<&list::Item> =
+        parsed.item.iter().collect();
+    assert_eq!(distinct.len(), 2);
+}
+
+#[test]
 fn parses_a_start_rule_from_a_str() {
     let parsed: list::Numbers = "1,2".parse().unwrap();
     assert_eq!(parsed.list.item.len(), 2);
