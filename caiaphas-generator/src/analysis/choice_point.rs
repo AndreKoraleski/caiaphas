@@ -3,7 +3,7 @@
 
 use crate::{
     analysis::{character_set::CharacterSet, facts::Facts},
-    ir::{Expression, ExpressionKind},
+    ir::{Expression, ExpressionKind, Grammar},
     span::Span,
 };
 
@@ -42,9 +42,52 @@ pub(crate) struct Branch {
     pub(crate) single_characters: Option<CharacterSet>,
 }
 
+impl ChoicePoint {
+    /// Returns whether two branches can start with the same character, so a
+    /// parser can try both after reading the same characters.
+    pub(crate) fn overlaps(&self) -> bool {
+        self.branches.iter().enumerate().any(|(index, branch)| {
+            self.branches[index + 1..].iter().any(|other| {
+                !branch.lookahead.intersection(&other.lookahead).is_empty()
+            })
+        })
+    }
+}
+
 /// Returns every choice point of the grammar `facts` answers about.
 pub(crate) fn choice_points(facts: &Facts<'_>) -> Vec<ChoicePoint> {
     let mut choice_points = Vec::new();
+    visit_choice_points(facts, &mut |_, choice_point| {
+        choice_points.push(choice_point);
+    });
+    choice_points
+}
+
+/// Returns which rules of `grammar`, which `facts` answers about, a parser can
+/// try more than once at the same place. Those are the rules that the
+/// branches of a choice point reach when two of them can start with the same
+/// character, and only they have to remember their matches.
+pub(crate) fn revisited_rules(
+    grammar: &Grammar,
+    facts: &Facts<'_>,
+) -> Vec<bool> {
+    let mut starts = Vec::new();
+    visit_choice_points(facts, &mut |expression, choice_point| {
+        if choice_point.overlaps() {
+            expression.visit_meta_identifiers(&mut |rule_id, _| {
+                starts.push(rule_id);
+            });
+        }
+    });
+    grammar.reached_from(starts)
+}
+
+/// Calls `visit` with every choice point of the grammar `facts` answers about,
+/// and the expression that makes it.
+fn visit_choice_points<'a>(
+    facts: &Facts<'a>,
+    visit: &mut impl FnMut(&'a Expression, ChoicePoint),
+) {
     facts.walk(&mut |expression, after| {
         let branch = |branch: &Expression| Branch {
             span: branch.span,
@@ -76,14 +119,14 @@ pub(crate) fn choice_points(facts: &Facts<'_>) -> Vec<ChoicePoint> {
             ),
             _ => return,
         };
-        choice_points.push(ChoicePoint {
+        let choice_point = ChoicePoint {
             kind,
             span: expression.span,
             branches,
             end_of_input: after.end_of_input,
-        });
+        };
+        visit(expression, choice_point);
     });
-    choice_points
 }
 
 #[cfg(test)]
@@ -126,6 +169,26 @@ mod tests {
         let points = choice_points_of("a = {'x'}, 'y';");
         assert_eq!(points[0].kind, ChoicePointKind::RepeatedSequence);
         assert_eq!(firsts(&points[0]), ["'x'", "'y'"]);
+    }
+
+    fn revisited(source: &str) -> Vec<bool> {
+        let grammar = build_valid(source);
+        revisited_rules(&grammar, &Facts::new(&grammar))
+    }
+
+    #[test]
+    fn finds_rules_two_alternatives_reach_after_the_same_characters() {
+        assert_eq!(
+            revisited("s = a, 'x' | a, 'y'; a = b; b = 'z';"),
+            [false, true, true]
+        );
+        assert_eq!(revisited("s = a | b; a = 'x'; b = 'y';"), [false; 3]);
+    }
+
+    #[test]
+    fn finds_rules_a_sequence_and_what_follows_it_both_reach() {
+        assert_eq!(revisited("s = [a, 'x'], a, 'y'; a = 'z';"), [false, true]);
+        assert_eq!(revisited("s = [a, 'x'], 'y'; a = 'z';"), [false, false]);
     }
 
     #[test]

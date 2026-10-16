@@ -107,7 +107,10 @@ impl<'a> Facts<'a> {
 
     /// Calls `visit` with every expression of every rule, and what can come
     /// right after it.
-    pub(crate) fn walk(&self, visit: &mut impl FnMut(&Expression, &Follow)) {
+    pub(crate) fn walk(
+        &self,
+        visit: &mut impl FnMut(&'a Expression, &Follow),
+    ) {
         for (position, rule) in self.grammar.syntax_rules.iter().enumerate() {
             let after = &self.follow_rules()[position];
             self.walk_expression(&rule.expression, after, visit);
@@ -116,9 +119,9 @@ impl<'a> Facts<'a> {
 
     fn walk_expression(
         &self,
-        expression: &Expression,
+        expression: &'a Expression,
         after: &Follow,
-        visit: &mut impl FnMut(&Expression, &Follow),
+        visit: &mut impl FnMut(&'a Expression, &Follow),
     ) {
         visit(expression, after);
         match &expression.kind {

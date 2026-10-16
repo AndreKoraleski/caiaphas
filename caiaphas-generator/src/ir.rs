@@ -25,4 +25,18 @@ impl Grammar {
             rule.expression.visit(visit);
         }
     }
+
+    /// Returns which rules the rules in `starts` reach through references,
+    /// those in `starts` included.
+    pub(crate) fn reached_from(
+        &self,
+        starts: impl IntoIterator<Item = RuleId>,
+    ) -> Vec<bool> {
+        let rules = &self.syntax_rules;
+        reachable(rules.len(), starts, |RuleId(position), pending| {
+            rules[position].expression.visit_meta_identifiers(
+                &mut |rule_id, _| pending.push(rule_id),
+            );
+        })
+    }
 }

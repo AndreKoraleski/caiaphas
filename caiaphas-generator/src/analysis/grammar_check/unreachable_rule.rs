@@ -11,7 +11,7 @@ use crate::{
         facts::Facts,
         finding::{Finding, FindingKind},
     },
-    ir::{Grammar, RuleId, reachable},
+    ir::Grammar,
 };
 
 /// Reports every rule that no start rule can reach through references.
@@ -20,14 +20,8 @@ pub(super) fn check(
     _facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
-    let rules = &grammar.syntax_rules;
-    let starts = grammar.start_syntax_rules.iter().copied();
     let reached =
-        reachable(rules.len(), starts, |RuleId(position), pending| {
-            rules[position].expression.visit_meta_identifiers(
-                &mut |rule_id, _| pending.push(rule_id),
-            );
-        });
+        grammar.reached_from(grammar.start_syntax_rules.iter().copied());
     for (rule, reached) in grammar.syntax_rules.iter().zip(reached) {
         if !reached {
             findings.push(Finding {

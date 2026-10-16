@@ -5,8 +5,8 @@
 //!
 //! Each choice takes the branch that matches the most text, and the first
 //! written of those that tie. Optional and repeated sequences take as much as
-//! they can. Each rule remembers its match at every position, so trying every
-//! branch never matches a rule twice in the same place.
+//! they can. A rule that a parser can try more than once at the same place
+//! remembers its match there, so trying every branch never matches it twice.
 //!
 //! A parse notes nothing about why an input might not match. Only when it
 //! does not match is it matched again, noting at each failure what could have
@@ -36,6 +36,9 @@ pub struct Rule {
     /// Whether the rule is left out of the tree and of errors, along with what
     /// it matches.
     pub hidden: bool,
+    /// Whether the rule remembers its match at each position, which only a
+    /// rule a parser can try more than once at the same place needs.
+    pub remembers: bool,
 }
 
 /// What a rule, or part of one, matches.
@@ -248,10 +251,12 @@ impl<'i> Parser<'i> {
     /// Returns where the rule numbered `rule` matched at `position` ends, and
     /// its node unless the rule is hidden.
     fn rule(&mut self, rule: usize, position: usize) -> Match {
-        if let Some(&found) = self.matches.get(&(rule, position)) {
-            return found;
-        }
         let definition = &self.grammar.rules[rule];
+        if definition.remembers {
+            if let Some(&found) = self.matches.get(&(rule, position)) {
+                return found;
+            }
+        }
         let earlier = if self.furthest == position {
             self.expected.len()
         } else {
@@ -283,7 +288,9 @@ impl<'i> Parser<'i> {
                 self.expected.push(Expected::Rule(definition.name));
             }
         }
-        self.matches.insert((rule, position), found);
+        if definition.remembers {
+            self.matches.insert((rule, position), found);
+        }
         found
     }
 
@@ -422,6 +429,7 @@ mod tests {
                     )),
                 ]),
                 hidden: false,
+                remembers: false,
             },
             Rule {
                 name: "item",
@@ -446,11 +454,13 @@ mod tests {
                     ),
                 ]),
                 hidden: false,
+                remembers: false,
             },
             Rule {
                 name: "digit",
                 expression: Expression::Range('0', '9'),
                 hidden: true,
+                remembers: false,
             },
         ],
     };
@@ -502,6 +512,7 @@ mod tests {
                 Expression::Text("c"),
             ]),
             hidden: false,
+            remembers: false,
         }],
     };
 
@@ -509,6 +520,41 @@ mod tests {
     fn skips_a_branch_that_cannot_start_with_the_next_character() {
         assert!(parse(&WRONG, 0, "c").is_ok());
         assert!(parse(&WRONG, 0, "b").is_err());
+    }
+
+    /// `s = a, 'x' | a, 'y'; a = 'z';`, where both branches reach `a` at the
+    /// start, so it remembers its match.
+    static SHARED: Grammar = Grammar {
+        rules: &[
+            Rule {
+                name: "s",
+                expression: Expression::Choice(&[
+                    Expression::Sequence(&[
+                        Expression::Rule(1),
+                        Expression::Text("x"),
+                    ]),
+                    Expression::Sequence(&[
+                        Expression::Rule(1),
+                        Expression::Text("y"),
+                    ]),
+                ]),
+                hidden: false,
+                remembers: false,
+            },
+            Rule {
+                name: "a",
+                expression: Expression::Text("z"),
+                hidden: false,
+                remembers: true,
+            },
+        ],
+    };
+
+    #[test]
+    fn matches_a_rule_that_remembers_once_at_each_place() {
+        let tree = parse(&SHARED, 0, "zy").unwrap();
+        assert_eq!(outline(tree.root()), "0(1:z)");
+        assert_eq!(tree.nodes.len(), 2);
     }
 
     /// `word = keyword | name; keyword = 'if'; name = letter, {letter};`
@@ -521,11 +567,13 @@ mod tests {
                     Expression::Rule(2),
                 ]),
                 hidden: false,
+                remembers: false,
             },
             Rule {
                 name: "keyword",
                 expression: Expression::Text("if"),
                 hidden: false,
+                remembers: false,
             },
             Rule {
                 name: "name",
@@ -534,6 +582,7 @@ mod tests {
                     Expression::Repeated(&Expression::Range('a', 'z')),
                 ]),
                 hidden: false,
+                remembers: false,
             },
         ],
     };
@@ -568,6 +617,7 @@ mod tests {
                 Expression::Times(2, &Expression::Text("?")),
             ]),
             hidden: false,
+            remembers: false,
         }],
     };
 
@@ -592,6 +642,7 @@ mod tests {
                 &Expression::Text("x"),
             )),
             hidden: false,
+            remembers: false,
         }],
     };
 

@@ -8,7 +8,7 @@ use proc_macro2::{Ident, Literal, TokenStream};
 use quote::quote;
 
 use crate::{
-    analysis::Facts,
+    analysis::{Facts, revisited_rules},
     generate::{
         name,
         shape::{Count, Field, Shape, Variant},
@@ -38,18 +38,12 @@ pub(crate) fn module(
         fields: written_names.map(name::field_name).collect(),
     };
     let facts = Facts::new(grammar);
-    let rules = grammar.syntax_rules.iter().map(|rule| {
-        let name = written(rule);
-        let expression = expression(&rule.expression, &facts);
-        let hidden = rule.hidden;
-        quote! {
-            __caiaphas::Rule {
-                name: #name,
-                expression: #expression,
-                hidden: #hidden,
-            }
-        }
-    });
+    let revisited = revisited_rules(grammar, &facts);
+    let rules = grammar
+        .syntax_rules
+        .iter()
+        .zip(revisited)
+        .map(|(rule, remembers)| rule_table(rule, remembers, &facts));
     let types = shapes.iter().enumerate().filter_map(|(position, shape)| {
         let shape = shape.as_ref()?;
         let rule = &grammar.syntax_rules[position];
@@ -95,6 +89,22 @@ pub(crate) fn module(
 /// words.
 fn written(rule: &Rule) -> String {
     rule.meta_identifier.words().collect::<Vec<_>>().join(" ")
+}
+
+/// Returns the table of `rule`, with `facts` about its grammar, and whether it
+/// `remembers` its matches.
+fn rule_table(rule: &Rule, remembers: bool, facts: &Facts<'_>) -> TokenStream {
+    let name = written(rule);
+    let expression = expression(&rule.expression, facts);
+    let hidden = rule.hidden;
+    quote! {
+        __caiaphas::Rule {
+            name: #name,
+            expression: #expression,
+            hidden: #hidden,
+            remembers: #remembers,
+        }
+    }
 }
 
 /// Returns the table of `expression`, with `facts` about its grammar.
