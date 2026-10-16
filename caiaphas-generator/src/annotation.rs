@@ -1,49 +1,17 @@
 //! Annotations are comments right before a syntax rule that tell caiaphas
-//! something about the rule. Being comments, they mean nothing to other EBNF
-//! tools.
-//!
-//! An expectation marks a finding in the rule as intended, so the analysis
-//! does not report it. It holds `expect`, then the code of the finding in
-//! kebab case, then a colon and the reason:
+//! something about the rule. Other EBNF tools read them as comments.
 //!
 //! ```text
 //! (* expect tied-branches: a keyword is never a name *)
 //! word = keyword | name;
 //! ```
 //!
-//! A hide, written `(* hide *)`, leaves the rule out of the types generated
-//! for the grammar, so the rules that use it get no field for it. It suits
-//! rules whose matches nobody reads, such as whitespace between tokens.
-//!
-//! A first match, written `(* first match *)`, makes every choice written in
-//! the rule take the first alternative after which the rest of the input still
-//! matches, in the order written, instead of the one that matches the most. It
-//! suits rules whose order says which alternative wins, as it does in a PEG.
-//!
-//! A greedy, written `(* greedy *)`, makes the rule take each way through it
-//! as it comes to it, even where the rest of the input needs another, so its
-//! parser never tries another way. It suits rules where taking the most at
-//! each step is what the grammar means, such as the `else` of a nested `if`,
-//! and keeps their parser fast.
-//!
-//! An inline, written `(* inline *)`, gives the rule no type of its own. Each
-//! rule that holds it holds what it holds instead, as if its definition were
-//! written there, so a rule holding `group` below holds its `expression`:
-//!
-//! ```text
-//! (* inline *)
-//! group = '(', expression, ')';
-//! ```
-//!
-//! A conversion, written such as `(* as u16 *)`, makes the rule's type that
-//! Rust type, read from the text the rule matched with `FromStr`. Text the
-//! type does not read fails to match there. The type is a primitive, such as
-//! `i64`, or a path whose last part starts with a capital, such as `String` or
-//! `std::net::Ipv4Addr`, so a comment such as `(* as such *)` stays a comment.
-//!
-//! Each comment holds one annotation, and a rule can have several. The
-//! standard reads quotes in a comment as terminal strings, so a reason cannot
-//! hold a lone `'` or `"`.
+//! An annotation is `hide`, `inline`, `first match`, `greedy`, `as` and a Rust
+//! type, or `expect` with a finding's code, a colon and a reason. A type is a
+//! primitive or a path whose last part starts with a capital, so a comment
+//! such as `(* as such *)` stays a comment. Each comment holds one annotation,
+//! and a rule can have several. The standard reads quotes in a comment as
+//! terminal strings, so a reason cannot hold a lone `'` or `"`.
 
 use crate::span::Span;
 
