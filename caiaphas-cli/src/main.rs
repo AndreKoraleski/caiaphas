@@ -67,6 +67,7 @@ fn explain(code: &str) -> ExitCode {
 /// a grammar cannot be read or has a problem that would stop the build.
 fn check(paths: &[String]) -> ExitCode {
     let mut failed = false;
+    let mut found = false;
     for path in paths {
         match fs::read_to_string(path) {
             Ok(source) => {
@@ -74,6 +75,7 @@ fn check(paths: &[String]) -> ExitCode {
                 for finding in &report.findings {
                     println!("{finding}\n");
                 }
+                found |= !report.findings.is_empty();
                 failed |= report.stops_build;
             }
             Err(error) => {
@@ -81,6 +83,12 @@ fn check(paths: &[String]) -> ExitCode {
                 failed = true;
             }
         }
+    }
+    if found {
+        println!(
+            "`caiaphas explain <code>` tells more about a finding, such as \
+             `caiaphas explain left-recursion`."
+        );
     }
     if failed {
         ExitCode::FAILURE

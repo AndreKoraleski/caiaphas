@@ -38,6 +38,12 @@ fn prints_suggestions_without_failing() {
         printed.starts_with("suggestion[single-character-rule]: `digit`"),
         "{printed}"
     );
+    assert!(
+        printed
+            .trim_end()
+            .ends_with("`caiaphas explain left-recursion`."),
+        "{printed}"
+    );
 }
 
 #[test]
