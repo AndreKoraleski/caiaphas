@@ -251,6 +251,19 @@ mod tests {
     }
 
     #[test]
+    fn leaves_a_branch_that_can_match_nothing_unguarded() {
+        let items = generate(
+            "s = (a | 'w'), 'z'; a = ['x'];",
+            "g.ebnf",
+            Options::default(),
+        )
+        .unwrap()
+        .items
+        .to_string();
+        assert!(!items.contains("matches ! (parser"), "{items}");
+    }
+
+    #[test]
     fn stops_at_errors() {
         assert_eq!(
             problems("s = a;"),
