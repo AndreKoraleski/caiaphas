@@ -44,6 +44,11 @@ impl Ends {
         }
     }
 
+    /// Returns the end a parser prefers, if any.
+    pub fn first(&self) -> Option<usize> {
+        self.ends.first().copied()
+    }
+
     /// Returns the ends in order.
     pub fn iter(&self) -> impl Iterator<Item = usize> + '_ {
         self.ends.iter().copied()
