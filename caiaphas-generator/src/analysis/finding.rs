@@ -81,85 +81,57 @@ pub(crate) enum FindingKind {
     UnfulfilledExpectation { code: FindingCode },
 }
 
-/// The kind of a finding without its details, which an expectation names in
-/// kebab case.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum FindingCode {
-    LeftRecursion,
-    IndirectLeftRecursion,
-    UnproductiveRule,
-    NullableRepeatedSequence,
-    TiedBranches,
-    LongerBranchConflict,
-    OptionalFollowConflict,
-    RepeatedFollowConflict,
-    RequiredOptionalSequence,
-    DeadEndRepeatedSequence,
-    AmbiguousNullableBranches,
-    UnreachableRule,
-    DuplicateAlternative,
-    IneffectiveException,
-    EmptyRule,
-    ExhaustiveException,
-    CaseOnlyNames,
-    UnknownExpectation,
-    UnexpectableFinding,
-    UnfulfilledExpectation,
+/// Defines [`FindingCode`], its [`ALL`](FindingCode::ALL) and the name of each
+/// code from one list, so `ALL` cannot miss a code.
+macro_rules! finding_codes {
+    ($($code:ident => $name:literal,)*) => {
+        /// The kind of a finding without its details, which an expectation
+        /// names in kebab case.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+        pub(crate) enum FindingCode {
+            $($code,)*
+        }
+
+        impl FindingCode {
+            /// Every code, so a name can be looked up.
+            pub(crate) const ALL: &[Self] = &[$(Self::$code,)*];
+
+            pub(crate) fn name(self) -> &'static str {
+                match self {
+                    $(Self::$code => $name,)*
+                }
+            }
+        }
+    };
+}
+
+finding_codes! {
+    LeftRecursion => "left-recursion",
+    IndirectLeftRecursion => "indirect-left-recursion",
+    UnproductiveRule => "unproductive-rule",
+    NullableRepeatedSequence => "nullable-repeated-sequence",
+    TiedBranches => "tied-branches",
+    LongerBranchConflict => "longer-branch-conflict",
+    OptionalFollowConflict => "optional-follow-conflict",
+    RepeatedFollowConflict => "repeated-follow-conflict",
+    RequiredOptionalSequence => "required-optional-sequence",
+    DeadEndRepeatedSequence => "dead-end-repeated-sequence",
+    AmbiguousNullableBranches => "ambiguous-nullable-branches",
+    UnreachableRule => "unreachable-rule",
+    DuplicateAlternative => "duplicate-alternative",
+    IneffectiveException => "ineffective-exception",
+    EmptyRule => "empty-rule",
+    ExhaustiveException => "exhaustive-exception",
+    CaseOnlyNames => "case-only-names",
+    UnknownExpectation => "unknown-expectation",
+    UnexpectableFinding => "unexpectable-finding",
+    UnfulfilledExpectation => "unfulfilled-expectation",
 }
 
 impl FindingCode {
-    /// Every code, so a name can be looked up.
-    pub(crate) const ALL: [Self; 20] = [
-        Self::LeftRecursion,
-        Self::IndirectLeftRecursion,
-        Self::UnproductiveRule,
-        Self::NullableRepeatedSequence,
-        Self::TiedBranches,
-        Self::LongerBranchConflict,
-        Self::OptionalFollowConflict,
-        Self::RepeatedFollowConflict,
-        Self::RequiredOptionalSequence,
-        Self::DeadEndRepeatedSequence,
-        Self::AmbiguousNullableBranches,
-        Self::UnreachableRule,
-        Self::DuplicateAlternative,
-        Self::IneffectiveException,
-        Self::EmptyRule,
-        Self::ExhaustiveException,
-        Self::CaseOnlyNames,
-        Self::UnknownExpectation,
-        Self::UnexpectableFinding,
-        Self::UnfulfilledExpectation,
-    ];
-
-    pub(crate) fn name(self) -> &'static str {
-        match self {
-            Self::LeftRecursion => "left-recursion",
-            Self::IndirectLeftRecursion => "indirect-left-recursion",
-            Self::UnproductiveRule => "unproductive-rule",
-            Self::NullableRepeatedSequence => "nullable-repeated-sequence",
-            Self::TiedBranches => "tied-branches",
-            Self::LongerBranchConflict => "longer-branch-conflict",
-            Self::OptionalFollowConflict => "optional-follow-conflict",
-            Self::RepeatedFollowConflict => "repeated-follow-conflict",
-            Self::RequiredOptionalSequence => "required-optional-sequence",
-            Self::DeadEndRepeatedSequence => "dead-end-repeated-sequence",
-            Self::AmbiguousNullableBranches => "ambiguous-nullable-branches",
-            Self::UnreachableRule => "unreachable-rule",
-            Self::DuplicateAlternative => "duplicate-alternative",
-            Self::IneffectiveException => "ineffective-exception",
-            Self::EmptyRule => "empty-rule",
-            Self::ExhaustiveException => "exhaustive-exception",
-            Self::CaseOnlyNames => "case-only-names",
-            Self::UnknownExpectation => "unknown-expectation",
-            Self::UnexpectableFinding => "unexpectable-finding",
-            Self::UnfulfilledExpectation => "unfulfilled-expectation",
-        }
-    }
-
     /// Returns the code with `name`, if any.
     pub(crate) fn from_name(name: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|code| code.name() == name)
+        Self::ALL.iter().copied().find(|code| code.name() == name)
     }
 
     pub(crate) fn severity(self) -> Severity {
@@ -773,7 +745,7 @@ mod tests {
 
     #[test]
     fn has_a_case_for_every_code() {
-        for code in FindingCode::ALL {
+        for &code in FindingCode::ALL {
             assert!(
                 CASES.iter().any(|case| case.code == code),
                 "no case for {}",
@@ -784,7 +756,7 @@ mod tests {
 
     #[test]
     fn names_every_code_once_in_kebab_case() {
-        for code in FindingCode::ALL {
+        for &code in FindingCode::ALL {
             let name = code.name();
             assert!(
                 name.split('-').all(|word| {
@@ -801,12 +773,6 @@ mod tests {
     #[test]
     fn describes_every_kind_of_finding() {
         for case in CASES {
-            assert_eq!(
-                FindingCode::from_name(case.code.name()),
-                Some(case.code),
-                "{} is missing from `FindingCode::ALL`",
-                case.code.name()
-            );
             let finding = crate::analysis::tests::findings(case.source)
                 .into_iter()
                 .find(|finding| finding.kind.code() == case.code)
