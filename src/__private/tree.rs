@@ -129,7 +129,9 @@ impl<'t> Node<'t> {
     }
 }
 
-/// Builds the type of a rule from the node of its match.
+/// Builds the type of a rule from the node of its match. Its docs are hidden,
+/// since every generated type implements it.
+#[doc(hidden)]
 pub trait FromNode {
     fn from_node(node: Node<'_>) -> Self;
 }

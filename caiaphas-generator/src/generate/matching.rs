@@ -136,6 +136,7 @@ impl FunctionWriter<'_> {
             }
         });
         quote! {
+            #[doc(hidden)]
             fn #function<const REPORTS: bool>(
                 parser: &mut __caiaphas::Parser<'_, REPORTS>,
                 position: usize,

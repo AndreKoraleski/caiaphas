@@ -61,6 +61,7 @@ impl ExactWriter<'_> {
             }
         });
         let ends_function = quote! {
+            #[doc(hidden)]
             fn #ends<const REPORTS: bool>(
                 parser: &mut __caiaphas::Parser<'_, REPORTS>,
                 position: usize,
@@ -84,6 +85,7 @@ impl ExactWriter<'_> {
         quote! {
             #ends_function
 
+            #[doc(hidden)]
             fn #build<const REPORTS: bool>(
                 parser: &mut __caiaphas::Parser<'_, REPORTS>,
                 position: usize,
@@ -109,6 +111,7 @@ impl ExactWriter<'_> {
             quote! { #build(parser, position, end) }
         };
         quote! {
+            #[doc(hidden)]
             fn #function<const REPORTS: bool>(
                 parser: &mut __caiaphas::Parser<'_, REPORTS>,
                 position: usize,
