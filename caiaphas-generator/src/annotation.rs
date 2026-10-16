@@ -73,6 +73,8 @@ pub(crate) enum Malformed {
     NoType,
     /// The comment is one word written almost as the annotation `meant`.
     Misspelled { meant: &'static str },
+    /// The comment holds several annotations apart by commas.
+    Several,
 }
 
 impl Comment {
@@ -83,6 +85,15 @@ impl Comment {
             .and_then(|text| text.strip_suffix("*)"))
             .unwrap_or(text)
             .trim_matches(is_gap);
+        let parts: Vec<&str> = content.split(',').collect();
+        let several = parts.len() > 1
+            && parts.iter().all(|part| {
+                let part = format!("(*{part}*)");
+                matches!(Self::read(&part, span), Self::Annotation(_))
+            });
+        if several {
+            return Self::Malformed(Malformed::Several);
+        }
         if let Some(rest) = after_word(content, "as") {
             let rest = rest.trim_matches(is_gap);
             if rest.is_empty() {
@@ -151,6 +162,9 @@ impl fmt::Display for Malformed {
                 f,
                 "this comment reads like `(* {meant} *)` written wrongly"
             ),
+            Self::Several => {
+                f.write_str("a comment holds one annotation, not several")
+            }
         }
     }
 }
@@ -193,6 +207,9 @@ impl Malformed {
                  meant, or more words for an ordinary comment"
                     .to_owned()
             }
+            Self::Several => "write each annotation in a comment of its own, \
+                              as in `(* hide *) (* inline *)`"
+                .to_owned(),
             Self::Misspelled { meant } => format!(
                 "write `(* {meant} *)` if that was meant, or more words for \
                  an ordinary comment"
@@ -281,6 +298,12 @@ fn is_type(text: &str) -> bool {
         "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64",
         "u128", "usize", "f32", "f64", "bool", "char",
     ];
+    // A generic type is a path to a type with types between `<` and `>`.
+    if let Some((path, arguments)) =
+        text.strip_suffix('>').and_then(|text| text.split_once('<'))
+    {
+        return is_type(path.trim_end()) && arguments_are_types(arguments);
+    }
     let path = text.strip_prefix("::").unwrap_or(text);
     let parts: Vec<&str> = path.split("::").collect();
     let identifier = |part: &&str| {
@@ -296,6 +319,27 @@ fn is_type(text: &str) -> bool {
     let last = parts[parts.len() - 1];
     parts.len() == 1 && PRIMITIVES.contains(&last)
         || last.starts_with(|c: char| c.is_ascii_uppercase())
+}
+
+/// Returns whether `arguments`, the inside of `<` and `>`, are types apart by
+/// commas outside any `<` and `>` of their own.
+fn arguments_are_types(arguments: &str) -> bool {
+    let mut depth = 0_usize;
+    let mut start = 0;
+    let mut types = Vec::new();
+    for (index, c) in arguments.char_indices() {
+        match c {
+            '<' => depth += 1,
+            '>' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                types.push(&arguments[start..index]);
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    types.push(&arguments[start..]);
+    types.iter().all(|ty| is_type(ty.trim_matches(is_gap)))
 }
 
 /// Returns whether `text` is lowercase words joined by `-`.
@@ -469,6 +513,28 @@ mod tests {
             assert_eq!(read(text), Comment::Ordinary, "{text:?}");
         }
         assert_eq!(read("(* as *)"), Comment::Malformed(Malformed::NoType));
+        for (text, ty) in [
+            ("(* as Vec<u8> *)", "Vec<u8>"),
+            (
+                "(* as HashMap<String, Vec<u8>> *)",
+                "HashMap<String, Vec<u8>>",
+            ),
+        ] {
+            assert_eq!(
+                read(text),
+                Comment::Annotation(Annotation::Converts(ty.to_owned())),
+                "{text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn reads_several_annotations_in_one_comment_as_a_mistake() {
+        assert_eq!(
+            read("(* hide, as u8 *)"),
+            Comment::Malformed(Malformed::Several)
+        );
+        assert_eq!(read("(* hide, then read *)"), Comment::Ordinary);
     }
 
     #[test]
