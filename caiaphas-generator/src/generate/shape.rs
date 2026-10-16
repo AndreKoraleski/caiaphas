@@ -92,8 +92,7 @@ fn variants(
                     if rule.hidden {
                         return None;
                     }
-                    let name =
-                        name::type_name(&name::words(&rule.meta_identifier));
+                    let name = name::type_name(rule.meta_identifier.written());
                     (
                         Variant::Rule {
                             rule: *rule_id,

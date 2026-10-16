@@ -53,7 +53,7 @@ fn clashes(grammar: &Grammar, shapes: &[Option<Shape>]) -> Vec<Diagnostic> {
         if shape.is_none() {
             continue;
         }
-        let name = name::type_name(&name::words(&rule.meta_identifier));
+        let name = name::type_name(rule.meta_identifier.written());
         match named.entry(name.to_string()) {
             Entry::Vacant(entry) => {
                 entry.insert(rule);

@@ -28,14 +28,13 @@ pub(crate) fn module(
     shapes: &[Option<Shape>],
     source: &str,
 ) -> TokenStream {
-    let words: Vec<Vec<String>> = grammar
+    let written_names = grammar
         .syntax_rules
         .iter()
-        .map(|rule| name::words(&rule.meta_identifier))
-        .collect();
+        .map(|rule| rule.meta_identifier.written());
     let names = Names {
-        types: words.iter().map(|words| name::type_name(words)).collect(),
-        fields: words.iter().map(|words| name::field_name(words)).collect(),
+        types: written_names.clone().map(name::type_name).collect(),
+        fields: written_names.map(name::field_name).collect(),
     };
     let rules = grammar.syntax_rules.iter().map(|rule| {
         let name = written(rule);

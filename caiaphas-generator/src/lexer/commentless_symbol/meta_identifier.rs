@@ -33,6 +33,11 @@ impl MetaIdentifier {
         &self.name
     }
 
+    /// Returns the meta identifier as written, gaps included.
+    pub(crate) fn written(&self) -> &str {
+        &self.written
+    }
+
     /// Returns the words that the gaps in the meta identifier separate.
     pub(crate) fn words(&self) -> impl Iterator<Item = &str> {
         self.written
