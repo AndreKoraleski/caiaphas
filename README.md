@@ -199,10 +199,10 @@ annotation, such as `(* hidde *)`, gets a warning.
 | `(* recover *)`             | a parse goes on past it, see [Errors](#errors) |
 | `(* expect code: reason *)` | marks a warning or suggestion as intended      |
 
-`(* as T *)` takes any type with `FromStr`, `Debug`, `Clone` and `PartialEq`,
-named as where `grammar!` is called, such as `String`, `f64`,
-`std::net::Ipv4Addr` or a type of your own, generic or not. Text the type does
-not read fails to match there, as `300` does for a `u8`.
+`(* as T *)` takes any type with `FromStr`, `Debug` and `Clone`, and
+`PartialEq` when an enum holds it, named as where `grammar!` is called, such as
+`String`, `f64`, `std::net::Ipv4Addr` or a type of your own, generic or not.
+Text the type does not read fails to match there, as `300` does for a `u8`.
 
 `(* as caiaphas::Spanned<T> *)` keeps where the value was read too, with
 `span()` and `text()`, and otherwise reads as the `T` it holds, so a program

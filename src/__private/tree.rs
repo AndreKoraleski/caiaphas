@@ -309,6 +309,12 @@ impl<T: Convert> FromNode for Converted<T> {
 
 /// What the text of a rule converts to, as `(* as T *)` names it: a type that
 /// reads it with `FromStr`, or a [`Spanned`] one, which keeps where it is too.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` cannot be read from the text of a rule",
+    label = "a rule here converts to `{Self}`",
+    note = "a type in `(* as T *)` needs `FromStr`, `Debug` and `Clone`, \
+            and `PartialEq` when an enum holds it"
+)]
 pub trait Convert: Sized {
     /// Returns whether `text` converts.
     fn accepts(text: &str) -> bool;
