@@ -29,7 +29,7 @@ fn reports_a_rule_that_could_not_start_by_its_name() {
     let error = list::Numbers::parse("1,(2,)").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "expected an item, found `)` at line 1, column 6"
+        "expected item, found `)` at line 1, column 6"
     );
 }
 
@@ -38,7 +38,7 @@ fn reports_an_input_that_goes_on_past_the_rule() {
     let error = list::Numbers::parse("1)").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "expected `,`, a digit or the end of the input, found `)` at line 1, \
+        "expected `,`, digit or the end of the input, found `)` at line 1, \
          column 2"
     );
 }
@@ -109,7 +109,7 @@ fn leaves_what_the_rest_of_the_input_needs() {
     assert_eq!(name.text(), "af");
     assert_eq!(
         parse("if").unwrap_err().to_string(),
-        "expected `fy` or a letter, found the end of the input at line 1, \
+        "expected `fy` or letter, found the end of the input at line 1, \
          column 3"
     );
 }
@@ -131,7 +131,7 @@ fn reports_every_rule_that_starts_with_a_remembered_one() {
     let error = shared::Shared::parse("(w").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "expected an a or a b, found `w` at line 1, column 2"
+        "expected a or b, found `w` at line 1, column 2"
     );
 }
 
@@ -239,7 +239,7 @@ fn takes_each_way_as_it_comes_in_a_greedy_rule() {
     assert!(matches!(parse("iffy"), Ok(greedy::Word::Keyword(_))));
     assert_eq!(
         parse("affy").unwrap_err().to_string(),
-        "expected `fy` or a letter, found the end of the input at line 1, \
+        "expected `fy` or letter, found the end of the input at line 1, \
          column 5"
     );
     let sentence = greedy::Sentence::parse("iff;").unwrap();
@@ -392,7 +392,7 @@ fn fails_where_a_type_does_not_read_the_text() {
     let error = "port=300".parse::<settings::Settings>().unwrap_err();
     assert_eq!(
         error.to_string(),
-        "expected a value, found `300` at line 1, column 6"
+        "expected value, found `300` at line 1, column 6"
     );
     assert_eq!(bytes::Pair::parse("2555").unwrap().byte, [255, 5]);
 }
@@ -510,7 +510,7 @@ fn tells_where_an_exception_took_a_match_away() {
     let error = statement::Statement::parse("let = x").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "expected a name, found `let` at line 1, column 1"
+        "expected name, found `let` at line 1, column 1"
     );
 }
 
@@ -519,7 +519,7 @@ fn calls_a_hidden_rule_of_character_ranges_by_its_name() {
     let error = hidden_ranges::Pair::parse("x?").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "expected a single or a tail, found `?` at line 1, column 2"
+        "expected single or tail, found `?` at line 1, column 2"
     );
 }
 
@@ -572,7 +572,7 @@ fn checks_the_text_of_a_hidden_rule_with_its_conversion() {
     let error = address::Address::parse("10.0.0.256").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "expected a byte, found `256` at line 1, column 8"
+        "expected byte, found `256` at line 1, column 8"
     );
 }
 

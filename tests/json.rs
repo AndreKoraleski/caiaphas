@@ -36,7 +36,7 @@ fn says_where_an_input_stops_matching() {
     let error = Json::parse("{\"a\": 1]").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "expected `,`, `}`, a digit, an exponent or a fraction, found `]` at \
+        "expected `,`, `}`, digit, exponent or fraction, found `]` at \
          line 1, column 8"
     );
 }
@@ -68,6 +68,6 @@ fn calls_what_failed_at_the_start_by_the_rule_inside_the_start_rule() {
     let error = Json::parse("tru").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "expected a value, found `t` at line 1, column 1"
+        "expected value, found `t` at line 1, column 1"
     );
 }

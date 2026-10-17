@@ -144,13 +144,9 @@ impl fmt::Display for Expected {
                 Shown(&first.to_string()),
                 Shown(&last.to_string())
             ),
-            Self::Rule(name) => {
-                let vowels =
-                    ['a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U'];
-                let article =
-                    if name.starts_with(vowels) { "an" } else { "a" };
-                write!(f, "{article} {name}")
-            }
+            // A rule's name stands alone, as a kind of text, since no article
+            // fits every name a grammar can give.
+            Self::Rule(name) => f.write_str(name),
             Self::End => f.write_str("the end of the input"),
         }
     }
@@ -356,7 +352,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .starts_with("expected a letter or digit or a name,"),
+                .starts_with("expected a letter or digit or name,"),
             "{error}"
         );
     }
@@ -392,13 +388,13 @@ mod tests {
         );
         assert_eq!(
             error.to_string(),
-            "expected a port, found `99999` at line 1, column 6"
+            "expected port, found `99999` at line 1, column 6"
         );
         assert_eq!(error.found(), Some("99999"));
     }
 
     #[test]
-    fn names_rules_with_their_article() {
+    fn names_rules_by_their_names_alone() {
         let error = Error::new(
             "]",
             0,
@@ -411,8 +407,7 @@ mod tests {
         );
         assert_eq!(
             error.to_string(),
-            "expected an Element, an object or a value, found `]` at line 1, \
-             column 1"
+            "expected Element, object or value, found `]` at line 1, column 1"
         );
     }
 

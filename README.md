@@ -242,7 +242,7 @@ have come there. For `{"a": 1]`, the parser of the [overview](#overview)
 gives:
 
 ```text
-expected `,`, `}`, a digit, an exponent or a fraction, found `]` at line 1, column 8
+expected `,`, `}`, digit, exponent or fraction, found `]` at line 1, column 8
 ```
 
 `Error` displays as that sentence, and `line()`, `column()`, `offset()`,
@@ -336,7 +336,7 @@ array 1:1 "[1, true]"
     number 1:2 "1"
   value 1:5 "true"
 $ printf '[1, tru]' | caiaphas parse grammars/json.ebnf --rule array
-error: expected a value, found `t` at line 1, column 5
+error: expected value, found `t` at line 1, column 5
 1 | [1, tru]
   |     ^
 ```

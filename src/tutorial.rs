@@ -143,7 +143,7 @@
 //! let error = input.parse::<setting::Setting>().unwrap_err();
 //! assert_eq!(
 //!     error.to_string(),
-//!     "expected a port, found `99999` at line 1, column 5"
+//!     "expected port, found `99999` at line 1, column 5"
 //! );
 //! assert_eq!((error.line(), error.column()), (1, 5));
 //! assert_eq!(error.excerpt(input), "1 | web=99999\n  |     ^");
