@@ -158,6 +158,12 @@ impl FindingKind {
             Self::IneffectiveAnnotation { .. } => {
                 "remove the `(* greedy *)`".to_owned()
             }
+            Self::GatheredField { held, .. } => format!(
+                "label each place with an inline rule of its own, as \
+                 `(* inline *) first {0} = {0};` does, so each gets a field \
+                 named after its label",
+                held.spaced()
+            ),
             Self::SingleCharacterRule { meta_identifier } => format!(
                 "hide it with `(* hide *)` unless a type needs `{}`, since \
                  the rules that read it keep its text",

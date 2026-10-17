@@ -137,7 +137,9 @@
 //! - A struct has one field for each rule it holds, wherever it holds it, so
 //!   in `sum = term, {'+', term};` every `term` is in one `Vec<Term>`. A
 //!   repeated group with a rule of its own keeps each of its matches together:
-//!   `sum = term, {addition}; addition = '+', term;`.
+//!   `sum = term, {addition}; addition = '+', term;`. Where places hold a rule
+//!   a different number of times each, a `gathered-field` suggestion tells how
+//!   to give each a field of its own.
 //! - Every struct has `text()` and `span()`, and a rule that only ever matches
 //!   one character also has `char()`. A type with `text()` displays as that
 //!   text.

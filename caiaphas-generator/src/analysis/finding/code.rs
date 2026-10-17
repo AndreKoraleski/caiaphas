@@ -61,6 +61,7 @@ finding_codes! {
     MisspelledAnnotation => "misspelled-annotation",
     SeveralStartRules => "several-start-rules",
     SingleCharacterRule => "single-character-rule",
+    GatheredField => "gathered-field",
     NondeterministicChoice => "nondeterministic-choice",
     UnknownExpectation => "unknown-expectation",
     UnexpectableFinding => "unexpectable-finding",
@@ -100,6 +101,7 @@ impl FindingCode {
             | Self::MisspelledAnnotation
             | Self::UnfulfilledExpectation => Severity::Warning,
             Self::SingleCharacterRule
+            | Self::GatheredField
             | Self::NondeterministicChoice
             | Self::SeveralStartRules
             | Self::NullableRepeatedSequence => Severity::Suggestion,
@@ -152,6 +154,9 @@ impl FindingCode {
             }
             Self::NullableRepeatedSequence => {
                 Some("a round that reads nothing ends the repetition")
+            }
+            Self::GatheredField => {
+                Some("the field holds every match, in order")
             }
             Self::AmbiguousSplit => Some(
                 "the parser gives each part the most text it can while the \

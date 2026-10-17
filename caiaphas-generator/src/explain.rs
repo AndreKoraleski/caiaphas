@@ -198,6 +198,14 @@ mod tests {
             "number = digit, {digit};",
             "number = digit, {digit}; digit = ? U+0030..U+0039 ?;",
         ),
+        fixed(
+            "gathered-field",
+            "call = name, '(', [name, {',', name}], ')';",
+            "call = name, '(', [name, {',', name}], ')'; \
+             name = ? /[a-z]+/ ?;",
+            "call = callee, '(', [argument, {',', argument}], ')'; \
+             (* inline *) callee = name; (* inline *) argument = name;",
+        ),
         example(
             "nondeterministic-choice",
             "statement = 'if', c, statement, ['else', statement] | 'x';",

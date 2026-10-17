@@ -158,6 +158,16 @@ impl fmt::Display for FindingKind {
                  it, so every character it matches builds a value of its own",
                 meta_identifier.spaced()
             ),
+            Self::GatheredField {
+                meta_identifier,
+                held,
+            } => write!(
+                f,
+                "these places hold `{}` a different number of times each, \
+                 and one field of `{}` gathers every match",
+                held.spaced(),
+                meta_identifier.spaced()
+            ),
             Self::NondeterministicChoice {
                 meta_identifier,
                 characters,

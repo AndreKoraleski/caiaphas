@@ -233,6 +233,16 @@ const CASES: &[Case] = &[
                the rules that read it keep its text",
     },
     Case {
+        source: "call = name, '(', [name, {',', name}], ')'; name = 'x';",
+        code: FindingCode::GatheredField,
+        severity: Severity::Suggestion,
+        message: "these places hold `name` a different number of times \
+                  each, and one field of `call` gathers every match",
+        help: "label each place with an inline rule of its own, as `(* \
+               inline *) first name = name;` does, so each gets a field \
+               named after its label",
+    },
+    Case {
         source: "s = {'x'}, 'x';",
         code: FindingCode::NondeterministicChoice,
         severity: Severity::Suggestion,

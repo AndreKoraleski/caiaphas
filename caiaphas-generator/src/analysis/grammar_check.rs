@@ -6,6 +6,7 @@ mod case_only_names;
 mod duplicate_alternative;
 mod empty_rule;
 mod exhaustive_exception;
+mod gathered_field;
 mod indirect_left_recursion;
 mod ineffective_annotation;
 mod ineffective_exception;
@@ -49,5 +50,6 @@ pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     several_start_rules::check,
     unreachable_alternative::check,
     single_character_rule::check,
+    gathered_field::check,
     nondeterministic_choice::check,
 ];

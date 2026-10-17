@@ -10,6 +10,8 @@ pub mod plan;
 mod rearrange;
 mod shape;
 
+pub(crate) use shape::gatherings;
+
 use std::collections::{HashMap, hash_map::Entry};
 
 use proc_macro2::TokenStream;

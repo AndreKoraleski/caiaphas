@@ -188,6 +188,17 @@ reads it, as `digit` does in `number = digit, {digit};`, so every character it
 matches builds a value of its own. Hide it with `(* hide *)` unless a type
 needs it, since the rules that read it keep its text.
 
+## gathered-field
+
+Suggestion. Places of one sequence hold a rule a different number of times
+each, as `name` is held in
+`call = name, '(', [name, {',', name}], ')';`,
+so the one field of the rule's struct for it gathers every match, and the
+places cannot be told apart. A list such as `item, {',', item}` is one place.
+Label each place with an inline rule of its own, so each gets a field named
+after its label:
+`call = callee, '(', [argument, {',', argument}], ')'; (* inline *) callee = name; (* inline *) argument = name;`
+
 ## nondeterministic-choice
 
 Suggestion. A parser cannot tell from the next character which way a choice
