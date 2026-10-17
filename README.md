@@ -293,6 +293,7 @@ caiaphas explain tied-branches
 | [json](examples/json.rs)             | a whole format, read from standard input    |
 | [ini](examples/ini.rs)               | lines, hidden rules and `(* as String *)`   |
 | [csv](examples/csv.rs)               | regular expressions and a type of your own  |
+| [log](examples/log.rs)               | an enum of your own and `(* greedy *)`      |
 
 ```sh
 cargo run --example calculator -- "1.5 + 2 * (3 - 4)"
