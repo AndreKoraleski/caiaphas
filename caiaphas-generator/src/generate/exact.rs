@@ -12,6 +12,7 @@ use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote};
 
 use crate::{
+    analysis::Facts,
     generate::{
         code,
         matching::{self, FunctionWriter},
@@ -41,6 +42,45 @@ pub(super) struct ExactWriter<'a> {
     /// Which rules keep the order a rule that takes the first match gives its
     /// ends, as [`ordered_rules`] tells.
     pub(super) ordered: &'a [bool],
+    /// Which rules end at the same places however much input follows, as
+    /// [`settled_rules`] tells.
+    pub(super) settled: &'a [bool],
+}
+
+/// Returns which rules end at the same places however much input follows them:
+/// those that always end at one place, and those that try every way and only
+/// read rules like that. Others can take a way as it comes, and that can hang
+/// on what follows.
+pub(super) fn settled_rules(facts: &Facts<'_>, general: &[bool]) -> Vec<bool> {
+    let rules = &facts.grammar().syntax_rules;
+    let once: Vec<bool> = rules
+        .iter()
+        .map(|rule| facts.ends_once(&rule.expression))
+        .collect();
+    let mut settled: Vec<bool> = once
+        .iter()
+        .zip(general)
+        .map(|(&once, &general)| once || general)
+        .collect();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for (position, rule) in rules.iter().enumerate() {
+            if !settled[position] || once[position] {
+                continue;
+            }
+            let mut unsettled = false;
+            rule.expression
+                .visit_meta_identifiers(&mut |RuleId(read), _| {
+                    unsettled |= !settled[read];
+                });
+            if unsettled {
+                settled[position] = false;
+                changed = true;
+            }
+        }
+    }
+    settled
 }
 
 /// Returns which rules keep the order a rule that takes the first match gives
@@ -250,6 +290,39 @@ impl ExactWriter<'_> {
                 // only takes some away.
                 let factor = self.ends(syntactic_factor);
                 let exception = self.ends(syntactic_exception);
+                let mut settled = true;
+                syntactic_exception.visit_meta_identifiers(
+                    &mut |RuleId(read), _| {
+                        settled &= self.settled[read];
+                    },
+                );
+                // An exception whose ends do not hang on what follows is read
+                // once, up to the furthest end of the factor, instead of once
+                // for each end.
+                if settled {
+                    return quote! {
+                        {
+                            let mut ends = #factor;
+                            if let ::core::option::Option::Some(furthest) =
+                                ends.iter().max()
+                            {
+                                let excluded = {
+                                    let mut within = parser.within(furthest);
+                                    let parser = &mut within;
+                                    #exception
+                                };
+                                ends.retain(|end| {
+                                    let excluded = excluded.contains(end);
+                                    if excluded {
+                                        parser.excluded(&RULE, position, end);
+                                    }
+                                    !excluded
+                                });
+                            }
+                            ends
+                        }
+                    };
+                }
                 return quote! {
                     {
                         let mut ends = #factor;

@@ -46,6 +46,7 @@ pub(crate) fn functions(facts: &Facts<'_>, general: &[bool]) -> TokenStream {
             });
     }
     let ordered = exact::ordered_rules(grammar, general);
+    let settled = exact::settled_rules(facts, general);
     let functions =
         grammar
             .syntax_rules
@@ -68,6 +69,7 @@ pub(crate) fn functions(facts: &Facts<'_>, general: &[bool]) -> TokenStream {
                     writer,
                     general,
                     ordered: &ordered,
+                    settled: &settled,
                 };
                 let committing = committed[position]
                     .then(|| ExactWriter::committed(rule_id, rule));
