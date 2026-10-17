@@ -140,6 +140,12 @@ impl FindingKind {
                     parts.join(" | ")
                 )
             }
+            Self::SeveralStartRules {
+                meta_identifier, ..
+            } => format!(
+                "use `{}` where it belongs, or remove it if it is left over",
+                meta_identifier.spaced()
+            ),
             Self::MisspelledAnnotation { meant: "expect" } => {
                 "write `(* expect code: reason *)` if an expectation was \
                  meant, or more words for an ordinary comment"

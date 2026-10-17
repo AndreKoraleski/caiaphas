@@ -171,6 +171,14 @@ any other, so caiaphas reads the rule as if it were not there, but a typo in
 an annotation changes the rule's type. Write the annotation as it is spelled,
 as `(* hide *)`, or more words for an ordinary comment.
 
+## several-start-rules
+
+Suggestion. No rule uses a rule besides the first start rule, as no rule uses
+`b` in `a = 'x'; b = 'y';`, so it is a start rule too. The standard has no
+start symbol, so a grammar may have several, but a rule left over, or one
+whose name is misspelled where it is used, looks the same. Use the rule where
+it belongs, as `a = 'x', b; b = 'y';`, or remove it if it is left over.
+
 ## single-character-rule
 
 Suggestion. A visible rule only ever matches one character and a repetition

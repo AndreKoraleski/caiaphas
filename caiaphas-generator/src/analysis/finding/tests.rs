@@ -200,6 +200,13 @@ const CASES: &[Case] = &[
                U+0041..U+005A ? | ? U+0061..U+007A ?`",
     },
     Case {
+        source: "a = 'x'; b = 'y';",
+        code: FindingCode::SeveralStartRules,
+        severity: Severity::Suggestion,
+        message: "no rule uses `b`, so it is a start rule besides `a`",
+        help: "use `b` where it belongs, or remove it if it is left over",
+    },
+    Case {
         source: "(* hidde *) s = 'x';",
         code: FindingCode::MisspelledAnnotation,
         severity: Severity::Warning,

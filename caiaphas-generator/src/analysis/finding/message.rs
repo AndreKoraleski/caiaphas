@@ -133,6 +133,15 @@ impl fmt::Display for FindingKind {
                  though they are neither letters nor digits",
                 between.described()
             ),
+            Self::SeveralStartRules {
+                meta_identifier,
+                first,
+            } => write!(
+                f,
+                "no rule uses `{}`, so it is a start rule besides `{}`",
+                meta_identifier.spaced(),
+                first.spaced()
+            ),
             Self::MisspelledAnnotation { meant } => write!(
                 f,
                 "this comment reads like `(* {meant} *)` written wrongly"

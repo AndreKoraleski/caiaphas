@@ -101,6 +101,12 @@ pub(crate) enum FindingKind {
     },
     /// A `(* greedy *)` changes nothing in its rule.
     IneffectiveAnnotation { meta_identifier: MetaIdentifier },
+    /// No rule uses a rule besides the first start rule, so it is a start rule
+    /// too, which a rule left over or misspelled where it is used also is.
+    SeveralStartRules {
+        meta_identifier: MetaIdentifier,
+        first: MetaIdentifier,
+    },
     /// A comment of one word right before a rule reads like the annotation
     /// `meant` written wrongly.
     MisspelledAnnotation { meant: &'static str },

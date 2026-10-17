@@ -182,6 +182,12 @@ mod tests {
             "(* greedy *) a = 'x';",
         ),
         fixed(
+            "several-start-rules",
+            "a = 'x'; b = 'y';",
+            "a = 'x'; b = 'y';",
+            "a = 'x', b; b = 'y';",
+        ),
+        fixed(
             "misspelled-annotation",
             "(* hidde *)",
             "(* hidde *) a = 'x';",

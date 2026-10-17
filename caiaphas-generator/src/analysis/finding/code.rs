@@ -59,6 +59,7 @@ finding_codes! {
     MixedClassRange => "mixed-class-range",
     IneffectiveAnnotation => "ineffective-annotation",
     MisspelledAnnotation => "misspelled-annotation",
+    SeveralStartRules => "several-start-rules",
     SingleCharacterRule => "single-character-rule",
     NondeterministicChoice => "nondeterministic-choice",
     UnknownExpectation => "unknown-expectation",
@@ -99,9 +100,9 @@ impl FindingCode {
             | Self::IneffectiveAnnotation
             | Self::MisspelledAnnotation
             | Self::UnfulfilledExpectation => Severity::Warning,
-            Self::SingleCharacterRule | Self::NondeterministicChoice => {
-                Severity::Suggestion
-            }
+            Self::SingleCharacterRule
+            | Self::NondeterministicChoice
+            | Self::SeveralStartRules => Severity::Suggestion,
         }
     }
 
@@ -164,6 +165,7 @@ impl FindingCode {
             | Self::MixedClassRange
             | Self::IneffectiveAnnotation
             | Self::MisspelledAnnotation
+            | Self::SeveralStartRules
             | Self::SingleCharacterRule
             | Self::LeftRecursion
             | Self::IndirectLeftRecursion

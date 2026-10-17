@@ -14,6 +14,7 @@ mod longer_branch_conflict;
 mod misspelled_annotation;
 mod mixed_class_range;
 mod nondeterministic_choice;
+mod several_start_rules;
 mod single_character_rule;
 mod tied_branches;
 mod unproductive_rule;
@@ -45,6 +46,7 @@ pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     mixed_class_range::check,
     ineffective_annotation::check,
     misspelled_annotation::check,
+    several_start_rules::check,
     unreachable_alternative::check,
     single_character_rule::check,
     nondeterministic_choice::check,
