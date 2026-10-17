@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn takes_the_first_match_in_the_rule_after_a_first_match() {
         let syntax = parse_valid(
-            "s = a, b; (* first match *) a = 'x' | 'xy'; b = 'y';",
+            "s = a, b; (* match first *) a = 'x' | 'xy'; b = 'y';",
         );
         let first_match: Vec<bool> = syntax
             .syntax_rules
@@ -187,13 +187,13 @@ mod tests {
 
     #[test]
     fn rejects_a_malformed_first_match() {
-        let (syntax, errors) = parse("(* first match now *) a = 'x';");
+        let (syntax, errors) = parse("(* match first now *) a = 'x';");
         assert!(!syntax.syntax_rules[0].first_match);
         assert_eq!(
             errors,
             [ParseError {
                 kind: ParseErrorKind::Malformed(Malformed::NotAlone(
-                    "first match"
+                    "match first"
                 )),
                 span: Span { start: 0, end: 21 },
             }]

@@ -28,7 +28,7 @@ adhere to [Semantic Versioning][semver].
   - `(* inline *)` gives the rules that hold a rule what it holds instead of
     its type.
   - `(* as T *)` makes the type of a rule a Rust type read from its text.
-  - `(* first match *)` makes the choices of a rule take the first alternative
+  - `(* match first *)` makes the choices of a rule take the first alternative
     after which the rest still matches, instead of the longest.
   - `(* greedy *)` makes a rule take each way as it comes and never go back, so
     its parser stays fast.

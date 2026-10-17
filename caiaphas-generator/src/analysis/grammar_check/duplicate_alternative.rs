@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn leaves_a_rule_that_takes_the_first_match_to_another_check() {
-        assert_eq!(duplicates("(* first match *) a = 'x' | 'x';"), []);
+        assert_eq!(duplicates("(* match first *) a = 'x' | 'x';"), []);
     }
 
     #[test]

@@ -310,11 +310,11 @@ mod tests {
         assert_eq!(
             general(
                 "items = item, {';', item}; \
-                 (* first match *) item = 'ab' | 'a', {'b'};"
+                 (* match first *) item = 'ab' | 'a', {'b'};"
             ),
             [true, true]
         );
-        assert_eq!(general("(* first match *) s = 'xy' | 'x', 'z';"), [false]);
-        assert_eq!(general("(* first match *) s = 'x', 'y' | 'x';"), [false]);
+        assert_eq!(general("(* match first *) s = 'xy' | 'x', 'z';"), [false]);
+        assert_eq!(general("(* match first *) s = 'x', 'y' | 'x';"), [false]);
     }
 }

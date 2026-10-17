@@ -20,7 +20,7 @@ pub(crate) struct SyntaxRule {
     /// Whether a `(* hide *)` right before the rule leaves it out of the
     /// generated types.
     pub(crate) hidden: bool,
-    /// Whether a `(* first match *)` comes right before the rule.
+    /// Whether a `(* match first *)` comes right before the rule.
     pub(crate) first_match: bool,
     /// Whether a `(* greedy *)` comes right before the rule.
     pub(crate) greedy: bool,

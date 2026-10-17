@@ -83,7 +83,7 @@ impl fmt::Display for ParseError {
             }
             ParseErrorKind::Malformed(malformed) => malformed.fmt(f),
             ParseErrorKind::AnnotationWithoutRule => f.write_str(
-                "an `expect`, `hide`, `first match`, `greedy`, `inline` or \
+                "an `expect`, `hide`, `match first`, `greedy`, `inline` or \
                  `as` comment must come right before the syntax rule it is \
                  about",
             ),
@@ -204,9 +204,9 @@ mod tests {
             ),
             (
                 error(ParseErrorKind::Malformed(Malformed::NotAlone(
-                    "first match",
+                    "match first",
                 ))),
-                "a rule takes the first match with `(* first match *)` alone",
+                "a rule takes the first match with `(* match first *)` alone",
             ),
             (
                 error(ParseErrorKind::Malformed(Malformed::NotAlone(
@@ -222,7 +222,7 @@ mod tests {
             ),
             (
                 error(ParseErrorKind::AnnotationWithoutRule),
-                "an `expect`, `hide`, `first match`, `greedy`, `inline` or \
+                "an `expect`, `hide`, `match first`, `greedy`, `inline` or \
                  `as` comment must come right before the syntax rule it is \
                  about",
             ),

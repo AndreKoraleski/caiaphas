@@ -266,7 +266,7 @@ mod tests {
         let rules = "a = 'x'; b = 'x', 'y';";
         let longest = items(format!("s = a | b; {rules}"));
         assert!(longest.contains("longest"), "{longest}");
-        let first = items(format!("(* first match *) s = b | a; {rules}"));
+        let first = items(format!("(* match first *) s = b | a; {rules}"));
         assert!(!first.contains("longest"), "{first}");
     }
 

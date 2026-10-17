@@ -99,7 +99,7 @@ pub(crate) enum FindingKind {
         last: char,
         between: CharacterSet,
     },
-    /// A `(* greedy *)` or `(* first match *)` changes nothing in its rule.
+    /// A `(* greedy *)` or `(* match first *)` changes nothing in its rule.
     IneffectiveAnnotation {
         meta_identifier: MetaIdentifier,
         annotation: Choosing,
@@ -144,7 +144,7 @@ impl Choosing {
     pub(crate) fn written(self) -> &'static str {
         match self {
             Self::Greedy => "greedy",
-            Self::FirstMatch => "first match",
+            Self::FirstMatch => "match first",
         }
     }
 }

@@ -568,7 +568,7 @@ caiaphas::grammar!(mod first_everywhere {
      optional = 'o', [f], {'b'};
      grouped = 'g', (f | 'c'), {'b'};
      sequence = 's', (f, ['b']), {'b'};
-     (* first match *) f = 'a' | 'ab', ['b'];"
+     (* match first *) f = 'a' | 'ab', ['b'];"
 });
 
 #[test]

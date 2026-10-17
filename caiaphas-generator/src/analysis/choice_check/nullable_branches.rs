@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn leaves_the_alternatives_of_a_first_match_to_another_check() {
-        assert_eq!(empty("(* first match *) a = ['x'] | ['y'];"), []);
+        assert_eq!(empty("(* match first *) a = ['x'] | ['y'];"), []);
     }
 
     #[test]

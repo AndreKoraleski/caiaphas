@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn finds_every_alternative_after_one_that_always_matches_when_greedy() {
-        let source = "(* first match *) a = 'z' | ['y'] | 'x' | 'w';";
+        let source = "(* match first *) a = 'z' | ['y'] | 'x' | 'w';";
         assert_eq!(
             unreachable_when_greedy(source),
             [(span(36, 39), span(28, 33)), (span(42, 45), span(28, 33))]
@@ -162,20 +162,20 @@ mod tests {
     #[test]
     fn finds_an_alternative_that_starts_with_an_earlier_one_when_greedy() {
         assert_eq!(
-            unreachable_when_greedy("(* first match *) a = 'x' | 'xy';"),
+            unreachable_when_greedy("(* match first *) a = 'x' | 'xy';"),
             [(span(28, 32), span(22, 25))]
         );
         assert_eq!(
-            unreachable_when_greedy("(* first match *) a = 'x' | 'x', 'y';"),
+            unreachable_when_greedy("(* match first *) a = 'x' | 'x', 'y';"),
             [(span(28, 36), span(22, 25))]
         );
-        assert_eq!(unreachable("(* first match *) a = 'x' | 'xy';"), []);
+        assert_eq!(unreachable("(* match first *) a = 'x' | 'xy';"), []);
     }
 
     #[test]
     fn finds_an_alternative_written_like_an_earlier_one() {
         assert_eq!(
-            unreachable("(* first match *) a = 'x' | 'x';"),
+            unreachable("(* match first *) a = 'x' | 'x';"),
             [(span(28, 31), span(22, 25))]
         );
     }
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn finds_an_alternative_whose_texts_an_earlier_one_matches() {
         assert_eq!(
-            unreachable("(* first match *) a = ('ab' | 'cd') | 'cd';"),
+            unreachable("(* match first *) a = ('ab' | 'cd') | 'cd';"),
             [(span(38, 42), span(22, 35))]
         );
     }
@@ -191,21 +191,21 @@ mod tests {
     #[test]
     fn finds_an_alternative_whose_characters_an_earlier_one_matches() {
         assert_eq!(
-            unreachable("(* first match *) a = ? U+0061..U+007A ? | 'x';"),
+            unreachable("(* match first *) a = ? U+0061..U+007A ? | 'x';"),
             [(span(43, 46), span(22, 40))]
         );
     }
 
     #[test]
     fn accepts_alternatives_that_each_match_something_of_their_own() {
-        assert_eq!(unreachable("(* first match *) a = 'xy' | 'x';"), []);
-        assert_eq!(unreachable("(* first match *) a = 'x' | ['y'];"), []);
+        assert_eq!(unreachable("(* match first *) a = 'xy' | 'x';"), []);
+        assert_eq!(unreachable("(* match first *) a = 'x' | ['y'];"), []);
     }
 
     #[test]
     fn accepts_an_earlier_alternative_whose_exception_can_take_its_match() {
         assert_eq!(
-            unreachable("(* first match *) a = ['y'] - ['z'] | 'x';"),
+            unreachable("(* match first *) a = ['y'] - ['z'] | 'x';"),
             []
         );
     }

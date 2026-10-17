@@ -1,7 +1,7 @@
 //! An ineffective annotation changes nothing in its rule. A `(* greedy *)`
 //! does not when a parser can already tell each way through the rule from the
 //! next character, and the rule reaches no rule that tries every way. A
-//! `(* first match *)` does not when no two alternatives of a choice in the
+//! `(* match first *)` does not when no two alternatives of a choice in the
 //! rule can match at the same place, since then the first that matches is also
 //! the one that matches the most.
 
@@ -14,7 +14,7 @@ use crate::{
     ir::{ExpressionKind, Grammar, Rule, RuleId},
 };
 
-/// Reports every `(* greedy *)` and `(* first match *)` that changes nothing
+/// Reports every `(* greedy *)` and `(* match first *)` that changes nothing
 /// in its rule.
 pub(super) fn check(
     grammar: &Grammar,
@@ -94,18 +94,18 @@ mod tests {
     #[test]
     fn finds_a_first_match_whose_alternatives_never_meet() {
         assert_eq!(
-            ineffective("(* first match *) s = 'x' | 'y';"),
+            ineffective("(* match first *) s = 'x' | 'y';"),
             [
-                "`(* first match *)` changes nothing in `s`, since no two of \
+                "`(* match first *)` changes nothing in `s`, since no two of \
                  its alternatives can match at the same place"
             ]
         );
         assert_eq!(
-            ineffective("(* first match *) s = 'x' | 'xy';"),
+            ineffective("(* match first *) s = 'x' | 'xy';"),
             Vec::<String>::new()
         );
         assert_eq!(
-            ineffective("(* first match *) s = 'x' | ;"),
+            ineffective("(* match first *) s = 'x' | ;"),
             Vec::<String>::new()
         );
     }

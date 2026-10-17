@@ -112,10 +112,10 @@ mod tests {
 
     #[test]
     fn finds_a_longer_branch_a_first_match_takes_before_the_shorter() {
-        let first_match = "(* first match *) s = ('x', 'y' | 'x'), 'y';";
+        let first_match = "(* match first *) s = ('x', 'y' | 'x'), 'y';";
         assert_eq!(conflicts(first_match).len(), 1);
         assert_eq!(
-            conflicts("(* first match *) s = ('x' | 'x', 'y'), 'y';"),
+            conflicts("(* match first *) s = ('x' | 'x', 'y'), 'y';"),
             []
         );
     }

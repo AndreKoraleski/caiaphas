@@ -101,7 +101,7 @@ mod tests {
     #[test]
     fn suggests_it_where_a_rule_takes_the_first_match() {
         assert_eq!(
-            suggested("(* first match *) s = a, 'x' | a, 'y'; a = 'z';").len(),
+            suggested("(* match first *) s = a, 'x' | a, 'y'; a = 'z';").len(),
             1
         );
     }
@@ -110,7 +110,7 @@ mod tests {
     fn leaves_what_other_checks_report_alone() {
         assert_eq!(suggested("s = a | a; a = 'z';"), []);
         assert_eq!(
-            suggested("(* first match *) s = a | a, 'y'; a = 'z';"),
+            suggested("(* match first *) s = a | a, 'y'; a = 'z';"),
             []
         );
     }

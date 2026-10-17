@@ -176,7 +176,7 @@
 //! rules where that is not so, and only those try every way. Two annotations
 //! change how a rule chooses:
 //!
-//! - `(* first match *)` makes its choices take the first alternative after
+//! - `(* match first *)` makes its choices take the first alternative after
 //!   which the rest still matches, in the order written.
 //! - `(* greedy *)` makes it take each way as it comes and never go back, as
 //!   the `else` of a nested `if` does. That keeps its parser fast.

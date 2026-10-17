@@ -6,7 +6,7 @@
 //! word = keyword | name;
 //! ```
 //!
-//! An annotation is `hide`, `inline`, `first match`, `greedy`, `as` and a Rust
+//! An annotation is `hide`, `inline`, `match first`, `greedy`, `as` and a Rust
 //! type, or `expect` with a finding's code, a colon and a reason. A type is a
 //! primitive or a path whose last part starts with a capital, so a comment
 //! such as `(* as such *)` stays a comment. Each comment holds one annotation,
@@ -105,14 +105,24 @@ impl Comment {
                 ));
             }
         }
-        let first_match = after_word(content, "first").and_then(|rest| {
-            after_word(rest.trim_start_matches(is_gap), "match")
-        });
+        let words = |first, second| {
+            after_word(content, first).and_then(|rest| {
+                after_word(rest.trim_start_matches(is_gap), second)
+            })
+        };
+        // The words of `match first` the other way around are how it was
+        // written before.
+        if words("first", "match").is_some_and(str::is_empty) {
+            return Self::Malformed(Malformed::Misspelled {
+                meant: "match first",
+            });
+        }
+        let first_match = words("match", "first");
         let alone = [
             ("hide", after_word(content, "hide"), Annotation::Hide),
             ("inline", after_word(content, "inline"), Annotation::Inline),
             ("greedy", after_word(content, "greedy"), Annotation::Greedy),
-            ("first match", first_match, Annotation::FirstMatch),
+            ("match first", first_match, Annotation::FirstMatch),
         ];
         for (name, rest, annotation) in alone {
             if let Some(rest) = rest {
@@ -141,8 +151,8 @@ impl fmt::Display for Malformed {
             Self::NotAlone("hide") => {
                 f.write_str("a rule is hidden with `(* hide *)` alone")
             }
-            Self::NotAlone("first match") => f.write_str(
-                "a rule takes the first match with `(* first match *)` alone",
+            Self::NotAlone("match first") => f.write_str(
+                "a rule takes the first match with `(* match first *)` alone",
             ),
             Self::NotAlone(name) => {
                 write!(f, "a rule is made {name} with `(* {name} *)` alone")
@@ -413,6 +423,7 @@ mod tests {
             "(* hides the rest *)",
             "(* first, the header *)",
             "(* first matching rule *)",
+            "(* match firstly *)",
         ] {
             assert_eq!(read(text), Comment::Ordinary, "{text:?}");
         }
@@ -443,9 +454,9 @@ mod tests {
     #[test]
     fn reads_a_first_match() {
         for text in [
-            "(* first match *)",
-            "(*first  match*)",
-            "(*\nfirst\nmatch\n*)",
+            "(* match first *)",
+            "(*match  first*)",
+            "(*\nmatch\nfirst\n*)",
         ] {
             assert_eq!(
                 read(text),
@@ -456,11 +467,22 @@ mod tests {
     }
 
     #[test]
+    fn tells_how_a_first_match_is_written_now() {
+        assert_eq!(
+            read("(* first match *)"),
+            Comment::Malformed(Malformed::Misspelled {
+                meant: "match first"
+            })
+        );
+        assert_eq!(read("(* first match wins *)"), Comment::Ordinary);
+    }
+
+    #[test]
     fn rejects_a_first_match_with_more_after_it() {
-        for text in ["(* first match wins *)", "(* first match: always *)"] {
+        for text in ["(* match first wins *)", "(* match first: always *)"] {
             assert_eq!(
                 read(text),
-                Comment::Malformed(Malformed::NotAlone("first match")),
+                Comment::Malformed(Malformed::NotAlone("match first")),
                 "{text:?}"
             );
         }

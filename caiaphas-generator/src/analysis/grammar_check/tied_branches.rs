@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn matches_a_rule_that_takes_the_first_match_as_its_parser_does() {
-        let rules = "(* first match *) k = 'i' | 'if'; o = 'if' | 'of';";
+        let rules = "(* match first *) k = 'i' | 'if'; o = 'if' | 'of';";
         assert_eq!(ties(&format!("s = k | o; {rules}")).len(), 1);
         assert_eq!(ties(&format!("s = k | o; (* greedy *) {rules}")), []);
     }

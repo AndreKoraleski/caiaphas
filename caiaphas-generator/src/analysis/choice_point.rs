@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn finds_the_alternatives_of_a_rule_that_takes_the_first_match() {
-        let points = choice_points_of("(* first match *) a = 'x' | 'xy';");
+        let points = choice_points_of("(* match first *) a = 'x' | 'xy';");
         assert_eq!(points[0].kind, ChoicePointKind::FirstMatchDefinitionsList);
     }
 
@@ -223,7 +223,7 @@ mod tests {
     #[test]
     fn finds_rules_two_alternatives_of_a_first_match_reach() {
         assert_eq!(
-            revisited("(* first match *) s = a, 'x' | a, 'y'; a = 'z';"),
+            revisited("(* match first *) s = a, 'x' | a, 'y'; a = 'z';"),
             [false, true]
         );
     }

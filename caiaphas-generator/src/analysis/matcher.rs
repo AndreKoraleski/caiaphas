@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn follows_every_way_outside_a_greedy_rule() {
-        let source = "s = k; (* first match *) k = 'i' | 'if';";
+        let source = "s = k; (* match first *) k = 'i' | 'if';";
         assert_eq!(first_rule_matches(source, "if"), Some(true));
         assert_eq!(first_rule_matches("s = {'x'}, 'x';", "xx"), Some(true));
         assert_eq!(first_rule_matches("s = ['x'], 'x';", "x"), Some(true));
@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn takes_the_first_branch_that_matches_in_a_greedy_rule() {
-        let source = "s = k; (* greedy *) (* first match *) k = 'i' | 'if';";
+        let source = "s = k; (* greedy *) (* match first *) k = 'i' | 'if';";
         assert_eq!(first_rule_matches(source, "i"), Some(true));
         assert_eq!(first_rule_matches(source, "if"), Some(false));
         assert_eq!(first_rule_texts(source), None);
