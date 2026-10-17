@@ -215,11 +215,11 @@ impl ExactWriter<'_> {
             !self.writer.first_match && self.keeps_order(expression);
         let ways = match &expression.kind {
             ExpressionKind::SingleDefinition(steps) => {
-                let steps = steps.iter().map(|step| self.part(step));
+                let steps = steps.iter().map(|step| self.step(step));
                 quote! {
                     {
                         let ends = #ends::one(position);
-                        #(let ends = parser.then(&ends, #steps);)*
+                        #(let ends = #steps;)*
                         ends
                     }
                 }
@@ -380,6 +380,29 @@ impl ExactWriter<'_> {
             keeps |= self.ordered[read];
         });
         keeps
+    }
+
+    /// Returns the code that tells where `step` of a sequence can end after
+    /// each of `ends`. A run of characters from a set is read once for all of
+    /// them, since the ends of a run all reach its end.
+    fn step(&self, step: &Expression) -> TokenStream {
+        let set = match &step.kind {
+            ExpressionKind::RepeatedSequence(sequence) => {
+                self.writer.set_parts(sequence)
+            }
+            _ => None,
+        };
+        if let Some((pattern, expected)) = set {
+            return quote! {
+                parser.then_span(
+                    &ends,
+                    |c| ::core::matches!(c, #pattern),
+                    &[#(#expected),*],
+                )
+            };
+        }
+        let part = self.part(step);
+        quote! { parser.then(&ends, #part) }
     }
 
     /// Returns the closure that tells where `expression` can end from the
