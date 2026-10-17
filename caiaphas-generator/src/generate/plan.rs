@@ -49,6 +49,8 @@ pub struct RulePlan {
     pub inline: bool,
     /// Whether no other rule uses the rule.
     pub start: bool,
+    /// Whether the rule has a type of its own, so a parse can start from it.
+    pub typed: bool,
     /// Whether a rule that takes each way as it comes remembers its match at
     /// each position.
     pub remembers: bool,
@@ -201,6 +203,10 @@ fn plan(grammar: &Grammar, shapes: &[Option<Shape>]) -> Plan {
                 quiet: rule.hidden && facts.is_nullable(&rule.expression),
                 inline: rule.inline,
                 start: grammar.start_syntax_rules.contains(&rule_id),
+                typed: matches!(
+                    shapes[position],
+                    Some(Shape::Struct(_) | Shape::Enum(_))
+                ),
                 // A rule that tries every way remembers its ends.
                 remembers: decisions.remembers[position] || general[position],
                 leaf: decisions.leaves[position],
@@ -331,8 +337,9 @@ mod tests {
         assert_eq!(plan.starts, [0]);
         assert!(plan.rules[1].general, "a name can hold dots");
         assert!(!plan.rules[2].general);
+        assert!(plan.rules[1].typed);
         let character = &plan.rules[3];
-        assert!(character.hidden && !character.builds);
+        assert!(character.hidden && !character.builds && !character.typed);
         let set = character.expression.set.as_ref().unwrap();
         assert_eq!(set.ranges, [('.', '.'), ('a', 'z')]);
         assert_eq!(
