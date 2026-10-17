@@ -100,7 +100,16 @@ impl<'a> Lexer<'a> {
             }
             Err(error) => {
                 let length = symbol_recovery_length(error, self.rest());
-                Err(self.skip(LexErrorKind::CommentlessSymbol(error), length))
+                // A `>` right after a `-` makes the `->` of other notations.
+                let arrow = error
+                    == ParseCommentlessSymbolError::NotCommentless('>')
+                    && self.source[..self.position].ends_with('-');
+                let kind = if arrow {
+                    LexErrorKind::Arrow
+                } else {
+                    LexErrorKind::CommentlessSymbol(error)
+                };
+                Err(self.skip(kind, length))
             }
         }
     }
@@ -178,7 +187,8 @@ fn symbol_recovery_length(
         }
         // A pattern a `?` cut short goes on to where it was meant to end.
         ParseCommentlessSymbolError::SpecialSequence(
-            ParseSpecialSequenceError::CutPattern(length),
+            ParseSpecialSequenceError::CutPattern(length)
+            | ParseSpecialSequenceError::CutClass(length),
         ) => length,
         ParseCommentlessSymbolError::SpecialSequence(_) => input[first..]
             .find('?')
@@ -235,6 +245,8 @@ pub(crate) struct LexError {
 pub(crate) enum LexErrorKind {
     CommentlessSymbol(ParseCommentlessSymbolError),
     BracketedTextualComment(ParseBracketedTextualCommentError),
+    /// A `>` right after a `-`, as other notations define a rule with `->`.
+    Arrow,
 }
 
 impl fmt::Display for LexErrorKind {
@@ -242,6 +254,9 @@ impl fmt::Display for LexErrorKind {
         match self {
             Self::CommentlessSymbol(error) => error.fmt(f),
             Self::BracketedTextualComment(error) => error.fmt(f),
+            Self::Arrow => {
+                ParseCommentlessSymbolError::NotCommentless('>').fmt(f)
+            }
         }
     }
 }
@@ -252,6 +267,9 @@ impl LexErrorKind {
         match self {
             Self::CommentlessSymbol(error) => error.help(),
             Self::BracketedTextualComment(error) => error.help(),
+            Self::Arrow => {
+                Some("write `=` instead of `->` to define a rule".to_owned())
+            }
         }
     }
 }
@@ -261,6 +279,7 @@ impl Error for LexErrorKind {
         match self {
             Self::CommentlessSymbol(error) => error.source(),
             Self::BracketedTextualComment(error) => error.source(),
+            Self::Arrow => None,
         }
     }
 }

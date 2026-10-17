@@ -89,14 +89,29 @@ fn read_pattern(
     if let Some(rest) = raw.strip_prefix('/') {
         let Some(text) = rest.strip_suffix('/') else {
             // A `?` inside a pattern ends the special sequence before the
-            // pattern does.
+            // pattern does, and inside a class it stands for itself.
+            let in_class = rest.rfind('[') > rest.rfind(']');
             return Err(match meant_length(input, length) {
+                Some(meant) if in_class => {
+                    ParseSpecialSequenceError::CutClass(meant)
+                }
                 Some(meant) => ParseSpecialSequenceError::CutPattern(meant),
                 None => ParseSpecialSequenceError::UnclosedPattern,
             });
         };
         return pattern::parse(text)
             .map_err(ParseSpecialSequenceError::InvalidPattern);
+    }
+    // Words apart describe what the sequence stands for, which is left to each
+    // tool.
+    let words = raw
+        .split(gap_separator::is_gap)
+        .filter(|word| {
+            !word.is_empty() && word.chars().all(char::is_alphabetic)
+        })
+        .count();
+    if words > 1 {
+        return Err(ParseSpecialSequenceError::Prose);
     }
     // Between the `?`, every character that is not part of a gap is a graphic
     // ASCII character.
@@ -187,6 +202,8 @@ pub(crate) enum ParseSpecialSequenceError {
     InvalidCharacter(char),
     /// What is between the `?` is not a code point or a range of them.
     Unsupported,
+    /// What is between the `?` describes what it stands for in words.
+    Prose,
     /// A code point is a surrogate or above `U+10FFFF`.
     NotAScalarValue(u32),
     /// A range starts after it ends.
@@ -198,6 +215,8 @@ pub(crate) enum ParseSpecialSequenceError {
     /// A `?` inside a pattern ended the special sequence, which was meant to
     /// be this long.
     CutPattern(usize),
+    /// The same, where the `?` is inside a class of characters, as in `[^?]`.
+    CutClass(usize),
     /// The pattern after `not` can match nothing, so it matches wherever the
     /// special sequence is.
     NullableNot,
@@ -217,7 +236,7 @@ impl fmt::Display for ParseSpecialSequenceError {
                 "{} is not a valid character in a special sequence",
                 shown(*c)
             ),
-            Self::Unsupported => f.write_str(
+            Self::Unsupported | Self::Prose => f.write_str(
                 "special sequence must hold a code point such as U+00E9, a \
                  range such as U+0041..U+005A, a pattern such as /[a-z]+/, \
                  one of those after `not`, or `end`",
@@ -228,7 +247,7 @@ impl fmt::Display for ParseSpecialSequenceError {
             Self::UnclosedPattern => {
                 f.write_str("pattern in a special sequence has no closing `/`")
             }
-            Self::CutPattern(_) => f.write_str(
+            Self::CutPattern(_) | Self::CutClass(_) => f.write_str(
                 "a `?` ends a special sequence, so this pattern stops before \
                  its closing `/`",
             ),
@@ -260,6 +279,15 @@ impl ParseSpecialSequenceError {
             ),
             Self::UnclosedPattern => Some(
                 "end the pattern with `/`, as in `? /[a-z]+/ ?`".to_owned(),
+            ),
+            Self::CutClass(_) => Some(
+                "write `U+003F` for a `?` in a class, as in `? /[^U+003F]/ ?`"
+                    .to_owned(),
+            ),
+            Self::Prose => Some(
+                "write a pattern for it, such as `? /[a-z]/ ?`, and keep the \
+                 words in a comment, since no words are read"
+                    .to_owned(),
             ),
             Self::NullableNot => Some(
                 "make the pattern read something, as `? not /[a-z]/ ?` does \
@@ -373,7 +401,6 @@ mod tests {
     fn rejects_anything_but_code_points_and_ranges() {
         for content in [
             "",
-            "LATIN SMALL LETTER E WITH ACUTE",
             "U+00e9",
             "u+00E9",
             "U00E9",
@@ -395,6 +422,21 @@ mod tests {
                 "{content:?}"
             );
         }
+    }
+
+    #[test]
+    fn tells_a_description_in_words_and_a_question_mark_in_a_class() {
+        for content in ["LATIN SMALL LETTER E WITH ACUTE", " any letter "] {
+            assert_eq!(
+                read(&format!("?{content}?")),
+                Err(ParseSpecialSequenceError::Prose),
+                "{content:?}"
+            );
+        }
+        assert_eq!(
+            SpecialSequence::read("? /[^?]/ ?"),
+            Err(ParseSpecialSequenceError::CutClass(10))
+        );
     }
 
     #[test]

@@ -158,10 +158,7 @@ fn how_to_write_outside(c: char) -> String {
                 digits and spaces"
             .to_owned(),
         '+' => "for one or more of `x`, write `x, {x}`".to_owned(),
-        '<' => "write a rule name without `<` and `>`".to_owned(),
-        '>' => "write a rule name without `<` and `>`, or `=` instead of \
-                `->` to define a rule"
-            .to_owned(),
+        '<' | '>' => "write a rule name without `<` and `>`".to_owned(),
         '#' => "write a comment as `(* a comment *)`, or `'#'` in quotes to \
                 match it"
             .to_owned(),
