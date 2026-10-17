@@ -149,6 +149,21 @@
 //! assert_eq!(error.excerpt(input), "1 | web=99999\n  |     ^");
 //! ```
 //!
+//! A span has `excerpt` too, for a program's own message about a match, such
+//! as a port it does not allow:
+//!
+//! ```
+//! # caiaphas::grammar!(pub mod setting {
+//! #     "setting = name, '=', port;
+//! #      (* as String *) name = letter, {letter};
+//! #      port = digit, {digit};
+//! #      (* hide *) letter = ? U+0061..U+007A ?;
+//! #      (* hide *) digit = ? U+0030..U+0039 ?;"
+//! # });
+//! let setting: setting::Setting = "web=0".parse().unwrap();
+//! assert_eq!(setting.port.span().excerpt(), "1 | web=0\n  |     ^");
+//! ```
+//!
 //! A rule written with `(* recover *)` lets a parse go on past an error in it.
 //! Where a match of the rule fails partway, `parse_recovering` skips to its
 //! next match from the error on, and gives every error found, with the value

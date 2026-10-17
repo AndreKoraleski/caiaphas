@@ -254,6 +254,10 @@ the line with a caret under the error, to show below it:
   |        ^
 ```
 
+The span of every match has `excerpt()` too, with carets under the text it
+covers, so a program that finds something wrong in a match, such as a name it
+does not know, can tell it the same way.
+
 A rule written with `(* recover *)` lets a parse go on past an error in it.
 Where a match of the rule fails partway, `parse_recovering` skips to its next
 match from the error on, and gives every error found, with the value of what
