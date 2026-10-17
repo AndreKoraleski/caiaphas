@@ -3,6 +3,7 @@
 mod ends;
 mod exact;
 mod recovery;
+mod runs;
 
 use std::{ops::Range, str::FromStr};
 
