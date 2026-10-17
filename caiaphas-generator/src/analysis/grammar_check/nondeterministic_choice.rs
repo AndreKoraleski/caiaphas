@@ -9,7 +9,7 @@ use crate::{
     analysis::{
         choice_check::CHOICE_CHECKS,
         choice_point::choice_points,
-        exactness::visit_conflicts,
+        exactness::{Conflict, visit_conflicts},
         facts::Facts,
         finding::{Finding, FindingCode, FindingKind},
     },
@@ -17,36 +17,52 @@ use crate::{
     ir::{Grammar, RuleId},
 };
 
-/// Suggests a way to keep the parser fast at each choice that makes a rule try
-/// every way through it.
+/// Suggests a way to keep the parser fast in each rule whose choices make it
+/// try every way through it, once for the rule, at its first such choice.
 pub(super) fn check(
     grammar: &Grammar,
     facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
-    let mut greedy = HashMap::new();
+    // The conflicts of each rule, in the order the rules first have one.
+    let mut conflicts: Vec<Vec<Conflict>> = Vec::new();
+    let mut at: HashMap<usize, usize> = HashMap::new();
     visit_conflicts(facts, &mut |conflict| {
         let RuleId(position) = conflict.rule_id;
-        let meta_identifier =
-            grammar.syntax_rules[position].meta_identifier.clone();
-        let greedy = greedy
-            .entry(position)
-            .or_insert_with(|| greedy_findings(grammar, conflict.rule_id))
-            .clone();
-        let labels = conflict.shorter.map(|span| Label {
+        let index = *at.entry(position).or_insert_with(|| {
+            conflicts.push(Vec::new());
+            conflicts.len() - 1
+        });
+        conflicts[index].push(conflict);
+    });
+    for mut conflicts in conflicts {
+        // The finding points at the first choice written, and labels the rest.
+        conflicts.sort_by_key(|conflict| conflict.span.start);
+        let mut conflicts = conflicts.into_iter();
+        let Some(first) = conflicts.next() else {
+            continue;
+        };
+        let RuleId(position) = first.rule_id;
+        let shorter = first.shorter.map(|span| Label {
             span,
             message: "this alternative ends where that one goes on",
         });
+        let rest = conflicts.map(|conflict| Label {
+            span: conflict.span,
+            message: "a parser cannot tell which way to take here either",
+        });
         findings.push(Finding {
             kind: FindingKind::NondeterministicChoice {
-                meta_identifier,
-                characters: conflict.characters,
-                greedy,
+                meta_identifier: grammar.syntax_rules[position]
+                    .meta_identifier
+                    .clone(),
+                characters: first.characters,
+                greedy: greedy_findings(grammar, first.rule_id),
             },
-            span: conflict.span,
-            labels: labels.into_iter().collect(),
+            span: first.span,
+            labels: shorter.into_iter().chain(rest).collect(),
         });
-    });
+    }
 }
 
 /// Returns the codes of the findings that `(* greedy *)` right before the rule
@@ -141,6 +157,22 @@ mod tests {
              reason *)` right before `statement` if it should take each way \
              as it comes, which keeps its parser fast, or make what comes \
              after the choice start differently"
+        );
+    }
+
+    #[test]
+    fn suggests_it_once_for_each_rule() {
+        let found = choices("s = {'x'}, 'x', {'y'}, 'y'; t = {'z'}, 'z';");
+        let spans: Vec<(Span, Vec<Span>)> = found
+            .into_iter()
+            .map(|(_, span, labels)| (span, labels))
+            .collect();
+        assert_eq!(
+            spans,
+            [
+                (Span { start: 4, end: 9 }, vec![Span { start: 16, end: 21 }]),
+                (Span { start: 32, end: 37 }, Vec::new())
+            ]
         );
     }
 
