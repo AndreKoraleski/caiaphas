@@ -62,6 +62,9 @@ pub struct RulePlan {
     pub general: bool,
     /// Whether the rule's choices take their first alternative that matches.
     pub first_match: bool,
+    /// Whether a parse that recovers skips the rule ahead to its next match
+    /// where it fails partway.
+    pub recovers: bool,
     /// The Rust type the rule's text converts to, as the grammar writes it.
     pub converts_to: Option<String>,
     /// What the rule matches.
@@ -213,6 +216,7 @@ fn plan(grammar: &Grammar, shapes: &[Option<Shape>]) -> Plan {
                 recursive: decisions.recursive[position],
                 general: general[position],
                 first_match: rule.first_match,
+                recovers: rule.recovers,
                 converts_to: rule.converts_to.clone(),
                 expression: part(&writer, &rule.expression),
             }

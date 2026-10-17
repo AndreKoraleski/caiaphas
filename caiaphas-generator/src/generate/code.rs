@@ -330,6 +330,20 @@ fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
             __caiaphas::parse::<Start>(input, DEPTH)
                 .map(|tree| tree.dump(NAMES))
         }
+
+        #[cfg(test)]
+        #[doc(hidden)]
+        pub fn __tree_recovering(
+            input: &str,
+        ) -> (
+            ::core::option::Option<::std::string::String>,
+            ::std::vec::Vec<::caiaphas::Error>,
+        ) {
+            #start
+            let (tree, errors) =
+                __caiaphas::parse_recovering::<Start>(input, DEPTH);
+            (tree.map(|tree| tree.dump(NAMES)), errors)
+        }
     }
 }
 
