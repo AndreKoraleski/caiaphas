@@ -20,6 +20,7 @@ path = "src/main.rs"
 doc = false
 
 [dependencies]
+caiaphas.workspace = true
 caiaphas-generator.workspace = true
 
 [lints]

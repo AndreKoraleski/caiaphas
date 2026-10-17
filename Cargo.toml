@@ -14,7 +14,11 @@ repository = "https://github.com/AndreKoraleski/caiaphas"
 # The crates of this workspace, each at exactly the version above, since the
 # code the macros generate calls into the internals of caiaphas. Cargo cannot
 # take these from `workspace.package`, so `cargo set-version` from cargo-edit
-# bumps all three at once.
+# bumps them all at once.
+[workspace.dependencies.caiaphas]
+path = "."
+version = "=0.1.0"
+
 [workspace.dependencies.caiaphas-generator]
 path = "caiaphas-generator"
 version = "=0.1.0"
