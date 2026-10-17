@@ -148,6 +148,19 @@ impl FunctionWriter<'_> {
                 }
             }
         });
+        // A rule that recovers goes on from where a parse that recovers tells
+        // it to, when it fails.
+        let finish = if rule.recovers {
+            quote! {
+                let found = parser.finish_rule(&RULE, start, end);
+                if found.is_some() {
+                    return found;
+                }
+                parser.recover(&RULE, start, #function::<REPORTS>)
+            }
+        } else {
+            quote! { parser.finish_rule(&RULE, start, end) }
+        };
         quote! {
             #[doc(hidden)]
             fn #function<const REPORTS: bool>(
@@ -159,7 +172,7 @@ impl FunctionWriter<'_> {
                 let start = parser.start_rule(position);
                 let end = #body;
                 #convert
-                parser.finish_rule(&RULE, start, end)
+                #finish
             }
         }
     }

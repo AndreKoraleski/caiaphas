@@ -43,6 +43,9 @@ pub(crate) struct Rule {
     /// Whether a `(* greedy *)` right before the rule makes it take each way
     /// through it as it comes to it.
     pub(crate) greedy: bool,
+    /// Whether a `(* recover *)` right before the rule lets a parse that
+    /// recovers skip it ahead to its next match where it fails partway.
+    pub(crate) recovers: bool,
     /// Whether an `(* inline *)` right before the rule gives the rules that
     /// hold it what it holds, instead of its type.
     pub(crate) inline: bool,

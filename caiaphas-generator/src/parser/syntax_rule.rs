@@ -24,6 +24,8 @@ pub(crate) struct SyntaxRule {
     pub(crate) first_match: bool,
     /// Whether a `(* greedy *)` comes right before the rule.
     pub(crate) greedy: bool,
+    /// Whether a `(* recover *)` comes right before the rule.
+    pub(crate) recovers: bool,
     /// Whether an `(* inline *)` comes right before the rule.
     pub(crate) inline: bool,
     /// The Rust type an `(* as T *)` right before the rule names, if any.
@@ -61,6 +63,7 @@ impl SyntaxRule {
             hidden: false,
             first_match: false,
             greedy: false,
+            recovers: false,
             inline: false,
             converts_to: None,
             comments: Vec::new(),

@@ -83,9 +83,9 @@ impl fmt::Display for ParseError {
             }
             ParseErrorKind::Malformed(malformed) => malformed.fmt(f),
             ParseErrorKind::AnnotationWithoutRule => f.write_str(
-                "an `expect`, `hide`, `match first`, `greedy`, `inline` or \
-                 `as` comment must come right before the syntax rule it is \
-                 about",
+                "an `expect`, `hide`, `match first`, `greedy`, `recover`, \
+                 `inline` or `as` comment must come right before the syntax \
+                 rule it is about",
             ),
         }
     }
@@ -222,9 +222,9 @@ mod tests {
             ),
             (
                 error(ParseErrorKind::AnnotationWithoutRule),
-                "an `expect`, `hide`, `match first`, `greedy`, `inline` or \
-                 `as` comment must come right before the syntax rule it is \
-                 about",
+                "an `expect`, `hide`, `match first`, `greedy`, `recover`, \
+                 `inline` or `as` comment must come right before the syntax \
+                 rule it is about",
             ),
         ];
         for (error, message) in cases {

@@ -135,6 +135,24 @@ impl ExactWriter<'_> {
                 });
             }
         });
+        // A rule that recovers goes on from where a parse that recovers tells
+        // it to, when it fails, and builds its node from there.
+        let (finish, start_from) = if rule.recovers {
+            (
+                quote! {
+                    let ends = parser.finish_ends(&RULE, start, ends);
+                    if ends.first().is_some() {
+                        return ends;
+                    }
+                    parser.recover_ends(&RULE, start, #ends::<REPORTS>)
+                },
+                Some(quote! {
+                    let position = parser.recovered(&RULE, position);
+                }),
+            )
+        } else {
+            (quote! { parser.finish_ends(&RULE, start, ends) }, None)
+        };
         let ends_function = quote! {
             #[doc(hidden)]
             fn #ends<const REPORTS: bool>(
@@ -150,7 +168,7 @@ impl ExactWriter<'_> {
                 let start = parser.start_rule(position);
                 let ends = #body;
                 #convert
-                parser.finish_ends(&RULE, start, ends)
+                #finish
             }
         };
         if rule.hidden {
@@ -167,6 +185,7 @@ impl ExactWriter<'_> {
                 end: usize,
             ) -> ::core::option::Option<usize> {
                 #constant
+                #start_from
                 let start = parser.start_rule(position);
                 #building
                 parser.built(&RULE, start, end)

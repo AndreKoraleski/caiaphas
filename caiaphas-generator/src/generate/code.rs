@@ -207,22 +207,28 @@ fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
          Returns where `input` stops matching a `{name}`, and what could \
          have come there instead."
     );
-    let parse = if general {
+    let recovering_documentation = format!(
+        " Returns the `{name}` that `input` matches once each error that a \
+         rule written with `(* recover *)` can skip is skipped, if any, and \
+         every error found."
+    );
+    let (parse, recovering) = if general {
         let (ends, build) =
             (exact::ends_name(rule_id), exact::build_name(rule_id));
-        quote! {
-            __caiaphas::parse_by_ends(
-                input,
-                #ends::<false>,
-                #build::<false>,
-                #ends::<true>,
-            )
-        }
+        let functions =
+            quote! { input, #ends::<false>, #build::<false>, #ends::<true> };
+        (
+            quote! { __caiaphas::parse_by_ends(#functions) },
+            quote! { __caiaphas::parse_by_ends_recovering(#functions) },
+        )
     } else {
         let function = matching::function_name(rule_id);
-        quote! {
-            __caiaphas::parse(input, #function::<false>, #function::<true>)
-        }
+        let functions =
+            quote! { input, #function::<false>, #function::<true> };
+        (
+            quote! { __caiaphas::parse(#functions) },
+            quote! { __caiaphas::parse_recovering(#functions) },
+        )
     };
     quote! {
         #[doc = #documentation]
@@ -233,6 +239,15 @@ fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
                 .map(|tree| {
                     <Self as __caiaphas::FromNode>::from_node(tree.root())
                 })
+        }
+
+        #[doc = #recovering_documentation]
+        pub fn parse_recovering(input: &str) -> ::caiaphas::Recovered<Self> {
+            let (tree, errors) = #recovering;
+            let value = tree.map(|tree| {
+                <Self as __caiaphas::FromNode>::from_node(tree.root())
+            });
+            __caiaphas::recovered(value, errors)
         }
     }
 }

@@ -39,6 +39,7 @@ impl Lowering<'_, '_> {
             hidden: syntax_rule.hidden,
             first_match: syntax_rule.first_match,
             greedy: syntax_rule.greedy,
+            recovers: syntax_rule.recovers,
             inline: syntax_rule.inline,
             converts_to: syntax_rule.converts_to.clone(),
             comments: syntax_rule.comments.clone(),

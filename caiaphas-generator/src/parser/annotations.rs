@@ -98,6 +98,7 @@ fn give(
             Annotation::Hide => rule.hidden = true,
             Annotation::FirstMatch => rule.first_match = true,
             Annotation::Greedy => rule.greedy = true,
+            Annotation::Recover => rule.recovers = true,
             Annotation::Inline => rule.inline = true,
             Annotation::Converts(ty) => rule.converts_to = Some(ty),
         }

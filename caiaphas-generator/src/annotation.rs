@@ -6,12 +6,12 @@
 //! word = keyword | name;
 //! ```
 //!
-//! An annotation is `hide`, `inline`, `match first`, `greedy`, `as` and a Rust
-//! type, or `expect` with a finding's code, a colon and a reason. A type is a
-//! primitive or a path whose last part starts with a capital, so a comment
-//! such as `(* as such *)` stays a comment. Each comment holds one annotation,
-//! and a rule can have several. The standard reads quotes in a comment as
-//! terminal strings, so a reason cannot hold a lone `'` or `"`.
+//! An annotation is `hide`, `inline`, `match first`, `greedy`, `recover`, `as`
+//! and a Rust type, or `expect` with a finding's code, a colon and a reason. A
+//! type is a primitive or a path whose last part starts with a capital, so a
+//! comment such as `(* as such *)` stays a comment. Each comment holds one
+//! annotation, and a rule can have several. The standard reads quotes in a
+//! comment as terminal strings, so a reason cannot hold a lone `'` or `"`.
 
 use std::fmt;
 
@@ -39,6 +39,9 @@ pub(crate) enum Annotation {
     FirstMatch,
     /// Makes the rule take each way through it as it comes to it.
     Greedy,
+    /// Lets a parse that recovers skip the rule ahead to its next match where
+    /// it fails partway.
+    Recover,
     /// Gives the rules that hold the rule what it holds, instead of its type.
     Inline,
     /// Makes the rule's type this Rust type, read from the text it matched.
@@ -122,6 +125,11 @@ impl Comment {
             ("hide", after_word(content, "hide"), Annotation::Hide),
             ("inline", after_word(content, "inline"), Annotation::Inline),
             ("greedy", after_word(content, "greedy"), Annotation::Greedy),
+            (
+                "recover",
+                after_word(content, "recover"),
+                Annotation::Recover,
+            ),
             ("match first", first_match, Annotation::FirstMatch),
         ];
         for (name, rest, annotation) in alone {
@@ -257,7 +265,7 @@ fn expectation(rest: &str, span: Span) -> Result<Expectation, Malformed> {
 /// Returns a comment of one word written almost as an annotation as a
 /// misspelling of it, and any other as ordinary.
 fn misspelled(content: &str) -> Comment {
-    const WORDS: &[&str] = &["hide", "inline", "greedy", "expect"];
+    const WORDS: &[&str] = &["hide", "inline", "greedy", "recover", "expect"];
     if content.is_empty() || content.contains(is_gap) {
         return Comment::Ordinary;
     }
@@ -486,6 +494,22 @@ mod tests {
                 "{text:?}"
             );
         }
+    }
+
+    #[test]
+    fn reads_a_recover() {
+        assert_eq!(
+            read("(* recover *)"),
+            Comment::Annotation(Annotation::Recover)
+        );
+        assert_eq!(
+            read("(* recover lines *)"),
+            Comment::Malformed(Malformed::NotAlone("recover"))
+        );
+        assert_eq!(
+            read("(* recovr *)"),
+            Comment::Malformed(Malformed::Misspelled { meant: "recover" })
+        );
     }
 
     #[test]
