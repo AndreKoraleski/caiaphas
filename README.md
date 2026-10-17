@@ -173,6 +173,7 @@ A comment right before a rule can tell caiaphas more about it.
 | `(* as u16 *)`              | the type is `u16`, read from the rule's text   |
 | `(* match first *)`         | how the rule chooses, see [Matching](#matching)|
 | `(* greedy *)`              | how the rule chooses, see [Matching](#matching)|
+| `(* recover *)`             | a parse goes on past it, see [Errors](#errors) |
 | `(* expect code: reason *)` | marks a warning or suggestion as intended      |
 
 `(* as T *)` takes any type with `FromStr`, `Debug`, `Clone` and `PartialEq`,
@@ -249,6 +250,26 @@ expected `,`, `}`, a digit, an exponent or a fraction, found `]` at line 1, colu
 
 `Error` displays as that sentence, and `line()`, `column()`, `offset()`,
 `expected()` and `found()` give the same as values.
+
+A rule written with `(* recover *)` lets a parse go on past an error in it.
+Where a match of the rule fails partway, `parse_recovering` skips to its next
+match from the error on, and gives every error found, with the value of what
+still matches:
+
+```ebnf
+settings = [line], {newline, [line]};
+(* recover *)
+line = name, ' = ', value;
+name = ? /[a-z]+/ ?;
+value = ? /[^\n]+/ ?;
+(* hide *) newline = ? U+000A ?;
+```
+
+For the lines `a = 1`, `broken` and `b = 2`, it gives the lines `a` and `b`
+and the error on line 2. A recovery starts in the rule that fails, so a
+missing separator between two matches that are whole stops the parse there.
+A skip can also end inside brackets the rule did not open, and add an error
+after the real one.
 
 ## Macro
 

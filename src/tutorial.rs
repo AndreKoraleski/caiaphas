@@ -146,6 +146,31 @@
 //! assert_eq!((error.line(), error.column()), (1, 5));
 //! ```
 //!
+//! A rule written with `(* recover *)` lets a parse go on past an error in it.
+//! Where a match of the rule fails partway, `parse_recovering` skips to its
+//! next match from the error on, and gives every error found, with the value
+//! of what still matches:
+//!
+//! ```
+//! caiaphas::grammar!(mod settings {
+//!     r"settings = [line], {newline, [line]};
+//!       (* recover *)
+//!       line = name, ' = ', value;
+//!       name = ? /[a-z]+/ ?;
+//!       value = ? /[^\n]+/ ?;
+//!       (* hide *) newline = ? U+000A ?;"
+//! });
+//!
+//! let input = "a=1\nb = 2\nc = 3";
+//! let recovered = settings::Settings::parse_recovering(input);
+//! assert_eq!(recovered.value.unwrap().line.len(), 2);
+//! assert_eq!(
+//!     recovered.errors[0].to_string(),
+//!     "expected ` = ` or a character from `a` to `z`, found `=` at line 1, \
+//!      column 2"
+//! );
+//! ```
+//!
 //! # Matching
 //!
 //! A grammar can describe the same input in more than one way. In a file name

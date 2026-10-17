@@ -74,3 +74,33 @@ fn shows_the_error_a_parser_gives() {
     let shown = error.to_string();
     assert!(blocks("text").contains(&shown), "{shown}");
 }
+
+caiaphas::grammar!(mod settings {
+    r"settings = [line], {newline, [line]};
+(* recover *)
+line = name, ' = ', value;
+name = ? /[a-z]+/ ?;
+value = ? /[^\n]+/ ?;
+(* hide *) newline = ? U+000A ?;"
+});
+
+#[test]
+fn recovers_as_the_errors_section_tells() {
+    assert!(blocks("ebnf").iter().any(|block| {
+        block.contains("(* recover *)\nline = name, ' = ', value;")
+    }));
+    let recovered =
+        settings::Settings::parse_recovering("a = 1\nbroken\nb = 2");
+    let names: Vec<&str> = recovered
+        .value
+        .as_ref()
+        .unwrap()
+        .line
+        .iter()
+        .map(|line| line.name.text())
+        .collect();
+    assert_eq!(names, ["a", "b"]);
+    let lines: Vec<usize> =
+        recovered.errors.iter().map(caiaphas::Error::line).collect();
+    assert_eq!(lines, [2]);
+}

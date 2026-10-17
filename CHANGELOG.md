@@ -39,6 +39,9 @@ adhere to [Semantic Versioning][semver].
 - `Display` that writes the text of every type with `text()`.
 - `parse` and `FromStr` on the type of every rule, so a part of a grammar can
   be read and tested alone.
+- `(* recover *)` and `parse_recovering` on each type, which go on past each
+  error that a rule written with it can skip, and give every error found with
+  the value of what still matches, as `Recovered`.
 - `Span` for where a rule matched in its input, and `Error` for where an input
   stops matching and what could have come there. `Error::expected` and
   `Error::found` give the same as values, with `Expected` at the root of the
