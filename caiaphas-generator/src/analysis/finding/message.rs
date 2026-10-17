@@ -133,6 +133,10 @@ impl fmt::Display for FindingKind {
                  though they are neither letters nor digits",
                 between.described()
             ),
+            Self::MisspelledAnnotation { meant } => write!(
+                f,
+                "this comment reads like `(* {meant} *)` written wrongly"
+            ),
             Self::IneffectiveAnnotation { meta_identifier } => write!(
                 f,
                 "`(* greedy *)` changes nothing in `{}`, since a parser can \

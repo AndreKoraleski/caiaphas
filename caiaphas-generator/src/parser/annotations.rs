@@ -1,7 +1,7 @@
 //! Annotations go to the syntax rule right after them.
 
 use crate::{
-    annotation::{Annotation, Comment},
+    annotation::{Annotation, Comment, Malformed, Misspelling},
     parser::{ParseError, ParseErrorKind, SyntaxRule},
     span::Span,
 };
@@ -9,7 +9,8 @@ use crate::{
 /// Gives each annotation in the `comments` of `source` to the rule right after
 /// it in `rules`, where `attempts` tells where each rule the parser tried to
 /// read is, and adds an error for each annotation that is malformed or comes
-/// before no rule.
+/// before no rule. A comment inside a rule is text for people alone, as every
+/// comment is to the standard.
 pub(super) fn attach(
     source: &str,
     comments: &[Span],
@@ -18,6 +19,12 @@ pub(super) fn attach(
     errors: &mut Vec<ParseError>,
 ) {
     for &span in comments {
+        let inside = attempts
+            .iter()
+            .any(|rule| rule.start < span.start && span.end < rule.end);
+        if inside {
+            continue;
+        }
         let kind = match Comment::read(&source[span.range()], span) {
             Comment::Ordinary => {
                 document(source, span, attempts, rules);
@@ -29,6 +36,14 @@ pub(super) fn attach(
                 }
                 ParseErrorKind::AnnotationWithoutRule
             }
+            // A word written almost as an annotation is likely a typo, which a
+            // warning about the rule it touches tells of.
+            Comment::Malformed(Malformed::Misspelled { meant }) => {
+                if let Some(rule) = touched(source, span, attempts, rules) {
+                    rule.misspellings.push(Misspelling { meant, span });
+                }
+                continue;
+            }
             Comment::Malformed(malformed) => {
                 ParseErrorKind::Malformed(malformed)
             }
@@ -38,29 +53,14 @@ pub(super) fn attach(
 }
 
 /// Gives the text of the ordinary comment at `span` of `source` to the rule it
-/// touches, with nothing but gaps and comments between them and no empty line,
-/// so a comment set apart, such as a header, stays a comment.
+/// touches, so a comment set apart, such as a header, stays a comment.
 fn document(
     source: &str,
     span: Span,
     attempts: &[Span],
     rules: &mut [SyntaxRule],
 ) {
-    let Some(next) = attempts.iter().find(|rule| rule.start >= span.end)
-    else {
-        return;
-    };
-    let between = &source[span.end..next.start];
-    // The lines wholly between the two are those past the comment's own line
-    // and before the rule's, and none of them can be empty.
-    let lines: Vec<&str> = between.split('\n').collect();
-    let inner = lines
-        .get(1..lines.len().saturating_sub(1))
-        .unwrap_or_default();
-    if inner.iter().any(|line| line.trim().is_empty()) {
-        return;
-    }
-    let Some(rule) = rules.iter_mut().find(|rule| rule.span == *next) else {
+    let Some(rule) = touched(source, span, attempts, rules) else {
         return;
     };
     let text = &source[span.start + 2..span.end - 2];
@@ -69,6 +69,28 @@ fn document(
     if !text.is_empty() {
         rule.comments.push(text);
     }
+}
+
+/// Returns the rule that the comment at `span` of `source` touches, with
+/// nothing but gaps and comments between them and no empty line.
+fn touched<'r>(
+    source: &str,
+    span: Span,
+    attempts: &[Span],
+    rules: &'r mut [SyntaxRule],
+) -> Option<&'r mut SyntaxRule> {
+    let next = attempts.iter().find(|rule| rule.start >= span.end)?;
+    let between = &source[span.end..next.start];
+    // The lines wholly between the two are those past the comment's own line
+    // and before the rule's, and none of them can be empty.
+    let lines: Vec<&str> = between.split('\n').collect();
+    let inner = lines
+        .get(1..lines.len().saturating_sub(1))
+        .unwrap_or_default();
+    if inner.iter().any(|line| line.trim().is_empty()) {
+        return None;
+    }
+    rules.iter_mut().find(|rule| rule.span == *next)
 }
 
 /// Gives `annotation`, written at `span`, to the rule right after it, and
@@ -80,16 +102,10 @@ fn give(
     attempts: &[Span],
     rules: &mut [SyntaxRule],
 ) -> bool {
-    let inside = attempts
-        .iter()
-        .any(|rule| rule.start < span.start && span.end < rule.end);
     let Some(next) = attempts.iter().find(|rule| rule.start >= span.end)
     else {
         return false;
     };
-    if inside {
-        return false;
-    }
     if let Some(rule) = rules.iter_mut().find(|rule| rule.span == *next) {
         match annotation {
             Annotation::Expectation(expectation) => {
@@ -173,16 +189,35 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_malformed_hide() {
+    fn reads_prose_after_an_annotation_word_as_a_comment() {
         let (syntax, errors) = parse("(* hide spaces *) a = 'x';");
         assert!(!syntax.syntax_rules[0].hidden);
+        assert_eq!(errors, []);
+        assert_eq!(syntax.syntax_rules[0].comments, ["hide spaces"]);
+    }
+
+    #[test]
+    fn leaves_a_comment_inside_a_rule_alone() {
+        let (syntax, errors) =
+            parse("a = 'x' (* expect a digit next *), (* hide *) 'y';");
+        assert_eq!(errors, []);
+        assert!(!syntax.syntax_rules[0].hidden);
+    }
+
+    #[test]
+    fn notes_a_word_written_almost_as_an_annotation_for_its_rule() {
+        let (syntax, errors) =
+            parse("(* HIDE *) a = 'x';\n\n(* Hidde *)\n\nb = 'y';");
+        assert_eq!(errors, []);
         assert_eq!(
-            errors,
-            [ParseError {
-                kind: ParseErrorKind::Malformed(Malformed::NotAlone("hide")),
-                span: Span { start: 0, end: 17 },
+            syntax.syntax_rules[0].misspellings,
+            [Misspelling {
+                meant: "hide",
+                span: Span { start: 0, end: 10 },
             }]
         );
+        // One set apart by an empty line is a header.
+        assert_eq!(syntax.syntax_rules[1].misspellings, []);
     }
 
     #[test]
@@ -200,39 +235,30 @@ mod tests {
 
     #[test]
     fn rejects_an_annotation_without_a_rule_after_it() {
-        for (source, start) in [
-            ("a = 'x'; (* expect empty-rule: kept *)", 9),
-            ("a = 'x', (* expect empty-rule: kept *) 'y';", 9),
-            ("a = 'x', (* expect empty-rule: kept *) 'y'; b = 'z';", 9),
+        let (syntax, errors) = parse("a = 'x'; (* expect empty-rule: kept *)");
+        assert_eq!(syntax.syntax_rules[0].expectations, []);
+        assert_eq!(
+            errors,
+            [ParseError {
+                kind: ParseErrorKind::AnnotationWithoutRule,
+                span: Span { start: 9, end: 38 },
+            }]
+        );
+        // One inside a rule is a comment like any other.
+        for source in [
+            "a = 'x', (* expect empty-rule: kept *) 'y'; b = 'z';",
+            "a = 'x', (* hide *) 'y'; b = 'z';",
         ] {
             let (syntax, errors) = parse(source);
+            assert_eq!(errors, [], "{source:?}");
+            assert!(syntax.syntax_rules.iter().all(|rule| !rule.hidden));
             assert!(
                 syntax
                     .syntax_rules
                     .iter()
                     .all(|rule| rule.expectations.is_empty())
             );
-            assert_eq!(
-                errors,
-                [ParseError {
-                    kind: ParseErrorKind::AnnotationWithoutRule,
-                    span: Span {
-                        start,
-                        end: start + 29,
-                    },
-                }],
-                "{source:?}"
-            );
         }
-        let (syntax, errors) = parse("a = 'x', (* hide *) 'y'; b = 'z';");
-        assert!(syntax.syntax_rules.iter().all(|rule| !rule.hidden));
-        assert_eq!(
-            errors,
-            [ParseError {
-                kind: ParseErrorKind::AnnotationWithoutRule,
-                span: Span { start: 9, end: 19 },
-            }]
-        );
     }
 
     #[test]

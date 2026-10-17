@@ -28,6 +28,16 @@ pub(crate) struct Expectation {
     pub(crate) span: Span,
 }
 
+/// A comment of one word written almost as an annotation, right before a rule,
+/// which a warning about the rule tells of.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Misspelling {
+    /// The annotation it reads like.
+    pub(crate) meant: &'static str,
+    /// The comment.
+    pub(crate) span: Span,
+}
+
 /// What a comment right before a syntax rule tells caiaphas about the rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Annotation {
@@ -58,8 +68,6 @@ pub(crate) enum Comment {
 /// How an annotation is written wrongly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Malformed {
-    /// An annotation of a few words, such as `hide`, holds more than them.
-    NotAlone(&'static str),
     /// An expectation has no code.
     NoCode,
     /// An expectation has no `:` after its code.
@@ -106,27 +114,30 @@ impl Comment {
             }
         }
         let alone = [
-            ("hide", after_word(content, "hide"), Annotation::Hide),
-            ("inline", after_word(content, "inline"), Annotation::Inline),
-            ("greedy", after_word(content, "greedy"), Annotation::Greedy),
-            (
-                "recover",
-                after_word(content, "recover"),
-                Annotation::Recover,
-            ),
+            (after_word(content, "hide"), Annotation::Hide),
+            (after_word(content, "inline"), Annotation::Inline),
+            (after_word(content, "greedy"), Annotation::Greedy),
+            (after_word(content, "recover"), Annotation::Recover),
         ];
-        for (name, rest, annotation) in alone {
+        // More words after the annotation's own make prose, such as
+        // `hide the details`.
+        for (rest, annotation) in alone {
             if let Some(rest) = rest {
                 return if rest.is_empty() {
                     Self::Annotation(annotation)
                 } else {
-                    Self::Malformed(Malformed::NotAlone(name))
+                    Self::Ordinary
                 };
             }
         }
         let Some(rest) = after_word(content, "expect") else {
             return misspelled(content);
         };
+        // `expect` starts prose too, such as `expect a digit next`, unless the
+        // code of a finding follows it.
+        if !names_a_code(rest) {
+            return Self::Ordinary;
+        }
         match expectation(rest, span) {
             Ok(expectation) => {
                 Self::Annotation(Annotation::Expectation(expectation))
@@ -139,15 +150,6 @@ impl Comment {
 impl fmt::Display for Malformed {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NotAlone("hide") => {
-                f.write_str("a rule is hidden with `(* hide *)` alone")
-            }
-            Self::NotAlone("recover") => {
-                f.write_str("a rule recovers with `(* recover *)` alone")
-            }
-            Self::NotAlone(name) => {
-                write!(f, "a rule is made {name} with `(* {name} *)` alone")
-            }
             Self::NoCode => f.write_str("an expectation names no finding"),
             Self::NoColon => f.write_str(
                 "an expectation needs a `:` between its code and its reason",
@@ -176,10 +178,6 @@ impl Malformed {
         const EXAMPLE: &str =
             "`(* expect tied-branches: a keyword is never a name *)`";
         match self {
-            Self::NotAlone(name) => format!(
-                "write `(* {name} *)` in a comment of its own, and the rest \
-                 in another"
-            ),
             Self::NoCode => format!(
                 "name the finding it expects by its code, as in {EXAMPLE}; \
                  `caiaphas explain` lists every code"
@@ -243,6 +241,26 @@ fn expectation(rest: &str, span: Span) -> Result<Expectation, Malformed> {
         reason: reason.to_owned(),
         span,
     })
+}
+
+/// Returns whether `rest`, written after `expect`, makes the comment an
+/// expectation and not prose: it holds the `:` of an expectation, starts with
+/// the code of a finding, or holds nothing.
+fn names_a_code(rest: &str) -> bool {
+    if rest.contains(':') {
+        return true;
+    }
+    let word = rest
+        .trim_start_matches(is_gap)
+        .split(|c| is_gap(c) || c == ':')
+        .next()
+        .unwrap_or_default();
+    if word.is_empty() {
+        return true;
+    }
+    let code = kebab_case(word);
+    explain::codes().any(|known| known == code)
+        || explain::similar_code(&code).is_some()
 }
 
 /// Returns a comment of one word written almost as an annotation as a
@@ -432,14 +450,21 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_hide_with_more_after_it() {
-        for text in ["(* hide whitespace *)", "(* hide: whitespace *)"] {
-            assert_eq!(
-                read(text),
-                Comment::Malformed(Malformed::NotAlone("hide")),
-                "{text:?}"
-            );
+    fn reads_words_after_an_annotation_as_prose() {
+        for text in [
+            "(* hide whitespace *)",
+            "(* hide: whitespace *)",
+            "(* recover lines *)",
+            "(* greedy else *)",
+            "(* inline everything below later *)",
+            "(* expect a digit next *)",
+        ] {
+            assert_eq!(read(text), Comment::Ordinary, "{text:?}");
         }
+        assert_eq!(
+            read("(* expect tied-branches *)"),
+            Comment::Malformed(Malformed::NoColon)
+        );
     }
 
     #[test]
@@ -447,10 +472,6 @@ mod tests {
         assert_eq!(
             read("(* recover *)"),
             Comment::Annotation(Annotation::Recover)
-        );
-        assert_eq!(
-            read("(* recover lines *)"),
-            Comment::Malformed(Malformed::NotAlone("recover"))
         );
         assert_eq!(
             read("(* recovr *)"),
@@ -467,10 +488,6 @@ mod tests {
                 "{text:?}"
             );
         }
-        assert_eq!(
-            read("(* greedy else *)"),
-            Comment::Malformed(Malformed::NotAlone("greedy"))
-        );
     }
 
     #[test]
@@ -482,10 +499,6 @@ mod tests {
                 "{text:?}"
             );
         }
-        assert_eq!(
-            read("(* inline group *)"),
-            Comment::Malformed(Malformed::NotAlone("inline"))
-        );
     }
 
     #[test]

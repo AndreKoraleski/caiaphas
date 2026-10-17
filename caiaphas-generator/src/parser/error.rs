@@ -258,16 +258,6 @@ mod tests {
                 "an expectation needs a `:` between its code and its reason",
             ),
             (
-                error(ParseErrorKind::Malformed(Malformed::NotAlone("hide"))),
-                "a rule is hidden with `(* hide *)` alone",
-            ),
-            (
-                error(ParseErrorKind::Malformed(Malformed::NotAlone(
-                    "greedy",
-                ))),
-                "a rule is made greedy with `(* greedy *)` alone",
-            ),
-            (
                 error(ParseErrorKind::Malformed(Malformed::Misspelled {
                     meant: "hide",
                 })),

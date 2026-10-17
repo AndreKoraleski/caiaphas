@@ -181,6 +181,12 @@ mod tests {
             "(* greedy *)",
             "(* greedy *) a = 'x';",
         ),
+        fixed(
+            "misspelled-annotation",
+            "(* hidde *)",
+            "(* hidde *) a = 'x';",
+            "(* hide *)",
+        ),
         example(
             "single-character-rule",
             "number = digit, {digit};",

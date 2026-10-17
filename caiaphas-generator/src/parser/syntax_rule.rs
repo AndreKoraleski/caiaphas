@@ -1,7 +1,7 @@
 //! Syntax rules of ISO/IEC 14977 EBNF.
 
 use crate::{
-    annotation::Expectation,
+    annotation::{Expectation, Misspelling},
     lexer::{CommentlessSymbol, MetaIdentifier, Symbol},
     parser::{
         Expected, ParseError, Parser, definitions_list::DefinitionsList,
@@ -28,6 +28,9 @@ pub(crate) struct SyntaxRule {
     pub(crate) inline: bool,
     /// The Rust type an `(* as T *)` right before the rule names, if any.
     pub(crate) converts_to: Option<String>,
+    /// Each comment right before the rule of one word written almost as an
+    /// annotation.
+    pub(crate) misspellings: Vec<Misspelling>,
     /// The text of each comment right before the rule that is no annotation.
     pub(crate) comments: Vec<String>,
     /// From the meta identifier to the terminator, both included.
@@ -63,6 +66,7 @@ impl SyntaxRule {
             recovers: false,
             inline: false,
             converts_to: None,
+            misspellings: Vec::new(),
             comments: Vec::new(),
             span: start.to(end),
         })

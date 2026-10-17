@@ -200,6 +200,14 @@ const CASES: &[Case] = &[
                U+0041..U+005A ? | ? U+0061..U+007A ?`",
     },
     Case {
+        source: "(* hidde *) s = 'x';",
+        code: FindingCode::MisspelledAnnotation,
+        severity: Severity::Warning,
+        message: "this comment reads like `(* hide *)` written wrongly",
+        help: "write `(* hide *)` if that was meant, or more words for an \
+               ordinary comment",
+    },
+    Case {
         source: "(* greedy *) s = {'x'}, 'y';",
         code: FindingCode::IneffectiveAnnotation,
         severity: Severity::Warning,

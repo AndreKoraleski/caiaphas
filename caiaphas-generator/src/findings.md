@@ -163,6 +163,14 @@ Warning. A `(* greedy *)` changes nothing in its rule, since the next
 character already decides each of its choices and it reaches no rule that
 tries every way. Remove the annotation.
 
+## misspelled-annotation
+
+Warning. A comment of one word right before a rule reads like an annotation
+written wrongly, as `(* hidde *)` does. To the standard it is a comment like
+any other, so caiaphas reads the rule as if it were not there, but a typo in
+an annotation changes the rule's type. Write the annotation as it is spelled,
+as `(* hide *)`, or more words for an ordinary comment.
+
 ## single-character-rule
 
 Suggestion. A visible rule only ever matches one character and a repetition

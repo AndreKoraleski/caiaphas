@@ -101,6 +101,9 @@ pub(crate) enum FindingKind {
     },
     /// A `(* greedy *)` changes nothing in its rule.
     IneffectiveAnnotation { meta_identifier: MetaIdentifier },
+    /// A comment of one word right before a rule reads like the annotation
+    /// `meant` written wrongly.
+    MisspelledAnnotation { meant: &'static str },
     /// A visible rule only ever matches one character and a repetition reads
     /// it, so every character it matches builds a value of its own.
     SingleCharacterRule { meta_identifier: MetaIdentifier },

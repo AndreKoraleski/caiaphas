@@ -140,6 +140,15 @@ impl FindingKind {
                     parts.join(" | ")
                 )
             }
+            Self::MisspelledAnnotation { meant: "expect" } => {
+                "write `(* expect code: reason *)` if an expectation was \
+                 meant, or more words for an ordinary comment"
+                    .to_owned()
+            }
+            Self::MisspelledAnnotation { meant } => format!(
+                "write `(* {meant} *)` if that was meant, or more words for \
+                 an ordinary comment"
+            ),
             Self::IneffectiveAnnotation { .. } => {
                 "remove the `(* greedy *)`".to_owned()
             }

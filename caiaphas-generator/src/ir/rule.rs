@@ -1,7 +1,10 @@
 //! Rules of the intermediate representation.
 
 use crate::{
-    annotation::Expectation, ir::Expression, lexer::MetaIdentifier, span::Span,
+    annotation::{Expectation, Misspelling},
+    ir::Expression,
+    lexer::MetaIdentifier,
+    span::Span,
 };
 
 /// Identifies a rule by its index in the rules of its grammar.
@@ -49,6 +52,9 @@ pub(crate) struct Rule {
     /// The Rust type an `(* as T *)` right before the rule makes its type,
     /// read from the text it matched.
     pub(crate) converts_to: Option<String>,
+    /// Each comment right before the rule of one word written almost as an
+    /// annotation.
+    pub(crate) misspellings: Vec<Misspelling>,
     /// The text of each comment right before the rule that is no annotation.
     /// The docs of the rule's type start with them.
     pub(crate) comments: Vec<String>,
