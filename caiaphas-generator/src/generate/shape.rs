@@ -1,13 +1,14 @@
 //! Shapes tell which Rust type each rule of a grammar becomes.
 //!
 //! A rule whose alternatives are each another rule or a word becomes an enum
-//! with a variant for each. Any other rule becomes a struct with a field for
-//! each rule it holds, typed by how many times it can hold it, and a rule it
-//! always holds the same number of times becomes an array. A rule that holds
-//! an inline rule holds what the inline rule holds instead, as if its
-//! definition were written there. Hidden and inline rules get no type and no
-//! field, and neither do rules that no start rule holds. A type that could
-//! contain itself holds itself in a box.
+//! with a variant for each, and so does a group of rules among parts that hold
+//! nothing, as in `(a | b), ws` with `ws` hidden. Any other rule becomes a
+//! struct with a field for each rule it holds, typed by how many times it can
+//! hold it, and a rule it always holds the same number of times becomes an
+//! array. A rule that holds an inline rule holds what the inline rule holds
+//! instead, as if its definition were written there. Hidden and inline rules
+//! get no type and no field, and neither do rules that no start rule holds. A
+//! type that could contain itself holds itself in a box.
 
 use std::collections::HashSet;
 
@@ -85,10 +86,39 @@ pub(crate) fn shapes(grammar: &Grammar) -> Vec<Option<Shape>> {
 }
 
 fn shape(grammar: &Grammar, expression: &Expression) -> Shape {
-    variants(grammar, expression).map_or_else(
-        || Shape::Struct(fields(grammar, expression)),
-        Shape::Enum,
-    )
+    variants(grammar, expression)
+        .or_else(|| grouped_variants(grammar, expression))
+        .map_or_else(
+            || Shape::Struct(fields(grammar, expression)),
+            Shape::Enum,
+        )
+}
+
+/// Returns the variants of a sequence whose one part that holds a rule is a
+/// group of alternatives, as in `(a | b), ws` with `ws` hidden, when each of
+/// them holds a rule. A word variant is told by the text of the whole match,
+/// and the other parts add to that text, so a word leaves the rule a struct.
+fn grouped_variants(
+    grammar: &Grammar,
+    expression: &Expression,
+) -> Option<Vec<Variant>> {
+    let ExpressionKind::SingleDefinition(parts) = &expression.kind else {
+        return None;
+    };
+    let mut holding = parts
+        .iter()
+        .filter(|part| !occurrences(grammar, part).is_empty());
+    let group = holding.next()?;
+    if holding.next().is_some()
+        || !matches!(group.kind, ExpressionKind::DefinitionsList(_))
+    {
+        return None;
+    }
+    let variants = variants(grammar, group)?;
+    variants
+        .iter()
+        .all(|variant| matches!(variant, Variant::Rule { .. }))
+        .then_some(variants)
 }
 
 /// Returns a variant for each alternative of `expression`, when each is a rule
@@ -438,6 +468,23 @@ mod tests {
                 shape("member", "struct {number One, value One}"),
                 shape("number", "struct {}"),
             ]
+        );
+    }
+
+    #[test]
+    fn makes_an_enum_of_a_group_with_parts_that_hold_nothing() {
+        let rules = "a = 'a'; b = 'b'; (* hide *) ws = {' '};";
+        assert_eq!(
+            shapes_of(&format!("s = (a | b), ws, ';'; {rules}"))[0],
+            shape("s", "enum {a, b}")
+        );
+        assert_eq!(
+            shapes_of(&format!("s = (a | 'c'), ws; {rules}"))[0],
+            shape("s", "struct {a Optional}")
+        );
+        assert_eq!(
+            shapes_of(&format!("s = (a | b), a, ws; {rules}"))[0],
+            shape("s", "struct {a Many, b Optional}")
         );
     }
 

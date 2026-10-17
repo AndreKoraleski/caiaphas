@@ -12,11 +12,12 @@ definition separator = '|' | '/' | '!';
 single definition = syntactic term, {',', gap, syntactic term};
 syntactic term = syntactic factor, ['-', gap, syntactic exception];
 syntactic exception = syntactic factor;
-syntactic factor = [integer, gap, '*', gap], [syntactic primary, gap];
+syntactic factor = [integer, gap, '*', gap], [syntactic primary];
 (* expect tied-branches: `(/` and `(:` are symbols of their own, as the
    standard reads them *)
-syntactic primary = optional sequence | repeated sequence | grouped sequence
-                  | meta identifier | terminal string | special sequence;
+syntactic primary = (optional sequence | repeated sequence | grouped sequence
+                     | meta identifier | terminal string | special sequence),
+                    gap;
 optional sequence = ('[' | '(/'), gap, definitions list, (']' | '/)');
 repeated sequence = ('{' | '(:'), gap, definitions list, ('}' | ':)');
 grouped sequence = '(', gap, definitions list, ')';
