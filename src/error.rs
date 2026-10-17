@@ -153,12 +153,13 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !self.expected.is_empty() {
             f.write_str("expected ")?;
-            for (index, item) in self.expected.iter().enumerate() {
+            let parts = described(&self.expected);
+            for (index, part) in parts.iter().enumerate() {
                 if index > 0 {
-                    let last = index == self.expected.len() - 1;
+                    let last = index == parts.len() - 1;
                     f.write_str(if last { " or " } else { ", " })?;
                 }
-                write!(f, "{item}")?;
+                f.write_str(part)?;
             }
         }
         match (self.expected.is_empty(), &self.found) {
@@ -172,6 +173,49 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+/// Classes of characters with a name, by their ranges, the largest first.
+const CLASSES: &[(&[(char, char)], &str)] = &[
+    (&[('0', '9'), ('A', 'Z'), ('a', 'z')], "a letter or digit"),
+    (&[('0', '9'), ('A', 'F'), ('a', 'f')], "a hexadecimal digit"),
+    (&[('A', 'Z'), ('a', 'z')], "a letter"),
+    (&[('0', '9')], "a digit"),
+    (&[('a', 'z')], "a lowercase letter"),
+    (&[('A', 'Z')], "an uppercase letter"),
+];
+
+/// Returns how to tell each of `expected`, with the ranges that make up a
+/// class of characters with a name told by that name, where the first of them
+/// is.
+fn described(expected: &[Expected]) -> Vec<String> {
+    let mut named: Vec<Option<&str>> = vec![None; expected.len()];
+    let mut taken = vec![false; expected.len()];
+    for &(ranges, name) in CLASSES {
+        let found: Option<Vec<usize>> = ranges
+            .iter()
+            .map(|&(first, last)| {
+                expected.iter().enumerate().position(|(index, item)| {
+                    !taken[index] && *item == Expected::Range(first, last)
+                })
+            })
+            .collect();
+        if let Some(found) = found {
+            for &index in &found {
+                taken[index] = true;
+            }
+            named[found[0]] = Some(name);
+        }
+    }
+    expected
+        .iter()
+        .enumerate()
+        .filter_map(|(index, item)| match (named[index], taken[index]) {
+            (Some(name), _) => Some(name.to_owned()),
+            (None, true) => None,
+            (None, false) => Some(item.to_string()),
+        })
+        .collect()
+}
 
 #[cfg(test)]
 mod tests {
@@ -240,16 +284,55 @@ mod tests {
     }
 
     #[test]
-    fn names_ranges_and_the_end_of_the_input() {
+    fn names_the_classes_of_characters_that_ranges_make_up() {
         let error = Error::new(
-            "x\ny",
-            3,
-            vec![Expected::Range('0', '9'), Expected::Range('a', 'a')],
+            "",
+            0,
+            vec![
+                Expected::Text("0x"),
+                Expected::Range('a', 'f'),
+                Expected::Range('0', '9'),
+                Expected::Range('A', 'F'),
+                Expected::Range('_', '_'),
+            ],
             None,
         );
         assert_eq!(
             error.to_string(),
-            "expected a character from `0` to `9` or `a`, found the end of \
+            "expected `0x`, a hexadecimal digit or `_`, found the end of the \
+             input at line 1, column 1"
+        );
+        assert_eq!(error.expected().len(), 5);
+        let error = Error::new(
+            "",
+            0,
+            vec![
+                Expected::Range('a', 'z'),
+                Expected::Range('A', 'Z'),
+                Expected::Range('0', '9'),
+                Expected::Rule("name"),
+            ],
+            None,
+        );
+        assert!(
+            error
+                .to_string()
+                .starts_with("expected a letter or digit or a name,"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn names_ranges_and_the_end_of_the_input() {
+        let error = Error::new(
+            "x\ny",
+            3,
+            vec![Expected::Range('0', '8'), Expected::Range('a', 'a')],
+            None,
+        );
+        assert_eq!(
+            error.to_string(),
+            "expected a character from `0` to `8` or `a`, found the end of \
              the input at line 2, column 2"
         );
         assert_eq!((error.line(), error.column()), (2, 2));

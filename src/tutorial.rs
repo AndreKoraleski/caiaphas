@@ -166,8 +166,7 @@
 //! assert_eq!(recovered.value.unwrap().line.len(), 2);
 //! assert_eq!(
 //!     recovered.errors[0].to_string(),
-//!     "expected ` = ` or a character from `a` to `z`, found `=` at line 1, \
-//!      column 2"
+//!     "expected ` = ` or a lowercase letter, found `=` at line 1, column 2"
 //! );
 //! ```
 //!
