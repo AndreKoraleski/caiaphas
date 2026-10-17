@@ -116,3 +116,36 @@ fn lists_every_code_with_how_serious_it_is() {
     assert!(printed.contains("tied-branches "), "{printed}");
     assert!(printed.trim_end().ends_with("warning"), "{printed}");
 }
+
+#[test]
+fn prints_the_types_of_a_grammar() {
+    let path = grammar(
+        "types",
+        "pair = key, '=', [value];\n\
+         (* as String *) key = ? /[a-z]+/ ?;\n\
+         value = ? /[0-9]+/ ?;",
+    );
+    let output = caiaphas(&["types", path.to_str().unwrap()]);
+    assert!(output.status.success());
+    assert_eq!(
+        printed(&output),
+        "/// pair = key, '=', [value];\n\
+         pub struct Pair {\n    pub key: String,\n    \
+         pub value: Option<Value>,\n}\n\
+         \n\
+         /// value = ? /[0-9]+/ ?;\n\
+         pub struct Value {}\n"
+    );
+}
+
+#[test]
+fn prints_the_problems_of_a_grammar_without_types() {
+    let path = grammar("no-types", "s = a;");
+    let output = caiaphas(&["types", path.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        printed(&output).starts_with("error: `a` is not defined"),
+        "{}",
+        printed(&output)
+    );
+}

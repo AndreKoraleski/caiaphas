@@ -51,8 +51,9 @@ adhere to [Semantic Versioning][semver].
   `Error::found` give the same as values, with `Expected` at the root of the
   crate.
 - The `caiaphas` command of the `caiaphas-cli` crate. `caiaphas check` checks
-  grammar files without building anything, and `caiaphas explain` tells what a
-  finding means, or lists every code.
+  grammar files without building anything, `caiaphas types` prints the types
+  a grammar gives, and `caiaphas explain` tells what a finding means, or lists
+  every code.
 - A tutorial in the docs, a page that explains every finding, and examples that
   read arithmetic, JSON, INI and CSV files, and logs.
 

@@ -304,11 +304,14 @@ Cargo builds again when the grammar's file changes.
 
 The `caiaphas` command checks grammar files without building anything, and
 prints every finding, suggestions included. It exits with 1 when one would
-stop the build, so it suits a CI step.
+stop the build, so it suits a CI step. It also prints the types a grammar
+gives, each after its rule, so a change to a grammar shows what it does to
+the types at once.
 
 ```sh
 cargo install caiaphas-cli
 caiaphas check grammars/json.ebnf
+caiaphas types grammars/json.ebnf
 caiaphas explain tied-branches
 ```
 

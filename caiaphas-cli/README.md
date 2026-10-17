@@ -4,10 +4,13 @@ The `caiaphas` command checks ISO/IEC 14977 EBNF grammars as the `grammar!`
 macro of [caiaphas] does, without building anything. It prints every finding,
 suggestions included, and explains each one by its code, with an example and
 the usual fix. `caiaphas explain` without a code lists every code.
+`caiaphas types` prints the types the macro would generate, each after its
+rule.
 
 ```sh
 cargo install caiaphas-cli
 caiaphas check grammars/json.ebnf
+caiaphas types grammars/json.ebnf
 caiaphas explain tied-branches
 ```
 

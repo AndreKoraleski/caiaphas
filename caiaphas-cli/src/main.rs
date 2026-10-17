@@ -1,6 +1,7 @@
 //! The `caiaphas` command checks ISO/IEC 14977 EBNF grammars as the `grammar!`
 //! macro does, without building anything, and prints the suggestions that
-//! would make their parsers faster too. It also explains each kind of finding.
+//! would make their parsers faster too. It also shows the types a grammar's
+//! module would hold, and explains each kind of finding.
 
 use std::{
     env,
@@ -12,15 +13,18 @@ use std::{
 
 const USAGE: &str = "\
 usage: caiaphas check <grammar>...
+       caiaphas types <grammar>
        caiaphas explain [<code>]";
 
 const HELP: &str = "\
 caiaphas check prints every finding the grammar! macro would report about each
-ISO/IEC 14977 EBNF grammar, suggestions included. caiaphas explain tells what a
-finding means, given its code, such as tied-branches, and lists every code
-without one.
+ISO/IEC 14977 EBNF grammar, suggestions included. caiaphas types prints the
+Rust types the macro would generate for a grammar, each after its rule.
+caiaphas explain tells what a finding means, given its code, such as
+tied-branches, and lists every code without one.
 
 usage: caiaphas check <grammar>...
+       caiaphas types <grammar>
        caiaphas explain [<code>]
 
 It exits with 1 when a grammar cannot be read, has a problem that would stop
@@ -38,6 +42,10 @@ fn main() -> ExitCode {
             }
             check(&paths)
         }
+        Some("types") => match (arguments.next(), arguments.next()) {
+            (Some(path), None) => types(&PathBuf::from(path)),
+            _ => misuse(),
+        },
         Some("explain") => match (arguments.next(), arguments.next()) {
             (None, _) => list(),
             (Some(code), None) => explain(&code.to_string_lossy()),
@@ -122,6 +130,30 @@ fn check(paths: &[PathBuf]) -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+/// Prints the types the grammar in the file at `path` gives. Fails when it
+/// cannot be read or has a problem that would stop the build, and prints the
+/// problems instead.
+fn types(path: &Path) -> ExitCode {
+    let source = match read(path) {
+        Ok(source) => source,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let name = path.to_string_lossy();
+    let options = caiaphas_generator::Options::default();
+    if let Ok(module) = caiaphas_generator::generate(&source, &name, options) {
+        print!("{}", module.types);
+        return ExitCode::SUCCESS;
+    }
+    // The problems read as `caiaphas check` prints them.
+    for finding in caiaphas_generator::check(&source, &name).findings {
+        println!("{finding}\n");
+    }
+    ExitCode::FAILURE
 }
 
 /// Returns the grammar in the file at `path`, or why it cannot be read.
