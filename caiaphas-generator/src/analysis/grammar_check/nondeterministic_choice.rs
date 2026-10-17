@@ -153,10 +153,11 @@ mod tests {
         .help();
         assert_eq!(
             help,
-            "write `(* greedy *)` and `(* expect optional-follow-conflict: \
-             reason *)` right before `statement` if it should take each way \
-             as it comes, which keeps its parser fast, or make what comes \
-             after the choice start differently"
+            "write `(* greedy *)` right before `statement` if it should take \
+             each way as it comes, which keeps its parser fast, with \
+             `(* expect optional-follow-conflict: reason *)` for what a \
+             greedy rule then warns of, or make what comes after the choice \
+             start differently"
         );
     }
 

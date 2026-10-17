@@ -197,7 +197,8 @@ impl fmt::Display for DictionaryError {
                 meta_identifier,
             } => write!(
                 f,
-                "`{}` is a start rule, so its type cannot be another one",
+                "`{}` is a start rule, so its type is its own, not one its \
+                 text converts to",
                 meta_identifier.spaced()
             ),
             DictionaryErrorKind::InlineStartSyntaxRule { meta_identifier } => {

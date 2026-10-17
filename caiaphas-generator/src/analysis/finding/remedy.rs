@@ -153,16 +153,26 @@ impl FindingKind {
                 greedy: Some(codes),
                 ..
             } => {
-                let annotations: Vec<String> =
-                    std::iter::once("`(* greedy *)`".to_owned())
-                        .chain(codes.iter().map(|code| {
-                            format!("`(* expect {}: reason *)`", code.name())
-                        }))
-                        .collect();
+                let expectations: Vec<String> = codes
+                    .iter()
+                    .map(|code| {
+                        format!("`(* expect {}: reason *)`", code.name())
+                    })
+                    .collect();
+                // A greedy rule brings warnings of its own, which the rule
+                // then expects.
+                let warned = if expectations.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        ", with {} for what a greedy rule then warns of",
+                        expectations.join(" and ")
+                    )
+                };
                 format!(
-                    "write {} right before `{}` if it should take each way as \
-                     it comes, which keeps its parser fast, or {}",
-                    annotations.join(" and "),
+                    "write `(* greedy *)` right before `{}` if it should take \
+                     each way as it comes, which keeps its parser \
+                     fast{warned}, or {}",
                     meta_identifier.spaced(),
                     start_differently("the choice")
                 )
