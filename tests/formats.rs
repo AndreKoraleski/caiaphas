@@ -37,6 +37,19 @@ fn reads_every_grammar_of_the_crate_as_iso_14977() {
 }
 
 #[test]
+fn reads_many_comments_in_one_pass_each() {
+    // A comment's text is a run of any character holding no `*)`, so reading
+    // every run to the end of the input would take minutes here.
+    let grammar = "(* a rule (* and a note *) *)\ns = 'a';\n".repeat(5_000);
+    let syntax = iso14977::Syntax::parse(&grammar).unwrap();
+    assert_eq!(syntax.syntax_rule.len(), 5_000);
+    // The error of a comment left open is found as quickly.
+    let open = format!("{grammar}(* open");
+    let error = iso14977::Syntax::parse(&open).unwrap_err();
+    assert_eq!((error.line(), error.column()), (10_001, 8));
+}
+
+#[test]
 fn reads_the_parts_of_a_syntax_rule() {
     use iso14977::{SyntacticPrimary, Syntax};
 

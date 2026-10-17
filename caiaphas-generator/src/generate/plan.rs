@@ -101,6 +101,10 @@ pub struct Part {
     /// For an exception, the characters it matches when it only ever matches
     /// one.
     pub exception_characters: Option<Vec<(char, char)>>,
+    /// Whether the part is an exception that takes away any run of the
+    /// characters of its factor holding a match of the exception's middle, so
+    /// a parser reads the run once, up to the first such match.
+    pub before_middle: bool,
 }
 
 /// The characters a part matches, and what a parser notes where it fails.
@@ -279,6 +283,15 @@ fn part(writer: &ExactWriter<'_>, expression: &Expression) -> Part {
         }
         ExpressionKind::EmptySequence => Kind::Empty,
     };
+    let before_middle = match &expression.kind {
+        ExpressionKind::SyntacticTerm {
+            syntactic_factor,
+            syntactic_exception,
+        } => writer
+            .run_and_middle(syntactic_factor, syntactic_exception)
+            .is_some(),
+        _ => false,
+    };
     let (start_apart, settled, exception_characters) = match &expression.kind {
         ExpressionKind::DefinitionsList(alternatives) => {
             (facts.start_apart(alternatives), false, None)
@@ -314,6 +327,7 @@ fn part(writer: &ExactWriter<'_>, expression: &Expression) -> Part {
         builds_nodes: writer.builds_nodes(expression),
         has_one_end: writer.has_one_end(expression),
         exception_characters,
+        before_middle,
     }
 }
 
@@ -359,5 +373,41 @@ mod tests {
     fn gives_the_problems_that_stop_a_grammar() {
         let problems = of("s = a;", "s.ebnf").unwrap_err();
         assert!(problems[0].starts_with("error: `a` is not defined"));
+    }
+
+    /// Returns whether the exception of `body` in the grammar of a quoted body
+    /// with `rules` reads its runs in one scan.
+    fn scans(rules: &str) -> bool {
+        let source = format!(
+            "quoted = '<', body, '>';\n\
+             (* hide *) c = ? /[a-z>]/ ?;\n\
+             {rules}"
+        );
+        let plan = of(&source, "quoted.ebnf").unwrap();
+        let body = &plan.rules[2].expression;
+        assert!(matches!(body.kind, Kind::Except { .. }), "{source}");
+        body.before_middle
+    }
+
+    #[test]
+    fn reads_runs_holding_no_middle_in_one_scan() {
+        assert!(scans("body = {c} - ({c}, '>', {c});"));
+        assert!(scans(
+            "body = {c} - ({c}, ('>' | 'ab', ['c'] | end), {c});\n\
+             end = 'x', 'y';"
+        ));
+        // Repetitions around the middle that take fewer characters than the
+        // run leave runs that hold a match of the middle.
+        assert!(!scans(
+            "body = {c} - ({d}, '>', {c});\n\
+             (* hide *) d = ? /[a-z]/ ?;"
+        ));
+        assert!(!scans("body = {c} - ({c}, '>');"));
+        // A middle that repeats could match much text from each place.
+        assert!(!scans("body = {c} - ({c}, '>', {c}, '>', {c});"));
+        assert!(!scans(
+            "body = {c} - ({c}, end, {c});\n\
+             end = 'x', {'y'};"
+        ));
     }
 }

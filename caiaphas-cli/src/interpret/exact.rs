@@ -2,6 +2,8 @@
 //! generated for it does. One function tells where its matches can end, and
 //! another, in `build`, builds the match the rest of the input goes on from.
 
+use std::ptr;
+
 use caiaphas::__private::{Ends, Parser, Width};
 use caiaphas_generator::plan::{Kind, Part};
 
@@ -124,6 +126,11 @@ impl Program {
                         parser, set, excludes, position,
                     ));
                 }
+                if part.before_middle {
+                    return self.before_middle(
+                        parser, rule, factor, exception, position,
+                    );
+                }
                 return self.except_ends(
                     parser, rule, part, factor, exception, position,
                 );
@@ -149,6 +156,40 @@ impl Program {
         } else {
             ways.longest_first()
         }
+    }
+
+    /// Returns where the run of characters `factor` matches can end before the
+    /// first match inside it of the middle of `exception`, for an exception
+    /// that takes away any run holding one.
+    fn before_middle<const R: bool, W: Width>(
+        &self,
+        parser: &mut Parser<'_, R, W>,
+        rule: usize,
+        factor: &'static Part,
+        exception: &'static Part,
+        position: usize,
+    ) -> Ends {
+        let (Kind::Repeat(run), Kind::Sequence(steps)) =
+            (&factor.kind, &exception.kind)
+        else {
+            unreachable!("the factor is a run and the exception a sequence");
+        };
+        let set = set_parts(run).expect("a run is of a set");
+        let middle = &steps[1..steps.len() - 1];
+        parser.span_ends_before(
+            &self.rules[rule],
+            ptr::from_ref(factor) as usize,
+            position,
+            contains(&set.ranges),
+            &expected(&set.expected),
+            |within, position| {
+                let mut ends = Ends::one(position);
+                for step in middle {
+                    ends = self.step(within, rule, step, &ends, true);
+                }
+                ends
+            },
+        )
     }
 
     /// Returns where what `factor` matches and `exception` does not can end,
