@@ -60,6 +60,7 @@ pub(crate) fn functions(
                 .all(|(&reached, &builds)| !(reached && builds))
         })
         .collect();
+    let recursive = grammar.recursive_rules();
     let ordered = exact::ordered_rules(grammar, general);
     let settled = exact::settled_rules(facts, general);
     let functions =
@@ -80,6 +81,7 @@ pub(crate) fn functions(
                         rule,
                         remembers[position],
                         leaves[position],
+                        recursive[position],
                     );
                 }
                 let writer = ExactWriter {
@@ -87,6 +89,7 @@ pub(crate) fn functions(
                     general,
                     ordered: &ordered,
                     settled: &settled,
+                    recursive: &recursive,
                 };
                 let committing = committed[position]
                     .then(|| ExactWriter::committed(rule_id, rule));
@@ -94,6 +97,28 @@ pub(crate) fn functions(
                 quote! { #functions #committing }
             });
     quote! { #(#functions)* }
+}
+
+/// Returns `body`, the code of a rule's function that gives an `output`, kept
+/// from nesting too deeply when the rule is `recursive`: past the depth a
+/// parser follows, the function gives `failure` instead.
+pub(super) fn nested(
+    recursive: bool,
+    output: &TokenStream,
+    failure: &TokenStream,
+    body: &TokenStream,
+) -> TokenStream {
+    if !recursive {
+        return body.clone();
+    }
+    quote! {
+        if !parser.enter(position) {
+            return #failure;
+        }
+        let found = (|| -> #output { #body })();
+        parser.leave();
+        found
+    }
 }
 
 /// Returns the name of the function of the rule `rule_id`.
@@ -141,13 +166,15 @@ impl FunctionWriter<'_> {
     }
 
     /// Returns the function of `rule`. It remembers the rule's matches when
-    /// `remembers` holds. A `leaf` builds no node and reads no rule that does.
+    /// `remembers` holds. A `leaf` builds no node and reads no rule that does,
+    /// and a `recursive` rule can reach itself.
     fn function(
         &self,
         rule_id: RuleId,
         rule: &Rule,
         remembers: bool,
         leaf: bool,
+        recursive: bool,
     ) -> TokenStream {
         let function = function_name(rule_id);
         let constant = self.rule_constant(rule_id, rule, remembers);
@@ -199,6 +226,18 @@ impl FunctionWriter<'_> {
                 }
             };
         }
+        let matching = nested(
+            recursive,
+            &quote! { __caiaphas::Match },
+            &quote! { ::core::option::Option::None },
+            &quote! {
+                #recall
+                #start
+                let end = #body;
+                #convert
+                #finish
+            },
+        );
         quote! {
             #[doc(hidden)]
             fn #function<const REPORTS: bool>(
@@ -206,11 +245,7 @@ impl FunctionWriter<'_> {
                 position: usize,
             ) -> __caiaphas::Match {
                 #constant
-                #recall
-                #start
-                let end = #body;
-                #convert
-                #finish
+                #matching
             }
         }
     }

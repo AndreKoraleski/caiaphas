@@ -45,6 +45,9 @@ pub(super) struct ExactWriter<'a> {
     /// Which rules end at the same places however much input follows, as
     /// [`settled_rules`] tells.
     pub(super) settled: &'a [bool],
+    /// Which rules can reach themselves, so their matches can nest as deeply
+    /// as an input does.
+    pub(super) recursive: &'a [bool],
 }
 
 /// Returns which rules end at the same places however much input follows them:
@@ -123,6 +126,7 @@ impl ExactWriter<'_> {
         rule: &Rule,
     ) -> TokenStream {
         let (ends, build) = (ends_name(rule_id), build_name(rule_id));
+        let RuleId(position) = rule_id;
         let constant = self.writer.rule_constant(rule_id, rule, true);
         let body = self.ends(&rule.expression);
         // A rule whose type its text converts to keeps only the ends whose
@@ -153,13 +157,11 @@ impl ExactWriter<'_> {
         } else {
             (quote! { parser.finish_ends(&RULE, start, ends) }, None)
         };
-        let ends_function = quote! {
-            #[doc(hidden)]
-            fn #ends<const REPORTS: bool>(
-                parser: &mut __caiaphas::Parser<'_, REPORTS>,
-                position: usize,
-            ) -> __caiaphas::Ends {
-                #constant
+        let ending = matching::nested(
+            self.recursive[position],
+            &quote! { __caiaphas::Ends },
+            &quote! { __caiaphas::Ends::none() },
+            &quote! {
                 if let ::core::option::Option::Some(ends) =
                     parser.recall_ends(&RULE, position)
                 {
@@ -169,6 +171,16 @@ impl ExactWriter<'_> {
                 let ends = #body;
                 #convert
                 #finish
+            },
+        );
+        let ends_function = quote! {
+            #[doc(hidden)]
+            fn #ends<const REPORTS: bool>(
+                parser: &mut __caiaphas::Parser<'_, REPORTS>,
+                position: usize,
+            ) -> __caiaphas::Ends {
+                #constant
+                #ending
             }
         };
         if rule.hidden {

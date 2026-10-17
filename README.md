@@ -329,7 +329,10 @@ cargo run --example calculator -- "1.5 + 2 * (3 - 4)"
 * There is no separate lexer, so a grammar describes its whitespace.
 * An exception cannot use a recursive rule after the `-`.
 * A parser reads the whole input as a `&str`, and stops at the first place it
-  cannot match.
+  cannot match unless a rule [recovers](#errors) there.
+* Matches of recursive rules nest at most 512 deep, so a parser never runs out
+  of stack. A deeper input gives an error whose `is_too_deep()` holds, and a
+  list written as a repetition never nests.
 
 ## Minimum supported Rust version
 

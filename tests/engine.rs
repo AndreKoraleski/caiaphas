@@ -627,3 +627,31 @@ fn parses_with_the_type_of_any_rule() {
     let error = settings::Setting::parse("port").unwrap_err();
     assert_eq!(error.column(), 5);
 }
+
+caiaphas::grammar!(mod brackets {
+    "brackets = '(', [brackets], ')';"
+});
+
+caiaphas::grammar!(mod either_bracket {
+    "brackets = '(', [brackets], ')' | '(', [brackets], ')', ';';"
+});
+
+#[test]
+fn stops_at_an_input_that_nests_too_deeply_for_the_stack() {
+    let nested = |depth| format!("{}{}", "(".repeat(depth), ")".repeat(depth));
+    assert!(brackets::Brackets::parse(&nested(500)).is_ok());
+    for depth in [513, 100_000] {
+        let error = brackets::Brackets::parse(&nested(depth)).unwrap_err();
+        assert!(error.is_too_deep(), "{error}");
+        assert_eq!(error.column(), 513);
+        assert_eq!(
+            error.to_string(),
+            "the input nests too deeply to parse at line 1, column 513"
+        );
+        let error =
+            either_bracket::Brackets::parse(&nested(depth)).unwrap_err();
+        assert!(error.is_too_deep(), "{error}");
+    }
+    let error = brackets::Brackets::parse("(()").unwrap_err();
+    assert!(!error.is_too_deep());
+}

@@ -39,4 +39,36 @@ impl Grammar {
             );
         })
     }
+
+    /// Returns which rules can reach themselves through references, so their
+    /// matches can nest as deeply as an input does.
+    pub(crate) fn recursive_rules(&self) -> Vec<bool> {
+        (0..self.syntax_rules.len())
+            .map(|position| {
+                let mut read = Vec::new();
+                self.syntax_rules[position]
+                    .expression
+                    .visit_meta_identifiers(&mut |rule_id, _| {
+                        read.push(rule_id);
+                    });
+                self.reached_from(read)[position]
+            })
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::dictionary::tests::build_valid;
+
+    #[test]
+    fn tells_the_rules_that_reach_themselves() {
+        let grammar = build_valid(
+            "s = a, b; a = '(', [a], ')'; b = c; c = 'x', [d]; d = c;",
+        );
+        assert_eq!(
+            grammar.recursive_rules(),
+            [false, true, false, true, true]
+        );
+    }
 }
