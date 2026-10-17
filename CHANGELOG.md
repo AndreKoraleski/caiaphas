@@ -41,7 +41,8 @@ adhere to [Semantic Versioning][semver].
   be read and tested alone.
 - A limit on how deeply the matches of recursive rules nest, so that no input
   can make a parser run out of stack. A deeper input gives an error, and
-  `Error::is_too_deep` tells which.
+  `Error::is_too_deep` tells which. `depth = N` in `grammar!` changes the
+  limit.
 - `(* recover *)` and `parse_recovering` on each type, which go on past each
   error that a rule written with it can skip, and give every error found with
   the value of what still matches, as `Recovered`.

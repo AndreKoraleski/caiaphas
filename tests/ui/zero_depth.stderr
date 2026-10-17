@@ -1,0 +1,5 @@
+error: a parser needs a depth of at least 1
+ --> tests/ui/zero_depth.rs:1:58
+  |
+1 | caiaphas::grammar!(mod pair { "pair = 'x', '=', 'y';" }, depth = 0);
+  |                                                          ^^^^^

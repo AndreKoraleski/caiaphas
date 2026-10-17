@@ -287,6 +287,10 @@ caiaphas::grammar!(pub mod json = "grammars/json.ebnf", suggest);
 // Read a start that alternatives share once, without changing the types.
 caiaphas::grammar!(pub mod json = "grammars/json.ebnf", optimize);
 
+// Follow 4096 nested matches of recursive rules instead of 512, for a program
+// with a larger stack.
+caiaphas::grammar!(pub mod json = "grammars/json.ebnf", depth = 4096);
+
 // Attributes and doc comments go before `mod`, inside the macro.
 caiaphas::grammar!(
     /// Reads JSON.
@@ -330,9 +334,10 @@ cargo run --example calculator -- "1.5 + 2 * (3 - 4)"
 * An exception cannot use a recursive rule after the `-`.
 * A parser reads the whole input as a `&str`, and stops at the first place it
   cannot match unless a rule [recovers](#errors) there.
-* Matches of recursive rules nest at most 512 deep, so a parser never runs out
-  of stack. A deeper input gives an error whose `is_too_deep()` holds, and a
-  list written as a repetition never nests.
+* Matches of recursive rules nest at most 512 deep, or as deep as the
+  macro's `depth` says, so a parser never runs out of stack. A deeper input
+  gives an error whose `is_too_deep()` holds, and a list written as a
+  repetition never nests.
 
 ## Minimum supported Rust version
 

@@ -672,3 +672,28 @@ fn follows_a_repetition_from_every_end_before_it() {
     let long = format!("{}x;", "ab ".repeat(500));
     assert_eq!(spaced_words::Words::parse(&long).unwrap().word.len(), 2);
 }
+
+caiaphas::grammar!(mod shallow {
+    "brackets = '(', [brackets], ')';"
+}, depth = 8);
+
+caiaphas::grammar!(mod deep {
+    "brackets = '(', [brackets], ')';"
+}, depth = 1000);
+
+#[test]
+fn follows_as_many_nested_matches_as_the_depth_of_its_grammar() {
+    let nested = |depth| format!("{}{}", "(".repeat(depth), ")".repeat(depth));
+    assert!(shallow::Brackets::parse(&nested(8)).is_ok());
+    assert!(
+        shallow::Brackets::parse(&nested(9))
+            .unwrap_err()
+            .is_too_deep()
+    );
+    assert!(deep::Brackets::parse(&nested(900)).is_ok());
+    assert!(
+        deep::Brackets::parse(&nested(1001))
+            .unwrap_err()
+            .is_too_deep()
+    );
+}

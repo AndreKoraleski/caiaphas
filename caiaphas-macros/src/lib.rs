@@ -5,7 +5,7 @@ use std::{env, fs, path::Path};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    Attribute, Ident, LitStr, Token, Visibility, braced,
+    Attribute, Ident, LitInt, LitStr, Token, Visibility, braced,
     parse::{Parse, ParseStream},
     parse_macro_input,
 };
@@ -23,6 +23,9 @@ struct Input {
     /// Whether the parser matches the grammar rearranged, as `optimize` after
     /// the grammar asks.
     optimize: bool,
+    /// How many matches of recursive rules the parser follows inside one
+    /// another, when `depth = N` after the grammar says.
+    depth: Option<usize>,
 }
 
 /// Where `grammar!` finds the grammar.
@@ -52,14 +55,25 @@ impl Parse for Input {
             }
             Source::Inline(grammar)
         };
-        let (mut suggest, mut optimize) = (false, false);
+        let (mut suggest, mut optimize, mut depth) = (false, false, None);
         while input.parse::<Option<Token![,]>>()?.is_some() {
             let flag: Ident = input.parse()?;
             match flag.to_string().as_str() {
                 "suggest" => suggest = true,
                 "optimize" => optimize = true,
+                "depth" => {
+                    input.parse::<Token![=]>()?;
+                    let value: LitInt = input.parse()?;
+                    let value: usize = value.base10_parse()?;
+                    if value == 0 {
+                        let message = "a parser needs a depth of at least 1";
+                        return Err(syn::Error::new(flag.span(), message));
+                    }
+                    depth = Some(value);
+                }
                 _ => {
-                    let message = "expected `suggest` or `optimize`";
+                    let message =
+                        "expected `suggest`, `optimize` or `depth = N`";
                     return Err(syn::Error::new(flag.span(), message));
                 }
             }
@@ -72,6 +86,7 @@ impl Parse for Input {
             source,
             suggest,
             optimize,
+            depth,
         })
     }
 }
@@ -91,7 +106,9 @@ impl Parse for Input {
 /// the grammar makes every suggestion stop the build, as a warning does.
 /// `optimize` makes the parser read each start that alternatives share once,
 /// without changing the types, and leaves out the `shared-start` suggestions.
-/// The [tutorial] tells what the module holds.
+/// `depth = N` lets the parser follow `N` matches of recursive rules inside
+/// one another, instead of 512, for a program with a larger stack. The
+/// [tutorial] tells what the module holds.
 ///
 /// [tutorial]: https://docs.rs/caiaphas/latest/caiaphas/tutorial/
 #[proc_macro]
@@ -103,6 +120,7 @@ pub fn grammar(input: TokenStream) -> TokenStream {
         source,
         suggest,
         optimize,
+        depth,
     } = parse_macro_input!(input as Input);
     // The literal every problem points at, the grammar, the name rendered
     // problems give it, and the file to rebuild after, if any.
@@ -148,6 +166,7 @@ pub fn grammar(input: TokenStream) -> TokenStream {
     };
     let mut options = caiaphas_generator::Options::default();
     options.optimize = optimize;
+    options.depth = depth;
     let module = match caiaphas_generator::generate(&grammar, &label, options)
     {
         Ok(module) if suggest && !module.suggestions.is_empty() => {

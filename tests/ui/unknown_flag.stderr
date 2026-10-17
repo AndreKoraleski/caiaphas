@@ -1,4 +1,4 @@
-error: expected `suggest` or `optimize`
+error: expected `suggest`, `optimize` or `depth = N`
  --> tests/ui/unknown_flag.rs:1:58
   |
 1 | caiaphas::grammar!(mod pair { "pair = 'x', '=', 'y';" }, quick);
