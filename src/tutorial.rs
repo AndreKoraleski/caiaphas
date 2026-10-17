@@ -210,6 +210,22 @@
 //! - `(* greedy *)` makes it take each way as it comes and never go back, as
 //!   the `else` of a nested `if` does. That keeps its parser fast.
 //!
+//! Text that must not hold something, such as the text of a comment, reads
+//! well as an exception. Where what it must not hold is short, the parser
+//! reads such text in one pass, up to the first place that holds it:
+//!
+//! ```
+//! caiaphas::grammar!(mod comment {
+//!     "comment = '(*', text, '*)';
+//!      (* as String *) text = {character} - ({character}, '*)', {character});
+//!      (* hide *) character = ? /./ ?;"
+//! });
+//!
+//! let comment = comment::Comment::parse("(* a (b) *)").unwrap();
+//! assert_eq!(comment.text, " a (b) ");
+//! assert!(comment::Comment::parse("(* a *) b *)").is_err());
+//! ```
+//!
 //! # Problems and suggestions
 //!
 //! Before generating, caiaphas checks the grammar. An error, such as left

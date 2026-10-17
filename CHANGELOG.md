@@ -16,6 +16,8 @@ adhere to [Semantic Versioning][semver].
 - Parsers that match exactly the inputs a grammar describes. Where an input
   reads more than one way, each part takes the most text it can while the rest
   still matches.
+- Text that must not hold a short part, written as an exception such as
+  `{c} - ({c}, '*)', {c})` for the text of a comment, read in one pass.
 - Checks for problems in a grammar, each with a code and a way to fix it.
   Errors and warnings stop the build, unless an `(* expect code: reason *)`
   comment marks a warning as intended, and suggestions stop it with `suggest`.
