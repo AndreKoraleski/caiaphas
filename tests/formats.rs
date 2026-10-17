@@ -65,3 +65,126 @@ fn tells_where_a_grammar_stops_being_iso_14977() {
     let error = iso14977::Syntax::parse("a = 'x' b;").unwrap_err();
     assert_eq!(error.column(), 9);
 }
+
+caiaphas::grammar!(mod toml = "tests/grammars/toml.ebnf");
+
+/// A document with every kind of TOML value, after the example of the
+/// specification.
+const DOCUMENT: &str = r#"# This is a TOML document
+
+title = "TOML \"Example\""
+
+[owner]
+name = 'Tom Preston-Werner'
+dob = 1979-05-27T07:32:00-08:00
+
+[database]
+enabled = true
+ports = [ 8000, 8001, 8002 ]
+data = [ ["delta", "phi"], [3.14] ]
+temp_targets = { cpu = 79.5, case = 72.0 }
+limits = [
+  0xFF, # in hex
+]
+
+[servers]
+
+[servers.alpha]
+ip = "10.0.0.1"
+role = """
+frontend
+and "more""""
+
+[[products]]
+name = "Hammer"
+sku = 738_594_937
+weight = -inf
+when = 07:32:00.999
+"#;
+
+#[test]
+fn reads_a_toml_document() {
+    use toml::{Toml, Value};
+
+    let parsed: Toml = DOCUMENT.parse().unwrap();
+    let values: Vec<(&str, &Value)> = parsed
+        .expression
+        .iter()
+        .filter_map(|expression| expression.key_value.as_ref())
+        .map(|pair| (pair.key.text(), &pair.value))
+        .collect();
+    let keys: Vec<&str> = values.iter().map(|(key, _)| *key).collect();
+    assert_eq!(
+        keys,
+        [
+            "title",
+            "name",
+            "dob",
+            "enabled",
+            "ports",
+            "data",
+            "temp_targets",
+            "limits",
+            "ip",
+            "role",
+            "name",
+            "sku",
+            "weight",
+            "when"
+        ]
+    );
+    let kinds: Vec<&str> = values
+        .iter()
+        .map(|(_, value)| match value {
+            Value::String(_) => "string",
+            Value::Boolean(_) => "boolean",
+            Value::Array(_) => "array",
+            Value::InlineTable(_) => "inline table",
+            Value::DateTime(_) => "date time",
+            Value::Float(_) => "float",
+            Value::Integer(_) => "integer",
+        })
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            "string",
+            "string",
+            "date time",
+            "boolean",
+            "array",
+            "array",
+            "inline table",
+            "array",
+            "string",
+            "string",
+            "string",
+            "integer",
+            "float",
+            "date time"
+        ]
+    );
+    let tables: Vec<&str> = parsed
+        .expression
+        .iter()
+        .filter_map(|expression| expression.table.as_ref())
+        .map(toml::Table::text)
+        .collect();
+    assert_eq!(
+        tables,
+        [
+            "[owner]",
+            "[database]",
+            "[servers]",
+            "[servers.alpha]",
+            "[[products]]"
+        ]
+    );
+}
+
+#[test]
+fn tells_where_a_toml_document_goes_wrong() {
+    let document = DOCUMENT.replace("0xFF", "0x_FF");
+    let error = toml::Toml::parse(&document).unwrap_err();
+    assert_eq!((error.line(), error.column()), (15, 5));
+}
