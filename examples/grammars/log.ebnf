@@ -1,7 +1,5 @@
 (* Log lines, such as `2026-10-17 08:30:00 WARN disk almost full`. *)
-(* greedy *)
-(* expect repeated-follow-conflict: a line and its line break are a round *)
-log = {line, newline}, [line];
+log = {line, (newline | ? end ?)};
 line = date, ' ', time, ' ', level, ' ', message;
 (* as String *)
 date = ? /\d{4}-\d{2}-\d{2}/ ?;
