@@ -7,7 +7,8 @@ the usual fix. `caiaphas explain` without a code lists every code.
 `caiaphas types` prints the types the macro would generate, each after its
 rule. `caiaphas parse` runs a grammar on an input, from a file or standard
 input, as its parser would, and prints the tree of the match or the error the
-parser would give. `--rule` starts from another rule with a type.
+parser would give, or every error a rule written with `(* recover *)` skips.
+`--rule` starts from another rule with a type.
 
 ```sh
 cargo install caiaphas-cli
