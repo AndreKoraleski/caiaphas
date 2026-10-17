@@ -66,6 +66,7 @@ pub(crate) fn module(
     depth: Option<usize>,
 ) -> TokenStream {
     let names = Names::new(grammar, shapes);
+    let rule_names = grammar.syntax_rules.iter().map(name::spaced);
     let facts = Facts::new(matched);
     let general = general_rules(&facts);
     // Only a rule whose node a type reads builds one. An inline rule's node
@@ -140,6 +141,10 @@ pub(crate) fn module(
         /// How many matches of recursive rules the parsers follow inside one
         /// another.
         const DEPTH: usize = #depth;
+
+        /// The name of each rule, as errors and tree dumps give it.
+        #[cfg(test)]
+        const NAMES: &[&str] = &[#(#rule_names),*];
 
         #functions
 
@@ -312,6 +317,18 @@ fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
                 tree.value::<Self>()
             });
             __caiaphas::recovered(value, errors)
+        }
+
+        // Tests compare what a grammar run without building anything finds
+        // with this, which only they see.
+        #[cfg(test)]
+        #[doc(hidden)]
+        pub fn __tree(
+            input: &str,
+        ) -> ::core::result::Result<::std::string::String, ::caiaphas::Error> {
+            #start
+            __caiaphas::parse::<Start>(input, DEPTH)
+                .map(|tree| tree.dump(NAMES))
         }
     }
 }

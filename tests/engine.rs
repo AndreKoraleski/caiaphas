@@ -711,3 +711,16 @@ fn builds_the_tree_of_an_input_with_more_nodes_than_bytes() {
         assert!(parsed.a.iter().all(|a| a.b.c.text().is_empty()));
     }
 }
+
+#[test]
+fn dumps_the_tree_of_a_parse_for_tests() {
+    assert_eq!(
+        list::Numbers::__tree("12,(3)").unwrap(),
+        "numbers 1:1 \"12,(3)\"\n\
+         \x20 list 1:1 \"12,(3)\"\n\
+         \x20   item 1:1 \"12\"\n\
+         \x20   item 1:4 \"(3)\"\n\
+         \x20     list 1:5 \"3\"\n\
+         \x20       item 1:5 \"3\"\n"
+    );
+}

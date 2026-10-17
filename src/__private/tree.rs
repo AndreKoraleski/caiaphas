@@ -1,6 +1,6 @@
 //! Generated code turns the tree a parser builds into its own types.
 
-use std::{str::FromStr, sync::Arc};
+use std::{fmt::Write, str::FromStr, sync::Arc};
 
 use super::nodes::{Nodes, Store, Width};
 use crate::span::{Input, Span};
@@ -21,6 +21,30 @@ impl Tree {
             nodes,
             root,
         }
+    }
+
+    /// Returns the tree as text, a node on each line under the node around it,
+    /// with the name of its rule from `names`, where it starts and the text it
+    /// matched. A tool that runs a grammar shows its trees this way.
+    #[must_use]
+    pub fn dump(&self, names: &[&str]) -> String {
+        let mut dump = String::new();
+        let input = &self.input;
+        match &self.nodes {
+            Store::W8(nodes) => {
+                dump_node(input, nodes, self.root, names, 0, &mut dump);
+            }
+            Store::W16(nodes) => {
+                dump_node(input, nodes, self.root, names, 0, &mut dump);
+            }
+            Store::W32(nodes) => {
+                dump_node(input, nodes, self.root, names, 0, &mut dump);
+            }
+            Store::W64(nodes) => {
+                dump_node(input, nodes, self.root, names, 0, &mut dump);
+            }
+        }
+        dump
     }
 
     /// Returns the value of type `T` that the root of the tree builds. Each
@@ -52,6 +76,42 @@ impl Tree {
                 index,
             }),
         }
+    }
+}
+
+/// How many characters of a node's text a dump shows.
+const SHOWN: usize = 40;
+
+/// Adds the node `index` of `nodes` and the nodes inside it to `dump`, `depth`
+/// nodes deep.
+fn dump_node<W: Width>(
+    input: &Arc<Input>,
+    nodes: &Nodes<W>,
+    index: usize,
+    names: &[&str],
+    depth: usize,
+    dump: &mut String,
+) {
+    let node = Node {
+        input,
+        nodes,
+        index,
+    };
+    let name = names.get(node.rule()).copied().unwrap_or("?");
+    let span = node.span();
+    let text = node.text();
+    let shown: String = text.chars().take(SHOWN).collect();
+    let more = if shown.len() < text.len() { "..." } else { "" };
+    let _ = writeln!(
+        dump,
+        "{:indent$}{name} {}:{} {shown:?}{more}",
+        "",
+        span.line(),
+        span.column(),
+        indent = depth * 2,
+    );
+    for child in node.children() {
+        dump_node(input, nodes, child.index, names, depth + 1, dump);
     }
 }
 
