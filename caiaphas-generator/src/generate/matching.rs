@@ -49,6 +49,17 @@ pub(crate) fn functions(
                 }
             });
     }
+    // A rule that builds no node and reads none that does needs no account of
+    // the nodes matched inside it.
+    let leaves: Vec<bool> = (0..grammar.syntax_rules.len())
+        .map(|position| {
+            let reached = grammar.reached_from([RuleId(position)]);
+            reached
+                .iter()
+                .zip(builds)
+                .all(|(&reached, &builds)| !(reached && builds))
+        })
+        .collect();
     let ordered = exact::ordered_rules(grammar, general);
     let settled = exact::settled_rules(facts, general);
     let functions =
@@ -68,6 +79,7 @@ pub(crate) fn functions(
                         rule_id,
                         rule,
                         remembers[position],
+                        leaves[position],
                     );
                 }
                 let writer = ExactWriter {
@@ -129,12 +141,13 @@ impl FunctionWriter<'_> {
     }
 
     /// Returns the function of `rule`. It remembers the rule's matches when
-    /// `remembers` holds.
+    /// `remembers` holds. A `leaf` builds no node and reads no rule that does.
     fn function(
         &self,
         rule_id: RuleId,
         rule: &Rule,
         remembers: bool,
+        leaf: bool,
     ) -> TokenStream {
         let function = function_name(rule_id);
         let constant = self.rule_constant(rule_id, rule, remembers);
@@ -159,7 +172,7 @@ impl FunctionWriter<'_> {
         });
         // A rule that recovers goes on from where a parse that recovers tells
         // it to, when it fails.
-        let finish = if rule.recovers {
+        let mut finish = if rule.recovers {
             quote! {
                 let found = parser.finish_rule(&RULE, start, end);
                 if found.is_some() {
@@ -170,6 +183,22 @@ impl FunctionWriter<'_> {
         } else {
             quote! { parser.finish_rule(&RULE, start, end) }
         };
+        let mut start = quote! { let start = parser.start_rule(position); };
+        // A parse that only matches needs no account of where a leaf starts,
+        // since it has no nodes to keep or drop.
+        if leaf && !remembers && !rule.recovers {
+            start = quote! {
+                let start = REPORTS.then(|| parser.start_rule(position));
+            };
+            finish = quote! {
+                match start {
+                    ::core::option::Option::Some(start) => #finish,
+                    ::core::option::Option::None => {
+                        end.map(|end| (end, ::core::option::Option::None))
+                    }
+                }
+            };
+        }
         quote! {
             #[doc(hidden)]
             fn #function<const REPORTS: bool>(
@@ -178,7 +207,7 @@ impl FunctionWriter<'_> {
             ) -> __caiaphas::Match {
                 #constant
                 #recall
-                let start = parser.start_rule(position);
+                #start
                 let end = #body;
                 #convert
                 #finish
