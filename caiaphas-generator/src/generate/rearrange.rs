@@ -1,7 +1,6 @@
 //! Rearranging rewrites a grammar into one that matches the same input and
 //! builds the same nodes in the same order, but that its parser reads faster.
-//! A grammar is only rearranged when its `grammar!` asks for it, since each
-//! rearrangement could be written in the grammar, as a suggestion tells.
+//! Every grammar is rearranged, so it can be written the way it reads best.
 //!
 //! Neighbouring alternatives that start with the same expression become that
 //! start followed by a choice of what each has after it, so `a, x | a, y`

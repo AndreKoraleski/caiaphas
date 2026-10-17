@@ -163,10 +163,6 @@ impl fmt::Display for FindingKind {
                  it, so every character it matches builds a value of its own",
                 meta_identifier.spaced()
             ),
-            Self::SharedStart => f.write_str(
-                "this alternative starts the same way as an earlier one, so a \
-                 parser reads that start twice",
-            ),
             Self::NondeterministicChoice {
                 meta_identifier,
                 characters,

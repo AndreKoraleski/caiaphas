@@ -290,9 +290,6 @@ caiaphas::grammar!(mod quoted { r#"quoted = '"', 'x', '"';"# });
 // Stop at every suggestion too.
 caiaphas::grammar!(pub mod json = "grammars/json.ebnf", suggest);
 
-// Read a start that alternatives share once, without changing the types.
-caiaphas::grammar!(pub mod json = "grammars/json.ebnf", optimize);
-
 // Follow 4096 nested matches of recursive rules instead of 512, for a program
 // with a larger stack.
 caiaphas::grammar!(pub mod json = "grammars/json.ebnf", depth = 4096);

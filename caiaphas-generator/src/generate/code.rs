@@ -54,8 +54,8 @@ impl Names {
 }
 
 /// Returns the items of the module that parses `grammar`, with a type for each
-/// rule that has a shape in `shapes`. The parser matches `matched`: `grammar`
-/// or the same rules rearranged. Each type's docs quote its rule from
+/// rule that has a shape in `shapes`. The parser matches the same rules
+/// rearranged, as `matched` holds them. Each type's docs quote its rule from
 /// `source`. Its parsers follow `depth` matches of recursive rules inside one
 /// another, or as many as the runtime does by default.
 pub(crate) fn module(

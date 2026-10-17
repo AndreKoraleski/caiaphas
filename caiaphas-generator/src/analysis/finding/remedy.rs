@@ -148,11 +148,6 @@ impl FindingKind {
                  the rules that read it keep its text",
                 meta_identifier.spaced()
             ),
-            Self::SharedStart => {
-                "write the shared start once, before a choice of what follows \
-                 it, so `a, x | a, y` becomes `a, (x | y)`"
-                    .to_owned()
-            }
             Self::NondeterministicChoice {
                 meta_identifier,
                 greedy: Some(codes),

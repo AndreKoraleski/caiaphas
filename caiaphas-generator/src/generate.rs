@@ -39,10 +39,6 @@ pub struct Module {
 #[derive(Debug, Clone, Copy, Default)]
 #[non_exhaustive]
 pub struct Options {
-    /// Whether the parser reads each start that alternatives share once,
-    /// without changing the types. The `shared-start` suggestions are then
-    /// left out.
-    pub optimize: bool,
     /// How many matches of recursive rules the parser follows inside one
     /// another before it stops with an error, instead of running out of stack.
     /// `None` keeps the runtime's default.
@@ -70,7 +66,7 @@ pub fn generate(
             .map(|diagnostic| diagnostic.render(path, source, false))
             .collect()
     };
-    let (grammar, diagnostics) = compile(source, options.optimize);
+    let (grammar, diagnostics) = compile(source);
     let (suggestions, problems): (Vec<_>, Vec<_>) = diagnostics
         .into_iter()
         .partition(|diagnostic| diagnostic.severity == Severity::Suggestion);
@@ -82,10 +78,15 @@ pub fn generate(
     if !clashes.is_empty() {
         return Err(render(clashes));
     }
-    let rearranged = options.optimize.then(|| rearrange::rearranged(&grammar));
-    let matched = rearranged.as_ref().unwrap_or(&grammar);
+    let matched = rearrange::rearranged(&grammar);
     Ok(Module {
-        items: code::module(&grammar, matched, &shapes, source, options.depth),
+        items: code::module(
+            &grammar,
+            &matched,
+            &shapes,
+            source,
+            options.depth,
+        ),
         suggestions: render(suggestions),
         types: code::outline(&grammar, &shapes, source),
     })
@@ -106,7 +107,7 @@ pub struct Report {
 /// with `path` naming the grammar's file, without generating its module.
 #[must_use]
 pub fn check(source: &str, path: &str) -> Report {
-    let (grammar, mut diagnostics) = compile(source, false);
+    let (grammar, mut diagnostics) = compile(source);
     if let Some(grammar) = grammar {
         let clashes = clashes(&grammar, &shape::shapes(&grammar));
         // Types that would share a name already tell what a warning about
@@ -292,26 +293,6 @@ mod tests {
         .to_string();
         assert!(items.contains("found"), "{items}");
         assert!(!items.contains("longest"), "{items}");
-    }
-
-    #[test]
-    fn leaves_out_the_suggestions_it_takes_care_of_when_optimizing() {
-        let source = "s = a, 'x' | a, 'y'; a = 'z';";
-        let suggestions = |optimize| {
-            generate(
-                source,
-                "g.ebnf",
-                Options {
-                    optimize,
-                    depth: None,
-                },
-            )
-            .unwrap()
-            .suggestions
-            .len()
-        };
-        assert_eq!(suggestions(false), 1);
-        assert_eq!(suggestions(true), 0);
     }
 
     #[test]

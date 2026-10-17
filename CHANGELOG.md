@@ -23,8 +23,8 @@ adhere to [Semantic Versioning][semver].
   comment marks a warning as intended, and suggestions stop it with `suggest`.
 - Special sequences that hold a code point, a range of them, or a regular
   expression between two `/`, such as `? /[a-z_]+/ ?`.
-- `optimize` reads each start that alternatives share once, without changing
-  the types.
+- Alternatives that start alike, as in `a, x | a, y`, read that start once,
+  as `a, (x | y)` does, without changing the types.
 - Annotations:
   - `(* hide *)` leaves a rule out of the generated types.
   - `(* inline *)` gives the rules that hold a rule what it holds instead of

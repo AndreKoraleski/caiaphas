@@ -13,7 +13,6 @@ mod left_recursion;
 mod longer_branch_conflict;
 mod mixed_class_range;
 mod nondeterministic_choice;
-mod shared_start;
 mod single_character_rule;
 mod tied_branches;
 mod unproductive_rule;
@@ -46,6 +45,5 @@ pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     ineffective_annotation::check,
     unreachable_alternative::check,
     single_character_rule::check,
-    shared_start::check,
     nondeterministic_choice::check,
 ];

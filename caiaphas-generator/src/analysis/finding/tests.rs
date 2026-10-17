@@ -218,15 +218,6 @@ const CASES: &[Case] = &[
                the rules that read it keep its text",
     },
     Case {
-        source: "s = a, 'x' | a, 'y'; a = 'z';",
-        code: FindingCode::SharedStart,
-        severity: Severity::Suggestion,
-        message: "this alternative starts the same way as an earlier one, so \
-                  a parser reads that start twice",
-        help: "write the shared start once, before a choice of what follows \
-               it, so `a, x | a, y` becomes `a, (x | y)`",
-    },
-    Case {
         source: "s = {'x'}, 'x';",
         code: FindingCode::NondeterministicChoice,
         severity: Severity::Suggestion,

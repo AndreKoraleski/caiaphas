@@ -20,9 +20,6 @@ struct Input {
     /// Whether the suggestions about the grammar stop the build. `suggest`
     /// after the grammar asks for that.
     suggest: bool,
-    /// Whether the parser matches the grammar rearranged, as `optimize` after
-    /// the grammar asks.
-    optimize: bool,
     /// How many matches of recursive rules the parser follows inside one
     /// another, when `depth = N` after the grammar says.
     depth: Option<usize>,
@@ -55,12 +52,11 @@ impl Parse for Input {
             }
             Source::Inline(grammar)
         };
-        let (mut suggest, mut optimize, mut depth) = (false, false, None);
+        let (mut suggest, mut depth) = (false, None);
         while input.parse::<Option<Token![,]>>()?.is_some() {
             let flag: Ident = input.parse()?;
             match flag.to_string().as_str() {
                 "suggest" => suggest = true,
-                "optimize" => optimize = true,
                 "depth" => {
                     input.parse::<Token![=]>()?;
                     let value: LitInt = input.parse()?;
@@ -72,8 +68,7 @@ impl Parse for Input {
                     depth = Some(value);
                 }
                 _ => {
-                    let message =
-                        "expected `suggest`, `optimize` or `depth = N`";
+                    let message = "expected `suggest` or `depth = N`";
                     return Err(syn::Error::new(flag.span(), message));
                 }
             }
@@ -85,7 +80,6 @@ impl Parse for Input {
             name,
             source,
             suggest,
-            optimize,
             depth,
         })
     }
@@ -104,8 +98,6 @@ impl Parse for Input {
 ///
 /// Attributes and doc comments before `mod` go to the module. `suggest` after
 /// the grammar makes every suggestion stop the build, as a warning does.
-/// `optimize` makes the parser read each start that alternatives share once,
-/// without changing the types, and leaves out the `shared-start` suggestions.
 /// `depth = N` lets the parser follow `N` matches of recursive rules inside
 /// one another, instead of 512, for a program with a larger stack. The
 /// [tutorial] tells what the module holds.
@@ -119,7 +111,6 @@ pub fn grammar(input: TokenStream) -> TokenStream {
         name,
         source,
         suggest,
-        optimize,
         depth,
     } = parse_macro_input!(input as Input);
     // The literal every problem points at, the grammar, the name rendered
@@ -165,7 +156,6 @@ pub fn grammar(input: TokenStream) -> TokenStream {
             .into()
     };
     let mut options = caiaphas_generator::Options::default();
-    options.optimize = optimize;
     options.depth = depth;
     let module = match caiaphas_generator::generate(&grammar, &label, options)
     {
@@ -266,12 +256,12 @@ mod tests {
     #[test]
     fn reads_a_grammar_written_in_the_macro() {
         let input: Input =
-            syn::parse_str("mod pair { \"pair = 'x';\" }, optimize").unwrap();
+            syn::parse_str("mod pair { \"pair = 'x';\" }, suggest").unwrap();
         let Source::Inline(grammar) = &input.source else {
             panic!("the grammar is inline");
         };
         assert_eq!(grammar.value(), "pair = 'x';");
-        assert!(input.optimize);
+        assert!(input.suggest);
         assert!(syn::parse_str::<Input>("mod pair { \"a\" \"b\" }").is_err());
     }
 
@@ -280,14 +270,17 @@ mod tests {
         let input: Input =
             syn::parse_str("mod json = \"json.ebnf\", suggest").unwrap();
         assert!(input.suggest);
-        assert!(!input.optimize);
         assert!(syn::parse_str::<Input>("mod json = \"j\", hint").is_err());
+        assert!(
+            syn::parse_str::<Input>("mod json = \"j\", optimize").is_err()
+        );
     }
 
     #[test]
     fn reads_every_flag_after_the_grammar() {
         let input: Input =
-            syn::parse_str("mod json = \"j\", optimize, suggest;").unwrap();
-        assert!(input.suggest && input.optimize);
+            syn::parse_str("mod json = \"j\", depth = 9, suggest;").unwrap();
+        assert!(input.suggest);
+        assert_eq!(input.depth, Some(9));
     }
 }

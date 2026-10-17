@@ -240,8 +240,7 @@
 //!
 //! A suggestion, such as where a rule has to try every way, does not stop the
 //! build unless `grammar!(..., suggest)` asks it to. The docs of the generated
-//! module list them, and `grammar!(..., optimize)` reads a start that
-//! alternatives share once, without changing the types.
+//! module list them.
 //!
 //! The [findings] page explains every finding. The `caiaphas` command of the
 //! `caiaphas-cli` crate checks grammar files without building anything, and

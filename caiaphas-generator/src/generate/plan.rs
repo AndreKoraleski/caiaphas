@@ -14,7 +14,7 @@ use crate::{
         clashes,
         exact::ExactWriter,
         matching::{Decisions, FunctionWriter},
-        name,
+        name, rearrange,
         shape::{self, Shape},
     },
     ir::{Expression, ExpressionKind, Grammar, RuleId},
@@ -159,7 +159,7 @@ pub fn of(source: &str, path: &str) -> Result<Plan, Vec<String>> {
             .map(|diagnostic| diagnostic.render(path, source, true))
             .collect::<Vec<String>>()
     };
-    let (grammar, diagnostics) = compile(source, false);
+    let (grammar, diagnostics) = compile(source);
     let problems: Vec<Diagnostic> = diagnostics
         .into_iter()
         .filter(|diagnostic| diagnostic.severity != Severity::Suggestion)
@@ -172,7 +172,9 @@ pub fn of(source: &str, path: &str) -> Result<Plan, Vec<String>> {
     if !clashes.is_empty() {
         return Err(render(&clashes));
     }
-    Ok(plan(&grammar, &shapes))
+    // The parser matches the grammar rearranged, with the types it has as
+    // written.
+    Ok(plan(&rearrange::rearranged(&grammar), &shapes))
 }
 
 /// Returns the plan of `grammar`, whose types `shapes` tells.

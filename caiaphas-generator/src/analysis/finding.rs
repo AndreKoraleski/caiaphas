@@ -107,9 +107,6 @@ pub(crate) enum FindingKind {
     /// A visible rule only ever matches one character and a repetition reads
     /// it, so every character it matches builds a value of its own.
     SingleCharacterRule { meta_identifier: MetaIdentifier },
-    /// An alternative starts the same way as an earlier one of the same
-    /// choice, so a parser reads that start twice.
-    SharedStart,
     /// A parser cannot tell from what comes next which way a choice takes, so
     /// its rule tries every way.
     NondeterministicChoice {
@@ -146,14 +143,6 @@ impl Choosing {
             Self::Greedy => "greedy",
             Self::FirstMatch => "match first",
         }
-    }
-}
-
-impl Finding {
-    /// Returns whether rearranging the grammar takes care of the finding, so a
-    /// module generated with the grammar rearranged leaves it out.
-    pub(crate) fn is_rearranged_away(&self) -> bool {
-        self.kind == FindingKind::SharedStart
     }
 }
 

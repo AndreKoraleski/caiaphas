@@ -11,13 +11,9 @@ use crate::{
 };
 
 /// Returns the grammar `source` defines, unless it has an error, and every
-/// diagnostic about it. Those that rearranging takes care of are left out when
-/// the grammar is to be `rearranged`, and suggestions are left out with an
-/// error, since no parser can be made faster before it works.
-pub(crate) fn compile(
-    source: &str,
-    rearranged: bool,
-) -> (Option<Grammar>, Vec<Diagnostic>) {
+/// diagnostic about it. Suggestions are left out with an error, since no
+/// parser can be made faster before it works.
+pub(crate) fn compile(source: &str) -> (Option<Grammar>, Vec<Diagnostic>) {
     let (syntax, errors) = parse(source);
     if !errors.is_empty() {
         return (None, diagnostics(errors));
@@ -26,9 +22,7 @@ pub(crate) fn compile(
     if !errors.is_empty() {
         return (None, diagnostics(errors));
     }
-    let mut findings = analyse(&grammar);
-    findings.retain(|finding| !(rearranged && finding.is_rearranged_away()));
-    let mut diagnostics = diagnostics(findings);
+    let mut diagnostics = diagnostics(analyse(&grammar));
     let works = diagnostics
         .iter()
         .all(|diagnostic| diagnostic.severity != Severity::Error);
@@ -64,15 +58,14 @@ mod tests {
 
     #[test]
     fn returns_a_grammar_without_problems() {
-        let (grammar, diagnostics) = compile("a = 'x', b; b = 'y';", false);
+        let (grammar, diagnostics) = compile("a = 'x', b; b = 'y';");
         assert_eq!(grammar.map(|grammar| grammar.syntax_rules.len()), Some(2));
         assert_eq!(diagnostics, []);
     }
 
     #[test]
     fn returns_a_grammar_with_its_warnings() {
-        let (grammar, diagnostics) =
-            compile("(* greedy *) a = ['xy'], 'x';", false);
+        let (grammar, diagnostics) = compile("(* greedy *) a = ['xy'], 'x';");
         assert!(grammar.is_some());
         assert_eq!(severities(&diagnostics), [Severity::Warning]);
         assert_eq!(
@@ -84,7 +77,7 @@ mod tests {
 
     #[test]
     fn stops_after_parse_errors() {
-        let (grammar, diagnostics) = compile("a = b", false);
+        let (grammar, diagnostics) = compile("a = b");
         assert!(grammar.is_none());
         assert_eq!(
             messages(&diagnostics),
@@ -94,7 +87,7 @@ mod tests {
 
     #[test]
     fn tells_how_to_write_a_character_no_terminal_string_holds() {
-        let help = |source: &str| compile(source, false).1.remove(0).help;
+        let help = |source: &str| compile(source).1.remove(0).help;
         assert_eq!(
             help("a = 'x\u{2013}y';").as_deref(),
             Some(
@@ -113,14 +106,14 @@ mod tests {
 
     #[test]
     fn stops_after_dictionary_errors() {
-        let (grammar, diagnostics) = compile("a = a, 'x' | b;", false);
+        let (grammar, diagnostics) = compile("a = a, 'x' | b;");
         assert!(grammar.is_none());
         assert_eq!(messages(&diagnostics), ["`b` is not defined"]);
     }
 
     #[test]
     fn keeps_no_grammar_nor_suggestions_with_an_error_in_the_analysis() {
-        let (grammar, diagnostics) = compile("a = a, 'x' | 'y' | 'y';", false);
+        let (grammar, diagnostics) = compile("a = a, 'x' | 'y' | 'y';");
         assert!(grammar.is_none());
         assert_eq!(
             severities(&diagnostics),

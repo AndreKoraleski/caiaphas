@@ -1,4 +1,3 @@
-(* Alternatives that start the same way, which an optimized parser reads
-   once. *)
+(* Alternatives that start the same way, which a parser reads once. *)
 starts = item, 'x' | item, 'y' | 'w';
 item = 'z', ['z'];

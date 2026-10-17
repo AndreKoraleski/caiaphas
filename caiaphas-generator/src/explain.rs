@@ -186,12 +186,6 @@ mod tests {
             "number = digit, {digit};",
             "number = digit, {digit}; digit = ? U+0030..U+0039 ?;",
         ),
-        fixed(
-            "shared-start",
-            "a, x | a, y",
-            "s = a, x | a, y; a = 'a'; x = 'x'; y = 'y';",
-            "a, (x | y)",
-        ),
         example(
             "nondeterministic-choice",
             "statement = 'if', c, statement, ['else', statement] | 'x';",
@@ -207,7 +201,7 @@ mod tests {
 
     /// Returns the code of every finding about `grammar`.
     fn codes_of(grammar: &str) -> Vec<&'static str> {
-        let (_, diagnostics) = compile(grammar, false);
+        let (_, diagnostics) = compile(grammar);
         diagnostics
             .iter()
             .filter_map(|diagnostic| diagnostic.code)

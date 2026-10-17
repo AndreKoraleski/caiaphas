@@ -172,13 +172,6 @@ reads it, as `digit` does in `number = digit, {digit};`, so every character it
 matches builds a value of its own. Hide it with `(* hide *)` unless a type
 needs it, since the rules that read it keep its text.
 
-## shared-start
-
-Suggestion. An alternative starts the same way as an earlier one, as in
-`a, x | a, y`, so a parser reads that start twice. Write the shared start
-once: `a, (x | y)`. With `grammar!(..., optimize)`, the parser does that
-without changing the grammar or its types.
-
 ## nondeterministic-choice
 
 Suggestion. A parser cannot tell from the next character which way a choice

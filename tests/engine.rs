@@ -12,7 +12,6 @@ caiaphas::grammar!(mod phrase = "tests/grammars/phrase.ebnf");
 caiaphas::grammar!(mod shared = "tests/grammars/shared.ebnf");
 caiaphas::grammar!(mod letter_x = "tests/grammars/letter_x.ebnf");
 caiaphas::grammar!(mod starts = "tests/grammars/starts.ebnf");
-caiaphas::grammar!(mod optimized = "tests/grammars/starts.ebnf", optimize);
 
 #[test]
 fn builds_the_tree_of_an_input() {
@@ -148,17 +147,6 @@ fn takes_out_a_character_without_expecting_anything_else() {
         parse("bq").unwrap_err().to_string(),
         "expected `x`, found `q` at line 1, column 2"
     );
-}
-
-#[test]
-fn matches_the_same_when_optimized() {
-    for input in ["zx", "zzy", "w", "zq", "z", ""] {
-        let plain = starts::Starts::parse(input)
-            .map(|parsed| parsed.item.map(|item| item.text().to_owned()));
-        let optimized = optimized::Starts::parse(input)
-            .map(|parsed| parsed.item.map(|item| item.text().to_owned()));
-        assert_eq!(plain, optimized, "{input:?}");
-    }
 }
 
 caiaphas::grammar!(mod inline { "inline = 'x', {'y'};" });
@@ -481,22 +469,15 @@ caiaphas::grammar!(mod ends_apart {
      s = a, 'ab' | a, 'b'; a = {'a'};"
 });
 
-caiaphas::grammar!(mod ends_apart_optimized {
-    "(* expect tied-branches: the first wins *)
-     s = a, 'ab' | a, 'b'; a = {'a'};"
-}, optimize);
-
-caiaphas::grammar!(mod duplicates_optimized {
+caiaphas::grammar!(mod duplicates {
     "(* expect duplicate-alternative: kept *) s = 'x' | 'x';"
-}, optimize);
+});
 
 #[test]
-fn builds_the_same_nodes_with_the_grammar_rearranged() {
-    let plain = ends_apart::S::parse("aab").unwrap();
-    let optimized = ends_apart_optimized::S::parse("aab").unwrap();
-    assert_eq!(plain.a.text(), "a");
-    assert_eq!(optimized.a.text(), plain.a.text());
-    assert!(duplicates_optimized::S::parse("x").is_ok());
+fn builds_the_nodes_of_alternatives_that_start_alike() {
+    // The alternatives share their start `a`, read once before the choice.
+    assert_eq!(ends_apart::S::parse("aab").unwrap().a.text(), "a");
+    assert!(duplicates::S::parse("x").is_ok());
 }
 
 caiaphas::grammar!(mod converted_character {
