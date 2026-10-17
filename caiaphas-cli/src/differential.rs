@@ -3,7 +3,7 @@
 //! does not, with or without recovering. The inputs come from the grammar
 //! itself, each followed by changes that make most of them wrong.
 
-use std::thread;
+use std::{mem, thread};
 
 use caiaphas::Error;
 use caiaphas_generator::plan::{self, Kind, Part, Plan};
@@ -116,12 +116,14 @@ struct Generated {
 }
 
 /// Checks that the grammar `source`, run from its plan starting with the rule
-/// named `start`, matches as `generated` does, on inputs from `seed`.
+/// named `start`, matches as `generated` does, on inputs from `seed` and on
+/// the `written` ones.
 fn compare(
     source: &'static str,
     start: &str,
     generated: Generated,
     seed: u64,
+    written: &[&str],
 ) {
     let plan = plan::of(source, "grammar.ebnf").expect("the grammar works");
     let start = plan
@@ -142,10 +144,21 @@ fn compare(
         all.extend([input, changed, changed_again]);
     }
     all.push(String::new());
+    all.extend(written.iter().map(|&input| input.to_owned()));
     // Without a rule that recovers, a parse that recovers runs the same rules
     // as one that does not.
     let recovers = plan.rules.iter().any(|rule| rule.recovers);
-    let program = Program::new(plan, start);
+    // An exception read in one scan of a run is checked against reading it as
+    // any other exception.
+    let mut general = plan.clone();
+    let mut scanned = false;
+    for rule in &mut general.rules {
+        scanned |= read_generally(&mut rule.expression);
+    }
+    let mut programs = vec![("interpreted", Program::new(plan, start))];
+    if scanned {
+        programs.push(("read generally", Program::new(general, start)));
+    }
     // Interpreted rules take more stack than generated ones.
     thread::Builder::new()
         .stack_size(256 << 20)
@@ -153,32 +166,58 @@ fn compare(
             let depth = caiaphas::__private::DEPTH;
             for input in all {
                 let expected = (generated.parse)(&input);
-                assert_eq!(
-                    program.parse(&input, depth),
-                    expected,
-                    "input {input:?}"
-                );
-                if !recovers {
-                    continue;
+                let recovered =
+                    recovers.then(|| (generated.recovering)(&input));
+                for (way, program) in &programs {
+                    assert_eq!(
+                        program.parse(&input, depth),
+                        expected,
+                        "input {input:?}, {way}"
+                    );
+                    if let Some(recovered) = &recovered {
+                        assert_eq!(
+                            &program.parse_recovering(&input, depth),
+                            recovered,
+                            "input {input:?}, {way}, recovering"
+                        );
+                    }
                 }
-                let recovered = (generated.recovering)(&input);
-                assert_eq!(
-                    program.parse_recovering(&input, depth),
-                    recovered,
-                    "input {input:?}, recovering"
-                );
                 // The first error a parse that recovers finds is the one a
                 // parse that does not gives.
-                assert_eq!(
-                    recovered.1.first(),
-                    expected.as_ref().err(),
-                    "input {input:?}"
-                );
+                if let Some((_, errors)) = &recovered {
+                    assert_eq!(
+                        errors.first(),
+                        expected.as_ref().err(),
+                        "input {input:?}"
+                    );
+                }
             }
         })
         .expect("a thread can start")
         .join()
         .expect("the interpreter matches as the generated parser does");
+}
+
+/// Makes each exception in `part` read as any other, and returns whether one
+/// was read in one scan of a run.
+fn read_generally(part: &mut Part) -> bool {
+    let mut scanned = mem::take(&mut part.before_middle);
+    match &mut part.kind {
+        Kind::Sequence(parts) | Kind::Choice(parts) => {
+            for part in parts {
+                scanned |= read_generally(part);
+            }
+        }
+        Kind::Optional(part) | Kind::Repeat(part) | Kind::Times(_, part) => {
+            scanned |= read_generally(part);
+        }
+        Kind::Except { factor, exception } => {
+            scanned |= read_generally(factor);
+            scanned |= read_generally(exception);
+        }
+        _ => {}
+    }
+    scanned
 }
 
 /// A test for each grammar file and rule a parse starts from, comparing the
@@ -200,6 +239,7 @@ macro_rules! files {
                     $start,
                     generated,
                     0x9E37_79B9_7F4A_7C15,
+                    &[],
                 );
             }
         )*
@@ -256,10 +296,13 @@ files! {
 }
 
 /// A test for each grammar written in the macro, comparing the interpreter
-/// with the parser `grammar!` generates for it. The module of each grammar
-/// takes the name of its test.
+/// with the parser `grammar!` generates for it, also on the inputs written
+/// after it, if any. The module of each grammar takes the name of its test.
 macro_rules! written {
-    ($($test:ident { $grammar:tt }, $start:literal => $ty:ident;)*) => {
+    ($(
+        $test:ident { $grammar:tt } $([$($input:literal),* $(,)?])?,
+        $start:literal => $ty:ident;
+    )*) => {
         $(
             caiaphas::grammar!(mod $test { $grammar });
 
@@ -269,7 +312,9 @@ macro_rules! written {
                     parse: $test::$ty::__tree,
                     recovering: $test::$ty::__tree_recovering,
                 };
-                compare($grammar, $start, generated, 0x2545_F491_4F6C_DD1D);
+                let written = [$($($input),*)?];
+                let seed = 0x2545_F491_4F6C_DD1D;
+                compare($grammar, $start, generated, seed, &written);
             }
         )*
     };
@@ -421,6 +466,32 @@ written! {
          number = ? /\d+/ ?;
          (* hide *) ws = {' '};"#
     }, "json" => Json;
+    comments {
+        "s = {'(*', text, '*)', ' '};
+         (* hide *) text = {c} - ({c}, ('(*' | '*)'), {c});
+         (* hide *) c = ? /[ab*()]/ ?;"
+    } [
+        "(**) ", "(*a*)b*) ", "(*(*a*) ", "(*a)*) (*b*) ", "(*ab", "(**)*) ",
+        "(*a*b(a)*) ",
+    ], "s" => S;
+    quoted {
+        "s = {(quoted | 'x'), ','};
+         quoted = '<', body, '>';
+         body = {l} - ({any}, close, {any});
+         (* hide *) close = '>' | 'ab', ['c'] | 'cx>';
+         (* hide *) l = ? /[a-c>U+00E9]/ ?;
+         (* hide *) any = ? /[a-zU+00E9<>]/ ?;"
+    } [
+        "<cx>,", "<acx>,<b>,", "<cxa>,", "x,<c>,x,", "<ab>,", "<abc>,",
+        "<a>b>,", "<\u{e9}c>,",
+    ], "s" => S;
+    strings {
+        r#"s = {'"', body, '"', ','};
+           body = {c} - ({c}, 'ab', {c});
+           (* hide *) c = ? /[abc]/ ?;"#
+    } [
+        r#""cab","#, r#""ca","b","#, r#""","#, r#""aab""#, r#""cba","#,
+    ], "s" => S;
     leaf_recovering {
         "list = item, {';', item};
          (* recover *) (* hide *) item = 'a', 'b';"
