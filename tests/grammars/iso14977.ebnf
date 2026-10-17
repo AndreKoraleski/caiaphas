@@ -1,0 +1,36 @@
+(* The syntax of ISO/IEC 14977 EBNF, after section 8 of the standard, with
+   gaps of whitespace and comments wherever a symbol can be followed by one. *)
+syntax = gap, syntax rule, {syntax rule};
+syntax rule = meta identifier, gap, '=', gap, definitions list, terminator,
+              gap;
+(* hide *)
+terminator = ';' | '.';
+definitions list = single definition,
+                   {definition separator, gap, single definition};
+(* hide *)
+definition separator = '|' | '/' | '!';
+single definition = syntactic term, {',', gap, syntactic term};
+syntactic term = syntactic factor, ['-', gap, syntactic exception];
+syntactic exception = syntactic factor;
+syntactic factor = [integer, gap, '*', gap], [syntactic primary, gap];
+(* expect tied-branches: `(/` and `(:` are symbols of their own, as the
+   standard reads them *)
+syntactic primary = optional sequence | repeated sequence | grouped sequence
+                  | meta identifier | terminal string | special sequence;
+optional sequence = ('[' | '(/'), gap, definitions list, (']' | '/)');
+repeated sequence = ('{' | '(:'), gap, definitions list, ('}' | ':)');
+grouped sequence = '(', gap, definitions list, ')';
+(* as u32 *)
+integer = ? /\d+/ ?;
+(* A name such as `syntax rule`, whose words a space can part. *)
+meta identifier = ? /[A-Za-z][A-Za-z0-9]*( +[A-Za-z0-9]+)*/ ?;
+terminal string = ? /'[^']+'/ ? | ? /"[^"]+"/ ?;
+special sequence = '?', {? /[^U+003F]/ ?}, '?';
+(* hide *)
+gap = {? /\s/ ? | comment};
+(* hide *)
+comment = '(*', text, {comment, text}, '*)';
+(* hide *)
+text = {character} - ({character}, ('(*' | '*)'), {character});
+(* hide *)
+character = ? /./ ?;
