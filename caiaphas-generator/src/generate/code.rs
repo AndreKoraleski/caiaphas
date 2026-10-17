@@ -29,8 +29,6 @@ struct Names {
     fields: Vec<Ident>,
     /// The Rust type a conversion makes each rule's type, if any.
     values: Vec<Option<TokenStream>>,
-    /// Whether each rule's type can derive `Eq` and `Hash`.
-    hashable: Vec<bool>,
     /// Whether each rule's type has `text()`.
     textual: Vec<bool>,
 }
@@ -47,7 +45,6 @@ impl Names {
             types: written_names.clone().map(name::type_name).collect(),
             fields: written_names.map(name::field_name).collect(),
             values: grammar.syntax_rules.iter().map(value_type).collect(),
-            hashable: hashable(shapes),
             textual: textual(shapes),
         }
     }
@@ -158,40 +155,6 @@ pub(super) fn value_type(rule: &Rule) -> Option<TokenStream> {
     Some(ty.parse().expect("a conversion names a Rust type"))
 }
 
-/// Returns whether the type of each rule can derive `Eq` and `Hash`. A
-/// converted rule's type can when it is an integer, `bool`, `char` or
-/// `String`, and any other type can when every type it holds can.
-fn hashable(shapes: &[Option<Shape>]) -> Vec<bool> {
-    const WHOLE: &[&str] = &[
-        "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64",
-        "u128", "usize", "bool", "char", "String",
-    ];
-    let mut hashable: Vec<bool> = shapes
-        .iter()
-        .map(|shape| match shape {
-            Some(Shape::Converted(ty)) => WHOLE.contains(&last_part(ty)),
-            _ => true,
-        })
-        .collect();
-    let mut changed = true;
-    while changed {
-        changed = false;
-        for (position, shape) in shapes.iter().enumerate() {
-            let Some(shape) = shape else {
-                continue;
-            };
-            let held = shape::held(shape);
-            if hashable[position]
-                && held.iter().any(|&RuleId(rule)| !hashable[rule])
-            {
-                hashable[position] = false;
-                changed = true;
-            }
-        }
-    }
-    hashable
-}
-
 /// Returns whether the type of each rule has `text()`. A converted rule's type
 /// does not, and an enum has it when every type it holds has it.
 fn textual(shapes: &[Option<Shape>]) -> Vec<bool> {
@@ -217,22 +180,6 @@ fn textual(shapes: &[Option<Shape>]) -> Vec<bool> {
         }
     }
     textual
-}
-
-/// Returns the type `ty` without the path to it, when the path is one of the
-/// standard library's, such as `String` for `::std::string::String`.
-fn last_part(ty: &str) -> &str {
-    const PATHS: &[&str] = &[
-        "std::string::",
-        "alloc::string::",
-        "std::primitive::",
-        "core::primitive::",
-    ];
-    let ty = ty.strip_prefix("::").unwrap_or(ty);
-    PATHS
-        .iter()
-        .find_map(|path| ty.strip_prefix(path))
-        .unwrap_or(ty)
 }
 
 /// Returns the `parse` function of the rule `rule_id`, written `rule`. With
@@ -353,7 +300,7 @@ fn character() -> TokenStream {
     quote! {
         /// Returns the one character this rule matched.
         pub fn char(&self) -> char {
-            match self.span.0.as_str().chars().next() {
+            match self.span.as_str().chars().next() {
                 ::core::option::Option::Some(character) => character,
                 ::core::option::Option::None => ::core::unreachable!(),
             }

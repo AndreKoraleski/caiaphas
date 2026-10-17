@@ -27,16 +27,16 @@ fn held_type(names: &Names, RuleId(rule): RuleId, boxed: bool) -> TokenStream {
     }
 }
 
-/// Returns the derive attribute of the type of the rule numbered `position`.
-fn derives(names: &Names, position: usize) -> TokenStream {
-    let hash = names.hashable[position]
-        .then(|| quote! { ::core::cmp::Eq, ::core::hash::Hash, });
+/// Returns the derive attribute of a type, which is `textual` when it has
+/// `text()`. One without compares by what it holds, having no text to compare
+/// by.
+fn derives(textual: bool) -> TokenStream {
+    let compared = (!textual).then(|| quote! { ::core::cmp::PartialEq, });
     quote! {
         #[derive(
             ::core::fmt::Debug,
             ::core::clone::Clone,
-            ::core::cmp::PartialEq,
-            #hash
+            #compared
         )]
     }
 }
@@ -86,7 +86,7 @@ pub(super) fn structure(
 ) -> TokenStream {
     let name = &names.types[position];
     let this = name::spaced(&grammar.syntax_rules[position]);
-    let display = display(name);
+    let traits = text_traits(name);
     let field_names: Vec<&Ident> = fields
         .iter()
         .map(|field| &names.fields[field.rule.0])
@@ -135,7 +135,7 @@ pub(super) fn structure(
         documentations.push(documentation);
         builds.push(build);
     }
-    let derives = derives(names, position);
+    let derives = derives(true);
     quote! {
         #[doc = #documentation]
         #derives
@@ -144,7 +144,7 @@ pub(super) fn structure(
                 #[doc = #documentations]
                 pub #field_names: #types,
             )*
-            span: __caiaphas::TextSpan,
+            span: ::caiaphas::Span,
         }
 
         impl #name {
@@ -152,16 +152,16 @@ pub(super) fn structure(
 
             /// Returns the text this rule matched.
             pub fn text(&self) -> &str {
-                self.span.0.as_str()
+                self.span.as_str()
             }
 
             /// Returns where this rule matched in its input.
             pub fn span(&self) -> &::caiaphas::Span {
-                &self.span.0
+                &self.span
             }
         }
 
-        #display
+        #traits
 
         impl __caiaphas::FromNode for #name {
             fn from_node<W: __caiaphas::Width>(
@@ -169,7 +169,7 @@ pub(super) fn structure(
             ) -> Self {
                 Self {
                     #(#field_names: #builds,)*
-                    span: __caiaphas::TextSpan(node.span()),
+                    span: node.span(),
                 }
             }
         }
@@ -247,8 +247,8 @@ pub(super) fn enumeration(
             }
         }
     }
-    let derives = derives(names, position);
-    let display = texts.is_some().then(|| display(name));
+    let derives = derives(texts.is_some());
+    let traits = texts.is_some().then(|| text_traits(name));
     let text = texts.map(|texts| {
         quote! {
             /// Returns the text this rule matched.
@@ -272,7 +272,7 @@ pub(super) fn enumeration(
             #text
         }
 
-        #display
+        #traits
 
         impl __caiaphas::FromNode for #name {
             fn from_node<W: __caiaphas::Width>(
@@ -293,9 +293,10 @@ pub(super) fn enumeration(
     }
 }
 
-/// Returns the implementation that writes the type `name` as the text its rule
-/// matched.
-fn display(name: &Ident) -> TokenStream {
+/// Returns the implementations that write, compare and hash the type `name` by
+/// the text its rule matched, so two matches of the same text are equal
+/// wherever they are.
+fn text_traits(name: &Ident) -> TokenStream {
     quote! {
         impl ::core::fmt::Display for #name {
             fn fmt(
@@ -303,6 +304,20 @@ fn display(name: &Ident) -> TokenStream {
                 f: &mut ::core::fmt::Formatter<'_>,
             ) -> ::core::fmt::Result {
                 f.write_str(self.text())
+            }
+        }
+
+        impl ::core::cmp::PartialEq for #name {
+            fn eq(&self, other: &Self) -> bool {
+                self.text() == other.text()
+            }
+        }
+
+        impl ::core::cmp::Eq for #name {}
+
+        impl ::core::hash::Hash for #name {
+            fn hash<__H: ::core::hash::Hasher>(&self, state: &mut __H) {
+                ::core::hash::Hash::hash(self.text(), state);
             }
         }
     }

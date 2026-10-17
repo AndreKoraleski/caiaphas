@@ -39,7 +39,8 @@ adhere to [Semantic Versioning][semver].
   `char()` on the type of a rule that only ever matches one character.
 - Docs on each type that quote its rule, and begin with the comments right
   before it.
-- `Display` that writes the text of every type with `text()`.
+- `Display` that writes the text of every type with `text()`, and `PartialEq`,
+  `Eq` and `Hash` that compare and hash by it.
 - `parse` and `FromStr` on the type of every rule, so a part of a grammar can
   be read and tested alone.
 - A limit on how deeply the matches of recursive rules nest, so that no input

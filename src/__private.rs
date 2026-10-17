@@ -20,13 +20,8 @@ use parser::Recoveries;
 pub use parser::{Ends, Parser, RuleStart};
 pub use tree::{Converted, FromNode, Node, Tree};
 
-use std::{
-    fmt,
-    hash::{Hash, Hasher},
-};
-
 pub use crate::error::Expected;
-use crate::{Recovered, Span, error::Error};
+use crate::{Recovered, error::Error};
 
 /// Where a rule's match ends, with its node unless the rule is hidden, or
 /// `None` when it does not match.
@@ -162,29 +157,4 @@ fn matched_in<S: Start, W: Width>(
 /// Returns the value and errors of a parse that recovers.
 pub fn recovered<T>(value: Option<T>, errors: Vec<Error>) -> Recovered<T> {
     Recovered::new(value, errors)
-}
-
-/// The span of a generated struct. It compares and hashes by its text alone,
-/// so two matches of the same text are equal wherever they are.
-#[derive(Clone)]
-pub struct TextSpan(pub Span);
-
-impl PartialEq for TextSpan {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.as_str() == other.0.as_str()
-    }
-}
-
-impl Eq for TextSpan {}
-
-impl Hash for TextSpan {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.as_str().hash(state);
-    }
-}
-
-impl fmt::Debug for TextSpan {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
-    }
 }

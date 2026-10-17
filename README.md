@@ -173,7 +173,8 @@ pub struct Square { pub size: [u32; 2] }
   of its type, unless it is an [annotation](#annotations). The docs then
   quote the rule.
 * Two matches are equal, and hash alike, when they matched the same text,
-  wherever they matched it.
+  wherever they matched it. An enum without `text()` compares what it holds
+  instead.
 * Every type has `parse` and implements `FromStr`, so a part of a grammar can
   be read and tested alone. A start rule is one that no other rule uses, or
   the first rule when every rule is used, as when the top rule recurs.

@@ -321,6 +321,22 @@ fn compares_and_hashes_matches_by_their_text() {
     assert_eq!(distinct.len(), 2);
 }
 
+caiaphas::grammar!(mod measures {
+    "measure = number, unit;
+     (* as f64 *) number = ? /[0-9.]+/ ?;
+     unit = 'm' | 's';"
+});
+
+#[test]
+fn hashes_a_match_that_holds_a_value_without_hash() {
+    let measures: std::collections::HashSet<measures::Measure> =
+        ["1.0m", "1m", "1.0m"]
+            .into_iter()
+            .map(|text| text.parse().unwrap())
+            .collect();
+    assert_eq!(measures.len(), 2);
+}
+
 #[test]
 fn parses_a_start_rule_from_a_str() {
     let parsed: list::Numbers = "1,2".parse().unwrap();
