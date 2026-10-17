@@ -11,6 +11,28 @@ use crate::{
     ir::{Expression, ExpressionKind, RuleId},
 };
 
+/// What a parser notes as expected where a set of characters fails.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Expectation {
+    Text(String),
+    Range(char, char),
+    /// A hidden rule that reads a range, by its name.
+    Rule(String),
+}
+
+impl Expectation {
+    /// Returns the code of what a parser notes.
+    fn code(&self) -> TokenStream {
+        match self {
+            Self::Text(text) => quote! { __caiaphas::Expected::Text(#text) },
+            Self::Range(first, last) => {
+                quote! { __caiaphas::Expected::Range(#first, #last) }
+            }
+            Self::Rule(name) => quote! { __caiaphas::Expected::Rule(#name) },
+        }
+    }
+}
+
 impl FunctionWriter<'_> {
     /// Returns the code of each of `alternatives` as a branch, with each run
     /// of alternatives that only ever match one character and build no node
@@ -118,19 +140,28 @@ impl FunctionWriter<'_> {
         &self,
         expression: &Expression,
     ) -> Option<(CharacterSet, Vec<TokenStream>)> {
+        let (characters, expected) = self.expectations(expression)?;
+        Some((characters, expected.iter().map(Expectation::code).collect()))
+    }
+
+    /// Returns what [`characters`](Self::characters) does, with what a parser
+    /// notes as data.
+    pub(in crate::generate) fn expectations(
+        &self,
+        expression: &Expression,
+    ) -> Option<(CharacterSet, Vec<Expectation>)> {
         let characters = self.facts.single_characters(expression)?;
         let expected = match &expression.kind {
             ExpressionKind::TerminalString(text) => {
-                vec![quote! { __caiaphas::Expected::Text(#text) }]
+                vec![Expectation::Text(text.clone())]
             }
             ExpressionKind::SpecialSequence(range) => {
-                let (first, last) = (range.start(), range.end());
-                vec![quote! { __caiaphas::Expected::Range(#first, #last) }]
+                vec![Expectation::Range(*range.start(), *range.end())]
             }
             ExpressionKind::DefinitionsList(alternatives) => {
                 let mut expected = Vec::new();
                 for alternative in alternatives {
-                    expected.extend(self.characters(alternative)?.1);
+                    expected.extend(self.expectations(alternative)?.1);
                 }
                 expected
             }
@@ -141,10 +172,9 @@ impl FunctionWriter<'_> {
                 }
                 // As its own function would, the rule goes by its name when it
                 // reads a range of characters.
-                let (_, expected) = self.characters(&rule.expression)?;
+                let (_, expected) = self.expectations(&rule.expression)?;
                 if reads_range(&rule.expression) {
-                    let name = name::spaced(rule);
-                    vec![quote! { __caiaphas::Expected::Rule(#name) }]
+                    vec![Expectation::Rule(name::spaced(rule))]
                 } else {
                     expected
                 }
