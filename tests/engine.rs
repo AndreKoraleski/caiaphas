@@ -682,6 +682,54 @@ fn dumps_the_tree_of_a_parse_for_tests() {
     );
 }
 
+caiaphas::grammar!(mod keywords {
+    "statements = {statement};
+     statement = keyword, [' '], name, ';' | name, ';';
+     keyword = ('if' | 'do'), ? not /[a-z]/ ?;
+     name = ? /[a-z]+/ ?;"
+});
+
+#[test]
+fn reads_a_keyword_only_where_no_letter_follows() {
+    assert_eq!(
+        keywords::Statements::__tree("ifx;if y;").unwrap(),
+        "statements 1:1 \"ifx;if y;\"\n\
+         \x20 statement 1:1 \"ifx;\"\n\
+         \x20   name 1:1 \"ifx\"\n\
+         \x20 statement 1:5 \"if y;\"\n\
+         \x20   keyword 1:5 \"if\"\n\
+         \x20   name 1:8 \"y\"\n"
+    );
+}
+
+caiaphas::grammar!(mod lines {
+    r"log = {line, (newline | ? end ?)};
+      line = ? /[^\n]+/ ?;
+      (* hide *) newline = ? U+000A ?;
+      entries = {'x', (';' | ? end ?)};
+      word = 'if', ? not /[a-z]/ ?, ' ', 'x';"
+});
+
+#[test]
+fn matches_where_the_input_ends() {
+    for input in ["ab\ncd", "ab\ncd\n"] {
+        assert_eq!(lines::Log::parse(input).unwrap().line.len(), 2);
+    }
+    assert_eq!(
+        lines::Entries::parse("x;xx").unwrap_err().to_string(),
+        "expected `;` or the end of the input, found `x` at line 1, column 4"
+    );
+}
+
+#[test]
+fn fails_where_what_must_not_come_next_does() {
+    assert!(lines::Word::parse("if x").is_ok());
+    assert_eq!(
+        lines::Word::parse("ifx x").unwrap_err().to_string(),
+        "unexpected `x` at line 1, column 3"
+    );
+}
+
 caiaphas::grammar!(mod empty_rounds { "s = {[a]}, ';'; a = 'x';" });
 
 #[test]

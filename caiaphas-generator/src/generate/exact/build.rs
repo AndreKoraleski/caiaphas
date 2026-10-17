@@ -115,6 +115,7 @@ impl ExactWriter<'_> {
             }
             ExpressionKind::TerminalString(_)
             | ExpressionKind::SpecialSequence(_)
+            | ExpressionKind::Not(_)
             | ExpressionKind::EmptySequence => TokenStream::new(),
         }
     }
@@ -255,6 +256,7 @@ impl ExactWriter<'_> {
             }
             ExpressionKind::TerminalString(_)
             | ExpressionKind::SpecialSequence(_)
+            | ExpressionKind::Not(_)
             | ExpressionKind::EmptySequence => true,
             ExpressionKind::DefinitionsList(_)
             | ExpressionKind::OptionalSequence(_)

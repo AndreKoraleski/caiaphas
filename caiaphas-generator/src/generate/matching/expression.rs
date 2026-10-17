@@ -3,8 +3,12 @@
 use proc_macro2::{Literal, TokenStream};
 use quote::quote;
 
-use super::{FunctionWriter, function_name};
-use crate::ir::{Expression, ExpressionKind};
+use super::{FunctionWriter, function_name, sets::pattern};
+use crate::{
+    analysis::CharacterSet,
+    generate::exact::ExactWriter,
+    ir::{Expression, ExpressionKind},
+};
 
 impl FunctionWriter<'_> {
     /// Returns the code of `expression`.
@@ -179,7 +183,59 @@ impl FunctionWriter<'_> {
                 let (first, last) = (range.start(), range.end());
                 quote! { parser.range(position, #first, #last) }
             }
+            ExpressionKind::Not(ahead) => self.not(ahead),
             ExpressionKind::EmptySequence => quote! { #some(position) },
+        }
+    }
+
+    /// Returns the code of a `not` of `ahead`, which matches nothing where
+    /// `ahead` matches none of what comes next. A `not` of every character
+    /// matches where the input ends, and one of a set of characters reads the
+    /// next one. Any other tries every way through `ahead`, on a parser that
+    /// notes nothing, since it only tells whether `ahead` matches.
+    pub(in crate::generate) fn not(&self, ahead: &Expression) -> TokenStream {
+        if let Some((characters, _)) = self.expectations(ahead) {
+            let any = CharacterSet::from_range('\0'..=char::MAX);
+            if any.is_subset(&characters) {
+                return quote! { parser.end(position) };
+            }
+            let found = pattern(&characters).map_or_else(
+                || quote! { false },
+                |pattern| {
+                    quote! {
+                        ::core::matches!(
+                            parser.character(position),
+                            ::core::option::Option::Some(#pattern)
+                        )
+                    }
+                },
+            );
+            return quote! {
+                {
+                    let found = #found;
+                    parser.not(position, found)
+                }
+            };
+        }
+        // What a `not` looks for reads no rule, so no rule is general.
+        let exact = ExactWriter {
+            writer: *self,
+            general: &[],
+            settled: &[],
+            recursive: &[],
+        };
+        let ends = exact.ends(ahead);
+        quote! {
+            {
+                let found = {
+                    let mut ahead = parser.ahead();
+                    let parser = &mut ahead;
+                    #ends
+                }
+                .first()
+                .is_some();
+                parser.not(position, found)
+            }
         }
     }
 }

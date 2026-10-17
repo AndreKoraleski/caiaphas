@@ -10,7 +10,8 @@ use std::cell::OnceCell;
 
 use expression::{
     SingleCharacterSearch, ends_once, first, inner, is_nullable,
-    is_productive, rule_single_characters, single_characters,
+    is_productive, looks_ahead, passing, rule_single_characters,
+    single_characters,
 };
 pub(crate) use follow::Follow;
 
@@ -37,6 +38,11 @@ pub(crate) struct Facts<'a> {
     single_characters: OnceCell<Vec<Option<CharacterSet>>>,
     /// Whether every match of each rule from a place ends at the same place.
     ending_once: OnceCell<Vec<bool>>,
+    /// Whether each rule can look at what comes after the text it reads.
+    looking_ahead: OnceCell<Vec<bool>>,
+    /// The characters that can come right after each rule where it matches
+    /// nothing.
+    passing: OnceCell<Vec<CharacterSet>>,
 }
 
 impl<'a> Facts<'a> {
@@ -50,6 +56,8 @@ impl<'a> Facts<'a> {
             follow: OnceCell::new(),
             single_characters: OnceCell::new(),
             ending_once: OnceCell::new(),
+            looking_ahead: OnceCell::new(),
+            passing: OnceCell::new(),
         }
     }
 
@@ -57,7 +65,8 @@ impl<'a> Facts<'a> {
     ///
     /// A syntactic term counts as one when its factor does, even if its
     /// exception takes the empty match away, so checks report too much rather
-    /// than too little.
+    /// than too little. So does a `not`, though it only matches where what it
+    /// looks for does not come next.
     pub(crate) fn is_nullable(&self, expression: &Expression) -> bool {
         is_nullable(expression, self.nullable_rules())
     }
@@ -133,6 +142,24 @@ impl<'a> Facts<'a> {
         })
     }
 
+    /// Returns whether matching `expression` can look at what comes after the
+    /// text it reads, as a `not` does, so where it ends can hang on that.
+    pub(crate) fn looks_ahead(&self, expression: &Expression) -> bool {
+        looks_ahead(expression, self.looking_ahead_rules())
+    }
+
+    /// Returns the characters that can come right after `expression` where it
+    /// matches nothing: none when it cannot, and otherwise every character but
+    /// those a `not` keeps from coming next, as `? not /[a-z]/ ?` keeps
+    /// letters and `? end ?` every character.
+    pub(crate) fn passing(&self, expression: &Expression) -> CharacterSet {
+        passing(
+            expression,
+            self.passing_rules(),
+            self.single_character_rules(),
+        )
+    }
+
     /// Returns the characters `expression` can start with when `after` comes
     /// right after it.
     pub(crate) fn first_before(
@@ -140,12 +167,8 @@ impl<'a> Facts<'a> {
         expression: &Expression,
         after: &CharacterSet,
     ) -> CharacterSet {
-        let first = self.first(expression);
-        if self.is_nullable(expression) {
-            first.union(after)
-        } else {
-            first
-        }
+        let passing = self.passing(expression).intersection(after);
+        self.first(expression).union(&passing)
     }
 
     /// Returns the meta identifiers `expression` can read before any
@@ -200,6 +223,7 @@ impl<'a> Facts<'a> {
             }
             ExpressionKind::TerminalString(_)
             | ExpressionKind::SpecialSequence(_)
+            | ExpressionKind::Not(_)
             | ExpressionKind::EmptySequence => {}
         }
     }
@@ -263,6 +287,20 @@ impl<'a> Facts<'a> {
             let characters = self.single_character_rules();
             self.fixed_point(false, |expression, rules| {
                 ends_once(expression, rules, characters)
+            })
+        })
+    }
+
+    fn looking_ahead_rules(&self) -> &[bool] {
+        self.looking_ahead
+            .get_or_init(|| self.fixed_point(false, looks_ahead))
+    }
+
+    fn passing_rules(&self) -> &[CharacterSet] {
+        self.passing.get_or_init(|| {
+            let characters = self.single_character_rules();
+            self.fixed_point(CharacterSet::default(), |expression, sets| {
+                passing(expression, sets, characters)
             })
         })
     }

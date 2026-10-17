@@ -158,12 +158,22 @@ pub(super) fn nested(
     }
 }
 
+/// Returns whether what `rule` could not read never tells why an input does
+/// not match: it is hidden and can match nothing, so a parser can always go on
+/// without it. One that looks ahead can still fail where it reads nothing.
+pub(super) fn quiet(facts: &Facts<'_>, rule: &Rule) -> bool {
+    rule.hidden
+        && facts.is_nullable(&rule.expression)
+        && !facts.looks_ahead(&rule.expression)
+}
+
 /// Returns the name of the function of the rule `rule_id`.
 pub(crate) fn function_name(RuleId(position): RuleId) -> Ident {
     format_ident!("rule_{position}")
 }
 
 /// Writes the function of one rule.
+#[derive(Clone, Copy)]
 pub(super) struct FunctionWriter<'a> {
     pub(super) facts: &'a Facts<'a>,
     /// Which rules build a node, since a type reads it.
@@ -184,7 +194,7 @@ impl FunctionWriter<'_> {
         let name = name::spaced(rule);
         let (hidden, inline) = (rule.hidden, rule.inline);
         let builds = self.builds[position];
-        let quiet = hidden && self.facts.is_nullable(&rule.expression);
+        let quiet = quiet(self.facts, rule);
         let start = self.facts.grammar().start_syntax_rules.contains(&rule_id);
         quote! {
             const RULE: __caiaphas::Rule = __caiaphas::Rule {

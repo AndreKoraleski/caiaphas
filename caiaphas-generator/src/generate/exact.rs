@@ -50,18 +50,20 @@ pub(super) struct ExactWriter<'a> {
 
 /// Returns which rules end at the same places however much input follows them:
 /// those that always end at one place, and those that try every way and only
-/// read rules like that. Others can take a way as it comes, and that can hang
-/// on what follows.
+/// read rules like that, unless they look ahead. Others can take a way as it
+/// comes, and that can hang on what follows.
 pub(super) fn settled_rules(facts: &Facts<'_>, general: &[bool]) -> Vec<bool> {
     let rules = &facts.grammar().syntax_rules;
     let once: Vec<bool> = rules
         .iter()
         .map(|rule| facts.ends_once(&rule.expression))
         .collect();
-    let mut settled: Vec<bool> = once
+    let mut settled: Vec<bool> = rules
         .iter()
-        .zip(general)
-        .map(|(&once, &general)| once || general)
+        .zip(once.iter().zip(general))
+        .map(|(rule, (&once, &general))| {
+            (once || general) && !facts.looks_ahead(&rule.expression)
+        })
         .collect();
     let mut changed = true;
     while changed {
@@ -198,7 +200,10 @@ impl ExactWriter<'_> {
 
     /// Returns the code that tells where `expression` can end, with the end of
     /// the most text first.
-    fn ends(&self, expression: &Expression) -> TokenStream {
+    pub(in crate::generate) fn ends(
+        &self,
+        expression: &Expression,
+    ) -> TokenStream {
         let ends = quote! { __caiaphas::Ends };
         if let Some(single) = self.writer.single(expression) {
             return quote! { #ends::of(#single) };
@@ -284,6 +289,10 @@ impl ExactWriter<'_> {
                 return quote! {
                     #ends::of(parser.range(position, #first, #last))
                 };
+            }
+            ExpressionKind::Not(ahead) => {
+                let not = self.writer.not(ahead);
+                return quote! { #ends::of(#not) };
             }
             ExpressionKind::EmptySequence => {
                 return quote! { #ends::one(position) };

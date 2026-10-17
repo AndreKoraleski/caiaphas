@@ -314,7 +314,8 @@ pub(crate) mod tests {
                 return;
             }
             SyntacticPrimaryKind::SpecialSequence(sequence) => {
-                write!(text, "? {:?} ?", sequence.pattern()).unwrap();
+                let not = if sequence.negated() { "not " } else { "" };
+                write!(text, "? {not}{:?} ?", sequence.pattern()).unwrap();
                 return;
             }
             SyntacticPrimaryKind::EmptySequence => return,

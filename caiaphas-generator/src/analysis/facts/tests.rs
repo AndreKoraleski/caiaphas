@@ -72,6 +72,37 @@ fn finds_what_rules_start_with_through_nullable_parts() {
 }
 
 #[test]
+fn keeps_what_a_not_looks_for_from_coming_next() {
+    let grammar = build_valid(
+        "s = {a, (b | ? end ?)}; a = ? /[a-z]+/ ?, ? not /[0-9]/ ?; \
+         b = ';' | ? end ?;",
+    );
+    let facts = Facts::new(&grammar);
+    let after = CharacterSet::from_range('\0'..=char::MAX);
+    let passing = |position| {
+        facts
+            .first_before(rule(&grammar, position), &after)
+            .to_string()
+    };
+    assert_eq!(passing(2), "';'");
+    let a = &rule(&grammar, 1).steps()[1];
+    assert_eq!(
+        facts.first_before(a, &after).to_string(),
+        "'\\0'..='/', ':'..='\\u{10ffff}'"
+    );
+    assert!(facts.looks_ahead(rule(&grammar, 0)));
+    assert!(!facts.looks_ahead(&rule(&grammar, 1).steps()[0]));
+    let ExpressionKind::RepeatedSequence(round) = &rule(&grammar, 0).kind
+    else {
+        panic!("a repetition");
+    };
+    // After a word, only `;` or the end of the input can come.
+    let follow = &facts.follow(RuleId(1)).characters;
+    assert_eq!(follow.to_string(), "';'");
+    assert!(facts.is_nullable(&round.steps()[1]));
+}
+
+#[test]
 fn finds_what_matches_can_hold_after_their_first_character() {
     let grammar = build_valid(
         "s = 'xyz' | a, b | {'q'}; a = ? U+0061..U+0063 ?; b = 'w', 'v';",

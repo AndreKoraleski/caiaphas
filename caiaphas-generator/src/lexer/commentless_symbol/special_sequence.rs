@@ -5,8 +5,13 @@
 //!
 //! Here it holds one code point, such as `? U+00E9 ?`, an inclusive range of
 //! them, such as `? U+0041..U+005A ?`, or a [`Pattern`] between two `/`, such
-//! as `? /[a-z]+/ ?`. Anything else, such as a description in words, is not
-//! read.
+//! as `? /[a-z]+/ ?`. After `not`, any of these matches nothing, where it does
+//! not match what comes next, as `? not /[a-z]/ ?` does where no letter comes
+//! next. `? end ?` matches nothing where the input ends. Anything else, such
+//! as a description in words, is not read.
+
+// A set of characters is a list of ranges, and often holds just one.
+#![allow(clippy::single_range_in_vec_init)]
 
 mod pattern;
 
@@ -19,9 +24,15 @@ use crate::lexer::{
     terminal_character::{Symbol, TerminalCharacter},
 };
 
-/// A special sequence stands for what its pattern matches.
+/// A special sequence stands for what its pattern matches, or for nothing
+/// where its pattern does not match.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SpecialSequence(Pattern);
+pub(crate) struct SpecialSequence {
+    pattern: Pattern,
+    /// Whether it matches nothing, where its pattern matches none of what
+    /// comes next.
+    negated: bool,
+}
 
 impl SpecialSequence {
     /// Returns the special sequence at the start of `input`, and how long it
@@ -35,33 +46,62 @@ impl SpecialSequence {
     ) -> Result<(Self, usize), ParseSpecialSequenceError> {
         let length = length(input)?;
         let raw = input[1..length - 1].trim_matches(gap_separator::is_gap);
-        if let Some(rest) = raw.strip_prefix('/') {
-            let Some(text) = rest.strip_suffix('/') else {
-                // A `?` inside a pattern ends the special sequence before the
-                // pattern does.
-                return Err(match meant_length(input, length) {
-                    Some(meant) => {
-                        ParseSpecialSequenceError::CutPattern(meant)
-                    }
-                    None => ParseSpecialSequenceError::UnclosedPattern,
-                });
-            };
-            let pattern = pattern::parse(text)
-                .map_err(ParseSpecialSequenceError::InvalidPattern)?;
-            return Ok((Self(pattern), length));
+        if raw == "end" {
+            // No character comes next where the input ends.
+            let pattern = Pattern::Characters(vec!['\0'..=char::MAX]);
+            let negated = true;
+            return Ok((Self { pattern, negated }, length));
         }
-        // Between the `?`, every character that is not part of a gap is a
-        // graphic ASCII character.
-        let content: String =
-            raw.chars().filter(char::is_ascii_graphic).collect();
-        let range = parse_range(&content)?;
-        Ok((Self(Pattern::Characters(vec![range])), length))
+        let apart = |c| gap_separator::is_gap(c) || c == '/';
+        let (negated, raw) = match raw.strip_prefix("not") {
+            Some(rest) if rest.starts_with(apart) => {
+                (true, rest.trim_start_matches(gap_separator::is_gap))
+            }
+            _ => (false, raw),
+        };
+        let pattern = read_pattern(input, length, raw)?;
+        if negated && pattern.is_nullable() {
+            return Err(ParseSpecialSequenceError::NullableNot);
+        }
+        Ok((Self { pattern, negated }, length))
     }
 
-    /// Returns what it matches.
+    /// Returns what it matches, or what must not come next.
     pub(crate) fn pattern(&self) -> &Pattern {
-        &self.0
+        &self.pattern
     }
+
+    /// Returns whether it matches nothing, where its pattern matches none of
+    /// what comes next.
+    pub(crate) fn negated(&self) -> bool {
+        self.negated
+    }
+}
+
+/// Returns the pattern `raw` holds, between two `/`, or as a code point or a
+/// range of them. It is the text between the `?` of the special sequence at
+/// the start of `input`, which is `length` long.
+fn read_pattern(
+    input: &str,
+    length: usize,
+    raw: &str,
+) -> Result<Pattern, ParseSpecialSequenceError> {
+    if let Some(rest) = raw.strip_prefix('/') {
+        let Some(text) = rest.strip_suffix('/') else {
+            // A `?` inside a pattern ends the special sequence before the
+            // pattern does.
+            return Err(match meant_length(input, length) {
+                Some(meant) => ParseSpecialSequenceError::CutPattern(meant),
+                None => ParseSpecialSequenceError::UnclosedPattern,
+            });
+        };
+        return pattern::parse(text)
+            .map_err(ParseSpecialSequenceError::InvalidPattern);
+    }
+    // Between the `?`, every character that is not part of a gap is a graphic
+    // ASCII character.
+    let content: String = raw.chars().filter(char::is_ascii_graphic).collect();
+    Ok(Pattern::Characters(vec![parse_range(&content)?]))
 }
 
 /// Returns how long the special sequence at the start of `input` is, `?`
@@ -158,6 +198,9 @@ pub(crate) enum ParseSpecialSequenceError {
     /// A `?` inside a pattern ended the special sequence, which was meant to
     /// be this long.
     CutPattern(usize),
+    /// The pattern after `not` can match nothing, so it matches wherever the
+    /// special sequence is.
+    NullableNot,
 }
 
 impl fmt::Display for ParseSpecialSequenceError {
@@ -176,7 +219,8 @@ impl fmt::Display for ParseSpecialSequenceError {
             ),
             Self::Unsupported => f.write_str(
                 "special sequence must hold a code point such as U+00E9, a \
-                 range such as U+0041..U+005A or a pattern such as /[a-z]+/",
+                 range such as U+0041..U+005A, a pattern such as /[a-z]+/, \
+                 one of those after `not`, or `end`",
             ),
             Self::InvalidPattern(reason) => {
                 write!(f, "invalid pattern in a special sequence: {reason}")
@@ -187,6 +231,10 @@ impl fmt::Display for ParseSpecialSequenceError {
             Self::CutPattern(_) => f.write_str(
                 "a `?` ends a special sequence, so this pattern stops before \
                  its closing `/`",
+            ),
+            Self::NullableNot => f.write_str(
+                "this `not` never matches, since its pattern can match \
+                 nothing",
             ),
             Self::NotAScalarValue(value) => {
                 write!(f, "U+{value:04X} is not a Unicode scalar value")
@@ -212,6 +260,11 @@ impl ParseSpecialSequenceError {
             ),
             Self::UnclosedPattern => Some(
                 "end the pattern with `/`, as in `? /[a-z]+/ ?`".to_owned(),
+            ),
+            Self::NullableNot => Some(
+                "make the pattern read something, as `? not /[a-z]/ ?` does \
+                 where `? not /[a-z]*/ ?` does not"
+                    .to_owned(),
             ),
             Self::NoClosingSymbol => Some(
                 "end it with `?`; for an optional `x`, write `[x]` instead of \
@@ -419,6 +472,35 @@ mod tests {
     }
 
     #[test]
+    fn reads_what_must_not_come_next() {
+        let read = |input| {
+            let (sequence, _) = SpecialSequence::read(input).unwrap();
+            (sequence.negated(), sequence.pattern().clone())
+        };
+        let letters = Pattern::Characters(vec!['a'..='z']);
+        assert_eq!(read("? not /[a-z]/ ?"), (true, letters.clone()));
+        assert_eq!(read("?not/[a-z]/?"), (true, letters.clone()));
+        assert_eq!(read("? /[a-z]/ ?"), (false, letters));
+        assert_eq!(
+            read("? not U+0041 ?"),
+            (true, Pattern::Characters(vec!['A'..='A']))
+        );
+        let any = Pattern::Characters(vec!['\0'..=char::MAX]);
+        assert_eq!(read("? end ?"), (true, any));
+        for input in ["? not ?", "? nothing ?", "? not end ?", "? ends ?"] {
+            assert_eq!(
+                SpecialSequence::read(input),
+                Err(ParseSpecialSequenceError::Unsupported),
+                "{input:?}"
+            );
+        }
+        assert_eq!(
+            SpecialSequence::read("? not /[a-z]*/ ?"),
+            Err(ParseSpecialSequenceError::NullableNot)
+        );
+    }
+
+    #[test]
     fn rejects_reversed_ranges() {
         assert_eq!(
             read("?U+005A..U+0041?"),
@@ -444,7 +526,8 @@ mod tests {
             (
                 ParseSpecialSequenceError::Unsupported,
                 "special sequence must hold a code point such as U+00E9, a \
-                 range such as U+0041..U+005A or a pattern such as /[a-z]+/",
+                 range such as U+0041..U+005A, a pattern such as /[a-z]+/, \
+                 one of those after `not`, or `end`",
             ),
             (
                 ParseSpecialSequenceError::NotAScalarValue(0xD800),

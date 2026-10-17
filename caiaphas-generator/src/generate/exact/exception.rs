@@ -146,8 +146,11 @@ impl ExactWriter<'_> {
     }
 
     /// Returns whether the ends of `exception` do not hang on what follows.
-    fn settled_exception(&self, exception: &Expression) -> bool {
-        let mut settled = true;
+    pub(in crate::generate) fn settled_exception(
+        &self,
+        exception: &Expression,
+    ) -> bool {
+        let mut settled = !self.writer.facts.looks_ahead(exception);
         exception.visit_meta_identifiers(&mut |RuleId(read), _| {
             settled &= self.settled[read];
         });
@@ -179,6 +182,7 @@ impl ExactWriter<'_> {
             } => self.short(part),
             ExpressionKind::TerminalString(_)
             | ExpressionKind::SpecialSequence(_)
+            | ExpressionKind::Not(_)
             | ExpressionKind::EmptySequence => true,
         }
     }

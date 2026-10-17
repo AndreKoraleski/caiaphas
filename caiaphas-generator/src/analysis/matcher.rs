@@ -6,6 +6,9 @@
 //! matches the most, and as much of an optional or repeated sequence as it
 //! can. Recursion can make matching run long or deep, so it gives up after a
 //! fixed number of steps or levels.
+//!
+//! What comes after a text is unknown, unless an exception reads it, so a
+//! `not` that would have to look past its end gives up too.
 
 use crate::ir::{Expression, ExpressionKind, Grammar, RuleId};
 
@@ -39,14 +42,23 @@ pub(crate) fn ends(
     position: usize,
     greedy: bool,
 ) -> Option<Vec<usize>> {
-    let mut matcher = Matcher {
-        grammar,
-        text,
-        steps: STEPS,
-        depth: DEPTH,
-        greedy,
-    };
+    let mut matcher = Matcher::new(grammar, text, greedy);
     matcher.ends(expression, position)
+}
+
+/// Returns whether the exception `exception` matches all of `text`, reading it
+/// as an exception reads the text its factor matched, with nothing after it,
+/// or `None` if matching gave up first.
+pub(crate) fn excludes(
+    grammar: &Grammar,
+    exception: &Expression,
+    text: &str,
+) -> Option<bool> {
+    let mut matcher = Matcher {
+        alone: true,
+        ..Matcher::new(grammar, text, false)
+    };
+    Some(matcher.ends(exception, 0)?.contains(&text.len()))
 }
 
 /// Returns every text `expression` can match, when it can only match a few
@@ -122,7 +134,8 @@ fn texts_within(
             found?
         }
         ExpressionKind::RepeatedSequence(_)
-        | ExpressionKind::SyntacticTerm { .. } => return None,
+        | ExpressionKind::SyntacticTerm { .. }
+        | ExpressionKind::Not(_) => return None,
     };
     (found.len() <= TEXTS).then_some(found)
 }
@@ -153,9 +166,26 @@ struct Matcher<'a> {
     depth: usize,
     /// Whether the rule being matched takes each way as it comes.
     greedy: bool,
+    /// Whether nothing comes after the text, as after the text an exception
+    /// reads.
+    alone: bool,
+    /// Whether matching looked for more than the text holds.
+    short: bool,
 }
 
-impl Matcher<'_> {
+impl<'a> Matcher<'a> {
+    fn new(grammar: &'a Grammar, text: &'a str, greedy: bool) -> Self {
+        Self {
+            grammar,
+            text,
+            steps: STEPS,
+            depth: DEPTH,
+            greedy,
+            alone: false,
+            short: false,
+        }
+    }
+
     /// Returns where the matches of `expression` at `position` can end, at
     /// most one in a greedy rule, or `None` once there are no steps or levels
     /// left.
@@ -178,18 +208,32 @@ impl Matcher<'_> {
     ) -> Option<Vec<usize>> {
         let rest = &self.text[position..];
         Some(match &expression.kind {
-            ExpressionKind::TerminalString(string) => rest
-                .starts_with(string.as_str())
-                .then(|| position + string.len())
-                .into_iter()
-                .collect(),
-            ExpressionKind::SpecialSequence(range) => rest
-                .chars()
-                .next()
-                .filter(|c| range.contains(c))
-                .map(|c| position + c.len_utf8())
-                .into_iter()
-                .collect(),
+            ExpressionKind::TerminalString(string) => {
+                self.short |= string.starts_with(rest);
+                rest.starts_with(string.as_str())
+                    .then(|| position + string.len())
+                    .into_iter()
+                    .collect()
+            }
+            ExpressionKind::SpecialSequence(range) => {
+                self.short |= rest.is_empty();
+                rest.chars()
+                    .next()
+                    .filter(|c| range.contains(c))
+                    .map(|c| position + c.len_utf8())
+                    .into_iter()
+                    .collect()
+            }
+            ExpressionKind::Not(ahead) => {
+                let around = std::mem::replace(&mut self.short, false);
+                let found = !self.ends(ahead, position)?.is_empty();
+                let short = std::mem::replace(&mut self.short, around);
+                // Text after this one could hold what the `not` looks for.
+                if !found && short && !self.alone {
+                    return None;
+                }
+                if found { Vec::new() } else { vec![position] }
+            }
             ExpressionKind::EmptySequence => vec![position],
             ExpressionKind::MetaIdentifier(RuleId(rule)) => {
                 let rule = &self.grammar.syntax_rules[*rule];
@@ -261,6 +305,7 @@ impl Matcher<'_> {
                     // The exception only reads what the factor matched.
                     let mut within = Matcher {
                         text: &self.text[..end],
+                        alone: true,
                         ..*self
                     };
                     let excluded = within
@@ -410,6 +455,28 @@ mod tests {
         let source = "s = (letter, letter) - 'if'; letter = 'i' | 'f';";
         assert_eq!(first_rule_matches(source, "fi"), Some(true));
         assert_eq!(first_rule_matches(source, "if"), Some(false));
+    }
+
+    #[test]
+    fn looks_ahead_only_as_far_as_the_text_tells() {
+        let source = "s = 'if', ? not /[a-z]/ ?, [t]; t = ? /[a-z ]+/ ?;";
+        assert_eq!(first_rule_matches(source, "if x"), Some(true));
+        assert_eq!(first_rule_matches(source, "ifx"), Some(false));
+        // Text after `if` could start with a letter.
+        assert_eq!(first_rule_matches(source, "if"), None);
+        let grammar = build_valid("s = 'ab' - ('a', ? not /c/ ?, 'b');");
+        let exception = |text| {
+            let ExpressionKind::SyntacticTerm {
+                syntactic_exception,
+                ..
+            } = &grammar.syntax_rules[0].expression.kind
+            else {
+                panic!("an exception");
+            };
+            excludes(&grammar, syntactic_exception, text)
+        };
+        assert_eq!(exception("ab"), Some(true));
+        assert_eq!(first_rule_texts("s = 'x', ? end ?;"), None);
     }
 
     #[test]

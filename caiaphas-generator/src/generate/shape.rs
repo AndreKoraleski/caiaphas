@@ -271,6 +271,7 @@ fn occurrences(
         } => of(syntactic_factor),
         ExpressionKind::TerminalString(_)
         | ExpressionKind::SpecialSequence(_)
+        | ExpressionKind::Not(_)
         | ExpressionKind::EmptySequence => Vec::new(),
     }
 }

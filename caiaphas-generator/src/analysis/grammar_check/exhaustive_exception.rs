@@ -42,12 +42,8 @@ pub(super) fn check(
             matcher::texts(grammar, syntactic_factor).is_some_and(|texts| {
                 !texts.is_empty()
                     && texts.iter().all(|text| {
-                        matcher::matches_all(
-                            grammar,
-                            syntactic_exception,
-                            text,
-                            false,
-                        ) == Some(true)
+                        matcher::excludes(grammar, syntactic_exception, text)
+                            == Some(true)
                     })
             });
         if characters || texts {

@@ -110,6 +110,7 @@ impl<'a> Facts<'a> {
             ExpressionKind::MetaIdentifier(_)
             | ExpressionKind::TerminalString(_)
             | ExpressionKind::SpecialSequence(_)
+            | ExpressionKind::Not(_)
             | ExpressionKind::EmptySequence => {}
         }
     }

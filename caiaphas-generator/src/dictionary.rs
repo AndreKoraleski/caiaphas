@@ -409,6 +409,9 @@ pub(crate) mod tests {
                 u32::from(*range.start()),
                 u32::from(*range.end())
             ),
+            ExpressionKind::Not(expression) => {
+                format!("not({})", render_expression(grammar, expression))
+            }
             ExpressionKind::EmptySequence => "empty".to_owned(),
         }
     }

@@ -83,7 +83,9 @@ impl<'a> Sampler<'a> {
                     .map(char::to_string)
                     .collect()
             }
-            ExpressionKind::EmptySequence => vec![String::new()],
+            ExpressionKind::Not(_) | ExpressionKind::EmptySequence => {
+                vec![String::new()]
+            }
             ExpressionKind::MetaIdentifier(RuleId(position)) => {
                 let Some(depth) = depth.checked_sub(1) else {
                     return Vec::new();

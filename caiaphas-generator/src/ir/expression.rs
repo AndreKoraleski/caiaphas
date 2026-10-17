@@ -41,6 +41,8 @@ pub(crate) enum ExpressionKind {
     TerminalString(String),
     /// Matches any one character in the range.
     SpecialSequence(RangeInclusive<char>),
+    /// Matches nothing, where `expression` matches none of what comes next.
+    Not(Box<Expression>),
     /// Matches without reading anything.
     EmptySequence,
 }
@@ -77,6 +79,7 @@ impl Expression {
                 }
                 ExpressionKind::OptionalSequence(expression)
                 | ExpressionKind::RepeatedSequence(expression)
+                | ExpressionKind::Not(expression)
                 | ExpressionKind::SyntacticFactor {
                     syntactic_primary: expression,
                     ..
@@ -140,7 +143,10 @@ impl Expression {
             | (
                 ExpressionKind::RepeatedSequence(left),
                 ExpressionKind::RepeatedSequence(right),
-            ) => left.is_written_like(right),
+            )
+            | (ExpressionKind::Not(left), ExpressionKind::Not(right)) => {
+                left.is_written_like(right)
+            }
             (
                 ExpressionKind::SyntacticFactor {
                     integer: left_integer,

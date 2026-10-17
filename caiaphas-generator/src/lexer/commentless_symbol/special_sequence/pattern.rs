@@ -30,6 +30,22 @@ pub(crate) enum Pattern {
     },
 }
 
+impl Pattern {
+    /// Returns whether the pattern can match nothing.
+    pub(crate) fn is_nullable(&self) -> bool {
+        match self {
+            Self::Characters(_) => false,
+            Self::Sequence(steps) => steps.iter().all(Self::is_nullable),
+            Self::Choice(alternatives) => {
+                alternatives.iter().any(Self::is_nullable)
+            }
+            Self::Repeat { pattern, least, .. } => {
+                *least == 0 || pattern.is_nullable()
+            }
+        }
+    }
+}
+
 /// Returns the pattern written `text`, or why it is not one.
 pub(crate) fn parse(text: &str) -> Result<Pattern, &'static str> {
     let chars: Vec<char> = text.chars().collect();

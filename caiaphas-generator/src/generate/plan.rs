@@ -13,7 +13,7 @@ use crate::{
     generate::{
         clashes,
         exact::ExactWriter,
-        matching::{Decisions, FunctionWriter},
+        matching::{Decisions, FunctionWriter, quiet},
         name, rearrange,
         shape::{self, Shape},
     },
@@ -137,6 +137,8 @@ pub enum Kind {
     Text(String),
     /// Any one character from the first to the last.
     Range(char, char),
+    /// Nothing, where the part matches none of what comes next.
+    Not(Box<Part>),
     /// Nothing.
     Empty,
 }
@@ -202,7 +204,7 @@ fn plan(grammar: &Grammar, shapes: &[Option<Shape>]) -> Plan {
                 name: name::spaced(rule),
                 hidden: rule.hidden,
                 builds: builds[position],
-                quiet: rule.hidden && facts.is_nullable(&rule.expression),
+                quiet: quiet(&facts, rule),
                 inline: rule.inline,
                 start: grammar.start_syntax_rules.contains(&rule_id),
                 typed: matches!(
@@ -275,6 +277,7 @@ fn part(writer: &ExactWriter<'_>, expression: &Expression) -> Part {
         ExpressionKind::SpecialSequence(range) => {
             Kind::Range(*range.start(), *range.end())
         }
+        ExpressionKind::Not(ahead) => Kind::Not(boxed(ahead)),
         ExpressionKind::EmptySequence => Kind::Empty,
     };
     let before_middle = match &expression.kind {
@@ -294,10 +297,7 @@ fn part(writer: &ExactWriter<'_>, expression: &Expression) -> Part {
             syntactic_exception,
             ..
         } => {
-            let mut settled = true;
-            syntactic_exception.visit_meta_identifiers(
-                &mut |RuleId(read), _| settled &= writer.settled[read],
-            );
+            let settled = writer.settled_exception(syntactic_exception);
             let characters = facts
                 .single_characters(syntactic_exception)
                 .map(|characters| ranges(&characters));

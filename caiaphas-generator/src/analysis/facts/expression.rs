@@ -17,6 +17,7 @@ pub(super) fn is_nullable(expression: &Expression, rules: &[bool]) -> bool {
             .any(|expression| is_nullable(expression, rules)),
         ExpressionKind::OptionalSequence(_)
         | ExpressionKind::RepeatedSequence(_)
+        | ExpressionKind::Not(_)
         | ExpressionKind::EmptySequence => true,
         ExpressionKind::SyntacticFactor {
             syntactic_primary: expression,
@@ -55,6 +56,7 @@ pub(super) fn ends_once(
         ExpressionKind::MetaIdentifier(RuleId(position)) => rules[*position],
         ExpressionKind::TerminalString(_)
         | ExpressionKind::SpecialSequence(_)
+        | ExpressionKind::Not(_)
         | ExpressionKind::EmptySequence => true,
         ExpressionKind::DefinitionsList(_)
         | ExpressionKind::OptionalSequence(_)
@@ -74,6 +76,7 @@ pub(super) fn is_productive(expression: &Expression, rules: &[bool]) -> bool {
         | ExpressionKind::RepeatedSequence(_)
         | ExpressionKind::TerminalString(_)
         | ExpressionKind::SpecialSequence(_)
+        | ExpressionKind::Not(_)
         | ExpressionKind::EmptySequence => true,
         ExpressionKind::SyntacticFactor {
             syntactic_primary: expression,
@@ -130,8 +133,69 @@ pub(super) fn first(
         ExpressionKind::SpecialSequence(range) => {
             CharacterSet::from_range(range.clone())
         }
-        ExpressionKind::EmptySequence => CharacterSet::default(),
+        ExpressionKind::Not(_) | ExpressionKind::EmptySequence => {
+            CharacterSet::default()
+        }
     }
+}
+
+/// Returns what [`Facts::passing`] does, given the same for each rule in
+/// `rules` and the single characters of each in `characters`.
+pub(super) fn passing(
+    expression: &Expression,
+    rules: &[CharacterSet],
+    characters: &[Option<CharacterSet>],
+) -> CharacterSet {
+    let passing = |expression| passing(expression, rules, characters);
+    let every = || CharacterSet::from_range('\0'..=char::MAX);
+    match &expression.kind {
+        ExpressionKind::SingleDefinition(expressions) => {
+            expressions.iter().fold(every(), |set, expression| {
+                set.intersection(&passing(expression))
+            })
+        }
+        ExpressionKind::DefinitionsList(expressions) => expressions
+            .iter()
+            .fold(CharacterSet::default(), |set, expression| {
+                set.union(&passing(expression))
+            }),
+        ExpressionKind::OptionalSequence(_)
+        | ExpressionKind::RepeatedSequence(_)
+        | ExpressionKind::EmptySequence => every(),
+        ExpressionKind::Not(ahead) => {
+            match single_characters(ahead, characters) {
+                Some(taken) => every().difference(&taken),
+                None => every(),
+            }
+        }
+        ExpressionKind::SyntacticFactor {
+            syntactic_primary: expression,
+            ..
+        }
+        | ExpressionKind::SyntacticTerm {
+            syntactic_factor: expression,
+            ..
+        } => passing(expression),
+        ExpressionKind::MetaIdentifier(RuleId(position)) => {
+            rules[*position].clone()
+        }
+        ExpressionKind::TerminalString(_)
+        | ExpressionKind::SpecialSequence(_) => CharacterSet::default(),
+    }
+}
+
+/// Returns whether `expression` holds a `not`, or reads a rule that looks
+/// ahead by `rules`.
+pub(super) fn looks_ahead(expression: &Expression, rules: &[bool]) -> bool {
+    let mut found = false;
+    expression.visit(&mut |expression| match &expression.kind {
+        ExpressionKind::Not(_) => found = true,
+        ExpressionKind::MetaIdentifier(RuleId(position)) => {
+            found |= rules[*position];
+        }
+        _ => {}
+    });
+    found
 }
 
 /// Returns what [`Facts::inner`] does, given the same for each rule in
@@ -178,9 +242,9 @@ pub(super) fn inner(
         ExpressionKind::MetaIdentifier(RuleId(position)) => {
             rules[*position].clone()
         }
-        ExpressionKind::SpecialSequence(_) | ExpressionKind::EmptySequence => {
-            CharacterSet::default()
-        }
+        ExpressionKind::SpecialSequence(_)
+        | ExpressionKind::Not(_)
+        | ExpressionKind::EmptySequence => CharacterSet::default(),
     }
 }
 
@@ -267,6 +331,7 @@ pub(super) fn single_characters_with(
         | ExpressionKind::OptionalSequence(_)
         | ExpressionKind::RepeatedSequence(_)
         | ExpressionKind::SyntacticFactor { .. }
+        | ExpressionKind::Not(_)
         | ExpressionKind::EmptySequence => None,
     }
 }

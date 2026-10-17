@@ -144,6 +144,9 @@ impl Program {
             Kind::Range(first, last) => {
                 return Ends::of(parser.range(position, *first, *last));
             }
+            Kind::Not(ahead) => {
+                return Ends::of(self.not(parser, rule, ahead, position));
+            }
             Kind::Empty => return Ends::one(position),
             _ => unreachable!("a plan holds no other part"),
         };

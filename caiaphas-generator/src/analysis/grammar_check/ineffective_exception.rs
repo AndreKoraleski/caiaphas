@@ -43,12 +43,8 @@ pub(super) fn check(
         let never =
             matcher::texts(grammar, syntactic_factor).is_some_and(|texts| {
                 texts.iter().all(|text| {
-                    matcher::matches_all(
-                        grammar,
-                        syntactic_exception,
-                        text,
-                        false,
-                    ) == Some(false)
+                    matcher::excludes(grammar, syntactic_exception, text)
+                        == Some(false)
                 })
             });
         if shared.is_empty() && !both_empty || longer || never {

@@ -121,6 +121,29 @@ impl Program {
         unchecked
     }
 
+    /// Matches a `not` of `ahead` in the rule numbered `rule` at `position`,
+    /// as its code does.
+    fn not<const R: bool, W: Width>(
+        &self,
+        parser: &mut Parser<'_, R, W>,
+        rule: usize,
+        ahead: &'static Part,
+        position: usize,
+    ) -> Option<usize> {
+        let Some(set) = &ahead.set else {
+            let mut looking = parser.ahead();
+            let ends = self.ends(&mut looking, rule, ahead, position);
+            return parser.not(position, ends.first().is_some());
+        };
+        if set.ranges == [('\0', char::MAX)] {
+            return parser.end(position);
+        }
+        let found = parser
+            .character(position)
+            .is_some_and(|c| within(&set.ranges, c));
+        parser.not(position, found)
+    }
+
     fn plan_of(&self, rule: usize) -> &'static RulePlan {
         &self.plan.rules[rule]
     }

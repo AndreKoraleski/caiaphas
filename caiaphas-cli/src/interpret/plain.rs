@@ -138,6 +138,7 @@ impl Program {
             }
             Kind::Text(text) => parser.text(position, text),
             Kind::Range(first, last) => parser.range(position, *first, *last),
+            Kind::Not(ahead) => self.not(parser, rule, ahead, position),
             Kind::Empty => Some(position),
             _ => unreachable!("a plan holds no other part"),
         }

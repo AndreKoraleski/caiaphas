@@ -495,4 +495,35 @@ written! {
         "(* expect ambiguous-split: each round takes what it can *)
          s = {a}, ';'; a = ['x'], ['y'];"
     } [";", "x;", "xy;", "yx;", "xyxy;", "y"], "s" => S;
+    not_keywords {
+        "s = {statement};
+         statement = keyword, [' '], name, ';' | name, ';';
+         keyword = ('if' | 'i'), ? not /[a-f]/ ?;
+         name = ? /[a-f]+/ ?;"
+    } ["ifa;", "if a;", "i f;", "if;", "if ;", "ia;i b;"], "s" => S;
+    not_lines {
+        r"log = {line, line end};
+          line = ? /[ab]+/ ?;
+          (* hide *) line end = newline | ? end ?;
+          (* hide *) newline = ? U+000A ?;"
+    } ["ab\nb", "ab\n", "a\n\nb", "", "\n"], "log" => Log;
+    not_pattern {
+        "s = {item, ';'};
+         item = 'a', ? not /b{2}|c/ ?, {'b'} | 'abb', 'c';"
+    } ["a;", "ab;", "abb;", "abbc;", "ac;", "abbb;"], "s" => S;
+    not_plain {
+        "s = {'a', ? not /bc/ ?, ['b', 'd']}, ';';"
+    } ["abd;", "a;", "abc;", "aabd;", "ab;"], "s" => S;
+    not_exception {
+        "s = {word, ' '};
+         word = name - (keyword | name, ? end ?, 'x');
+         keyword = ('if' | 'do'), ? not /[a-z]/ ?;
+         name = ? /[a-z]+/ ?;"
+    } ["if ", "ifx ", "x ", "do do ", "dox if "], "s" => S;
+    not_recovering {
+        "settings = {line};
+         (* recover *)
+         line = name, '=', name, (';' | ? end ?);
+         name = ? /[ab]+/ ?;"
+    } ["a=b;b=a", "a=b;a;b=a", "a=b b=a", "a="], "settings" => Settings;
 }

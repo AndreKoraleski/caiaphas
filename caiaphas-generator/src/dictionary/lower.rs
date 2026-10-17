@@ -185,11 +185,15 @@ impl Lowering<'_, '_> {
                 ExpressionKind::TerminalString(string.as_str().to_owned())
             }
             SyntacticPrimaryKind::SpecialSequence(sequence) => {
-                super::pattern::expression(
+                let pattern = super::pattern::expression(
                     sequence.pattern(),
                     syntactic_primary.span,
-                )
-                .kind
+                );
+                if sequence.negated() {
+                    ExpressionKind::Not(Box::new(pattern))
+                } else {
+                    pattern.kind
+                }
             }
             SyntacticPrimaryKind::EmptySequence => {
                 ExpressionKind::EmptySequence

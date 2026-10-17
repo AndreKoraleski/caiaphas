@@ -3,7 +3,9 @@
 //!
 //! Grammar theory calls the rules that can match nothing nullable, and removes
 //! the ones that can only match nothing when it normalizes a grammar. A rule
-//! is empty when it can match nothing but cannot start with any character.
+//! is empty when it can match nothing but cannot start with any character,
+//! unless it looks ahead, as `? end ?` does, since that tells where it can
+//! match.
 
 use crate::{
     analysis::{
@@ -22,6 +24,7 @@ pub(super) fn check(
     for rule in &grammar.syntax_rules {
         if facts.is_nullable(&rule.expression)
             && facts.first(&rule.expression).is_empty()
+            && !facts.looks_ahead(&rule.expression)
         {
             findings.push(Finding {
                 kind: FindingKind::EmptyRule {
@@ -58,6 +61,14 @@ mod tests {
     #[test]
     fn finds_a_rule_that_only_references_empty_rules() {
         assert_eq!(empty("s = a, 'x'; a = [b], {b}; b = ;"), ["a", "b"]);
+    }
+
+    #[test]
+    fn accepts_a_rule_that_looks_ahead() {
+        assert_eq!(
+            empty("s = 'x', a; a = ? end ?; b = ? not /y/ ?, [b];"),
+            Vec::<String>::new()
+        );
     }
 
     #[test]
