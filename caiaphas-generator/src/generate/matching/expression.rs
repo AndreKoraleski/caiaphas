@@ -108,9 +108,11 @@ impl FunctionWriter<'_> {
                         loop {
                             let position = end;
                             let mark = parser.mark();
+                            // A round that reads nothing ends the repetition,
+                            // since repeating it adds nothing.
                             match #branch {
-                                #some(next) => end = next,
-                                #none => {
+                                #some(next) if next > end => end = next,
+                                _ => {
                                     parser.truncate(mark);
                                     break #some(end);
                                 }

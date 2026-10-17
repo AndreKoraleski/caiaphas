@@ -84,7 +84,8 @@ impl<'i, const REPORTS: bool, W: Width> Parser<'i, REPORTS, W> {
 
     /// Returns where `round`, taken any number of times one after another from
     /// `position`, can end. Each way that takes one more round comes before
-    /// stopping, and the analysis makes sure a round never matches nothing.
+    /// stopping. A round that reads nothing reaches no new place, so it ends
+    /// the repetition.
     pub fn rounds(
         &mut self,
         position: usize,

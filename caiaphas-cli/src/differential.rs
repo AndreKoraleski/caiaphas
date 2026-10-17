@@ -488,4 +488,11 @@ written! {
         "list = item, {';', item};
          (* recover *) (* hide *) item = 'a', 'b';"
     }, "list" => List;
+    empty_rounds {
+        "s = {['x']}, ';', {'y' | }, '.';"
+    } [";.", "x;.", "xx;y.", "xxx;yy.", ";", "x"], "s" => S;
+    empty_round_nodes {
+        "(* expect ambiguous-split: each round takes what it can *)
+         s = {a}, ';'; a = ['x'], ['y'];"
+    } [";", "x;", "xy;", "yx;", "xyxy;", "y"], "s" => S;
 }

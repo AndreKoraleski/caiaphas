@@ -681,3 +681,12 @@ fn dumps_the_tree_of_a_parse_for_tests() {
          \x20       item 1:5 \"3\"\n"
     );
 }
+
+caiaphas::grammar!(mod empty_rounds { "s = {[a]}, ';'; a = 'x';" });
+
+#[test]
+fn ends_a_repetition_at_a_round_that_reads_nothing() {
+    assert_eq!(empty_rounds::S::parse("xx;").unwrap().a.len(), 2);
+    assert_eq!(empty_rounds::S::parse(";").unwrap().a.len(), 0);
+    assert!(empty_rounds::S::parse("xy;").is_err());
+}

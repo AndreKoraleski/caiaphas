@@ -101,8 +101,8 @@ impl Program {
                 let mut end = position;
                 loop {
                     let mark = parser.mark();
-                    let Some(next) = self.branch(parser, rule, sequence, end)
-                    else {
+                    let next = self.branch(parser, rule, sequence, end);
+                    let Some(next) = next.filter(|&next| next > end) else {
                         parser.truncate(mark);
                         break Some(end);
                     };

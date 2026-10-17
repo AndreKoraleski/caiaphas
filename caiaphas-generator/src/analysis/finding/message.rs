@@ -25,8 +25,8 @@ impl fmt::Display for FindingKind {
                 meta_identifier.spaced()
             ),
             Self::NullableRepeatedSequence => f.write_str(
-                "this repeated sequence can match nothing, so it could repeat \
-                 forever",
+                "a round of this repeated sequence can match nothing, and \
+                 such a round ends the repetition",
             ),
             Self::TiedBranches { matched, .. } => write!(
                 f,

@@ -35,8 +35,10 @@ alternative that only reads characters, or make the recursion optional:
 
 ## nullable-repeated-sequence
 
-Error. A repeated sequence can match nothing, as `{['x']}` can, so it could
-repeat forever. Make what repeats read something: `{'x'}`.
+Suggestion. A round of a repeated sequence can match nothing, as one of
+`{['x']}` can. Repeating nothing adds nothing, so a round that reads nothing
+ends the repetition, and `{['x']}` matches what `{'x'}` does, as the standard
+says. Write what repeats so it always reads something: `{'x'}`.
 
 ## tied-branches
 

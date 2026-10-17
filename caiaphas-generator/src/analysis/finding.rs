@@ -36,7 +36,7 @@ pub(crate) enum FindingKind {
     },
     /// No input can ever finish matching a rule.
     UnproductiveRule { meta_identifier: MetaIdentifier },
-    /// A repeated sequence can match nothing, so it could repeat forever.
+    /// A round of a repeated sequence can match nothing, which ends it.
     NullableRepeatedSequence,
     /// Two alternatives can match the same text, so a parser can only take the
     /// one written first.

@@ -10,8 +10,8 @@ use crate::{
 };
 
 /// Reports every choice point with more than one branch that can match
-/// nothing. For a repeated sequence that means its body can match nothing, so
-/// it could repeat forever.
+/// nothing. For a repeated sequence that means its body can match nothing, and
+/// a round that does ends the repetition.
 ///
 /// Only the alternatives of a definitions list get labels, since the finding
 /// already points at the only body of an optional or repeated sequence.

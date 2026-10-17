@@ -78,7 +78,6 @@ impl FindingCode {
             Self::LeftRecursion
             | Self::IndirectLeftRecursion
             | Self::UnproductiveRule
-            | Self::NullableRepeatedSequence
             | Self::UnknownExpectation
             | Self::UnexpectableFinding => Severity::Error,
             Self::TiedBranches
@@ -102,7 +101,8 @@ impl FindingCode {
             | Self::UnfulfilledExpectation => Severity::Warning,
             Self::SingleCharacterRule
             | Self::NondeterministicChoice
-            | Self::SeveralStartRules => Severity::Suggestion,
+            | Self::SeveralStartRules
+            | Self::NullableRepeatedSequence => Severity::Suggestion,
         }
     }
 
@@ -150,6 +150,9 @@ impl FindingCode {
             Self::NondeterministicChoice => {
                 Some("the parser still tries every way")
             }
+            Self::NullableRepeatedSequence => {
+                Some("a round that reads nothing ends the repetition")
+            }
             Self::AmbiguousSplit => Some(
                 "the parser gives each part the most text it can while the \
                  rest still matches",
@@ -170,7 +173,6 @@ impl FindingCode {
             | Self::LeftRecursion
             | Self::IndirectLeftRecursion
             | Self::UnproductiveRule
-            | Self::NullableRepeatedSequence
             | Self::UnknownExpectation
             | Self::UnexpectableFinding
             | Self::UnfulfilledExpectation => None,

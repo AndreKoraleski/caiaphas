@@ -44,9 +44,9 @@ const CASES: &[Case] = &[
     Case {
         source: "a = {['x']};",
         code: FindingCode::NullableRepeatedSequence,
-        severity: Severity::Error,
-        message: "this repeated sequence can match nothing, so it could \
-                  repeat forever",
+        severity: Severity::Suggestion,
+        message: "a round of this repeated sequence can match nothing, and \
+                  such a round ends the repetition",
         help: "make what repeats always read something, as `{'x'}` does \
                where `{['x']}` does not",
     },
