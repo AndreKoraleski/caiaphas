@@ -1,7 +1,7 @@
 //! Tests that running a grammar's plan matches as its generated parser does:
 //! the same tree for each input that matches, and the same error for each that
-//! does not. The inputs come from the grammar itself, each followed by changes
-//! that make most of them wrong.
+//! does not, with or without recovering. The inputs come from the grammar
+//! itself, each followed by changes that make most of them wrong.
 
 use std::thread;
 
@@ -107,12 +107,20 @@ impl Inputs<'_> {
     }
 }
 
+/// What the parser `grammar!` generates gives for an input: the tree or the
+/// error, then the tree and errors of a parse that recovers.
+#[derive(Clone, Copy)]
+struct Generated {
+    parse: fn(&str) -> Result<String, Error>,
+    recovering: fn(&str) -> (Option<String>, Vec<Error>),
+}
+
 /// Checks that the grammar `source`, run from its plan starting with the rule
 /// named `start`, matches as `generated` does, on inputs from `seed`.
 fn compare(
     source: &'static str,
     start: &str,
-    generated: fn(&str) -> Result<String, Error>,
+    generated: Generated,
     seed: u64,
 ) {
     let plan = plan::of(source, "grammar.ebnf").expect("the grammar works");
@@ -134,18 +142,38 @@ fn compare(
         all.extend([input, changed, changed_again]);
     }
     all.push(String::new());
+    // Without a rule that recovers, a parse that recovers runs the same rules
+    // as one that does not.
+    let recovers = plan.rules.iter().any(|rule| rule.recovers);
     let program = Program::new(plan, start);
     // Interpreted rules take more stack than generated ones.
     thread::Builder::new()
         .stack_size(256 << 20)
         .spawn(move || {
+            let depth = caiaphas::__private::DEPTH;
             for input in all {
-                let found = program
-                    .parse(&input, caiaphas::__private::DEPTH)
-                    .map_err(|error| error.to_string());
-                let expected =
-                    generated(&input).map_err(|error| error.to_string());
-                assert_eq!(found, expected, "input {input:?}");
+                let expected = (generated.parse)(&input);
+                assert_eq!(
+                    program.parse(&input, depth),
+                    expected,
+                    "input {input:?}"
+                );
+                if !recovers {
+                    continue;
+                }
+                let recovered = (generated.recovering)(&input);
+                assert_eq!(
+                    program.parse_recovering(&input, depth),
+                    recovered,
+                    "input {input:?}, recovering"
+                );
+                // The first error a parse that recovers finds is the one a
+                // parse that does not gives.
+                assert_eq!(
+                    recovered.1.first(),
+                    expected.as_ref().err(),
+                    "input {input:?}"
+                );
             }
         })
         .expect("a thread can start")
@@ -163,10 +191,14 @@ macro_rules! files {
 
             #[test]
             fn $test() {
+                let generated = Generated {
+                    parse: $test::$ty::__tree,
+                    recovering: $test::$ty::__tree_recovering,
+                };
                 compare(
                     include_str!(concat!("../", $path)),
                     $start,
-                    $test::$ty::__tree,
+                    generated,
                     0x9E37_79B9_7F4A_7C15,
                 );
             }
@@ -233,8 +265,11 @@ macro_rules! written {
 
             #[test]
             fn $test() {
-                let seed = 0x2545_F491_4F6C_DD1D;
-                compare($grammar, $start, $test::$ty::__tree, seed);
+                let generated = Generated {
+                    parse: $test::$ty::__tree,
+                    recovering: $test::$ty::__tree_recovering,
+                };
+                compare($grammar, $start, generated, 0x2545_F491_4F6C_DD1D);
             }
         )*
     };
@@ -357,6 +392,39 @@ written! {
         "(* expect ambiguous-split: the first part takes what it can *)
          s = a, b; a = 'x' | 'x', 'y'; b = ['y'], 'z';"
     }, "s" => S;
+    settings_recovering {
+        r"settings = [line], {newline, [line]};
+          (* recover *)
+          line = name, ws, '=', ws, value;
+          (* as String *) name = ? /[a-z_]+/ ?;
+          (* as String *) value = ? /[^\n ][^\n]*/ ?;
+          (* hide *) ws = {' '};
+          (* hide *) newline = ? U+000A ?;"
+    }, "settings" => Settings;
+    files_recovering {
+        "files = file, {',', file};
+         (* recover *)
+         file = name, '.', extension;
+         name = character, {character};
+         extension = letter, {letter};
+         (* hide *) character = letter | '.';
+         (* hide *) letter = ? U+0061..U+007A ?;"
+    }, "files" => Files;
+    json_recovering {
+        r#"json = ws, value, ws;
+         value = object | array | number | 'true';
+         object = '{', ws, [member, ws, {',', ws, member, ws}], '}';
+         (* recover *)
+         member = string, ws, ':', ws, value;
+         array = '[', ws, [value, ws, {',', ws, value, ws}], ']';
+         string = '"', ? /[a-z]*/ ?, '"';
+         number = ? /\d+/ ?;
+         (* hide *) ws = {' '};"#
+    }, "json" => Json;
+    leaf_recovering {
+        "list = item, {';', item};
+         (* recover *) (* hide *) item = 'a', 'b';"
+    }, "list" => List;
 }
 
 written! {
