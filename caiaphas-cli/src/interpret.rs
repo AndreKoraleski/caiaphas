@@ -7,6 +7,7 @@
 //! the interpreter does not have the type, so such a rule takes any text its
 //! grammar matches.
 
+mod build;
 mod exact;
 mod plain;
 
