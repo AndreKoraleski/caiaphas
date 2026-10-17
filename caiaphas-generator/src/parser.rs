@@ -173,6 +173,30 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Returns the error for a rule that starts with something other than its
+    /// name. A `;` or `.` there ends no rule, and a `.` right after the one
+    /// that ended a rule reads as `..`, as if it made a range, so the rest of
+    /// that is moved past too.
+    fn no_rule_name(&mut self) -> ParseError {
+        if self.peek_symbol() != Some(Symbol::Terminator) {
+            return self.unexpected(Expected::MetaIdentifier);
+        }
+        let Some(span) = self.peek().map(|token| token.span) else {
+            return self.unexpected(Expected::MetaIdentifier);
+        };
+        let source = self.lexer.source();
+        let range = span.start > 0
+            && span.start == self.previous_end
+            && source[span.range()] == *"."
+            && source[..span.start].ends_with('.');
+        if !range {
+            return self.unexpected(Expected::MetaIdentifierNotTerminator);
+        }
+        let error = self.unexpected(Expected::MetaIdentifierNotRange);
+        self.bump();
+        error
+    }
+
     /// Returns the error for a rule that goes on where it should end. Before
     /// the name of the next rule, the rule lacks its `;`, so the error is
     /// where the rule ends. Before anything else a rule holds, it lacks a `,`.
@@ -406,6 +430,36 @@ pub(crate) mod tests {
                     Expected::MetaIdentifier
                 ),
                 span: Span { start: 0, end: 1 },
+            }]
+        );
+    }
+
+    #[test]
+    fn tells_a_terminator_that_ends_no_rule() {
+        let (syntax, errors) = parse("a = 'x';; b = 'y';");
+        assert_eq!(render(&syntax), "a = 'x';b = 'y';");
+        assert_eq!(
+            errors,
+            [ParseError {
+                kind: ParseErrorKind::UnexpectedToken(
+                    Expected::MetaIdentifierNotTerminator
+                ),
+                span: Span { start: 8, end: 9 },
+            }]
+        );
+    }
+
+    #[test]
+    fn tells_two_dots_after_a_rule_once() {
+        let (syntax, errors) = parse("a = 'x'..'z'; b = 'y';");
+        assert_eq!(render(&syntax), "a = 'x';b = 'y';");
+        assert_eq!(
+            errors,
+            [ParseError {
+                kind: ParseErrorKind::UnexpectedToken(
+                    Expected::MetaIdentifierNotRange
+                ),
+                span: Span { start: 8, end: 9 },
             }]
         );
     }

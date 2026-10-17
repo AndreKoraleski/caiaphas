@@ -39,6 +39,10 @@ pub(crate) enum ParseErrorKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Expected {
     MetaIdentifier,
+    /// The same, where a `;` or `.` ends no rule.
+    MetaIdentifierNotTerminator,
+    /// The same, where `..` follows a rule as if it made a range.
+    MetaIdentifierNotRange,
     DefiningSymbol,
     TerminatorSymbol,
     /// What can come between two items of a rule, or after its last.
@@ -54,7 +58,9 @@ pub(crate) enum Expected {
 impl fmt::Display for Expected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::MetaIdentifier => "a rule name",
+            Self::MetaIdentifier
+            | Self::MetaIdentifierNotTerminator
+            | Self::MetaIdentifierNotRange => "a rule name",
             Self::DefiningSymbol => "`=`",
             Self::TerminatorSymbol => "`;` or `.`",
             Self::Separator | Self::SeparatorNotRepetition => {
@@ -126,6 +132,19 @@ impl From<ParseError> for Diagnostic {
             ParseErrorKind::UnexpectedToken(Expected::TerminatorSymbol) => {
                 Some("end the rule with `;`".to_owned())
             }
+            ParseErrorKind::UnexpectedToken(Expected::DefiningSymbol) => {
+                Some("define a rule with `=`, as in `a = 'x';`".to_owned())
+            }
+            ParseErrorKind::UnexpectedToken(
+                Expected::MetaIdentifierNotTerminator,
+            ) => Some("remove it, since it ends no rule".to_owned()),
+            ParseErrorKind::UnexpectedToken(
+                Expected::MetaIdentifierNotRange,
+            ) => Some(
+                "a `.` ends a rule, as `;` does; write a range of \
+                     characters as `? /[a-z]/ ?` or `? U+0061..U+007A ?`"
+                    .to_owned(),
+            ),
             _ => None,
         };
         Self {
@@ -169,6 +188,47 @@ mod tests {
         assert_eq!(
             Diagnostic::from(errors[0]).message,
             "invalid terminal string in a comment: terminal string is empty"
+        );
+    }
+
+    #[test]
+    fn helps_with_what_other_notations_write() {
+        let helps = |source| -> Vec<String> {
+            parse(source)
+                .1
+                .into_iter()
+                .filter_map(|error| Diagnostic::from(error).help)
+                .collect()
+        };
+        assert_eq!(
+            helps("a = 'x'..'z';"),
+            [
+                "a `.` ends a rule, as `;` does; write a range of characters \
+                 as `? /[a-z]/ ?` or `? U+0061..U+007A ?`"
+            ]
+        );
+        assert_eq!(
+            helps("a = 'x';; b = 'y';"),
+            ["remove it, since it ends no rule"]
+        );
+        assert!(
+            helps("a -> 'x';").contains(
+                &"define a rule with `=`, as in `a = 'x';`".to_owned()
+            )
+        );
+        assert_eq!(
+            helps("a = 'x'; # a note"),
+            [
+                "write a comment as `(* a comment *)`, or `'#'` in quotes to \
+                 match it"
+            ]
+        );
+        assert_eq!(
+            helps("a = 'x', b?; b = 'y';"),
+            [
+                "end it with `?`; for an optional `x`, write `[x]` instead of \
+              `x?`"
+            ]
         );
     }
 

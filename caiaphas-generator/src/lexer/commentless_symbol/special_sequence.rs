@@ -212,6 +212,11 @@ impl ParseSpecialSequenceError {
             Self::UnclosedPattern => Some(
                 "end the pattern with `/`, as in `? /[a-z]+/ ?`".to_owned(),
             ),
+            Self::NoClosingSymbol => Some(
+                "end it with `?`; for an optional `x`, write `[x]` instead of \
+                 `x?`"
+                    .to_owned(),
+            ),
             _ => None,
         }
     }

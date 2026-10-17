@@ -44,7 +44,7 @@ impl SyntaxRule {
                 _ => None,
             })
         else {
-            return Err(parser.unexpected(Expected::MetaIdentifier));
+            return Err(parser.no_rule_name());
         };
         parser.bump();
         parser.expect(Symbol::Defining, Expected::DefiningSymbol)?;
