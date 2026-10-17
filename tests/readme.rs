@@ -70,9 +70,12 @@ fn reads_the_document_of_the_overview() {
 
 #[test]
 fn shows_the_error_a_parser_gives() {
-    let error = json::Json::parse(r#"{"a": 1]"#).unwrap_err();
+    let input = r#"{"a": 1]"#;
+    let error = json::Json::parse(input).unwrap_err();
     let shown = error.to_string();
     assert!(blocks("text").contains(&shown), "{shown}");
+    let excerpt = error.excerpt(input);
+    assert!(blocks("text").contains(&excerpt), "{excerpt}");
 }
 
 caiaphas::grammar!(mod settings {

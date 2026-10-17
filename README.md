@@ -249,7 +249,13 @@ expected `,`, `}`, a digit, an exponent or a fraction, found `]` at line 1, colu
 ```
 
 `Error` displays as that sentence, and `line()`, `column()`, `offset()`,
-`expected()` and `found()` give the same as values.
+`expected()` and `found()` give the same as values. `excerpt(input)` gives
+the line with a caret under the error, to show below it:
+
+```text
+1 | {"a": 1]
+  |        ^
+```
 
 A rule written with `(* recover *)` lets a parse go on past an error in it.
 Where a match of the rule fails partway, `parse_recovering` skips to its next

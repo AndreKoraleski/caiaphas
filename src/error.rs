@@ -115,7 +115,59 @@ impl Error {
     pub fn found(&self) -> Option<&str> {
         self.found.as_deref()
     }
+
+    /// Returns the line of `input` the error is on, with a caret under where
+    /// it is, to show below the error. `input` is the text that was parsed. A
+    /// long line shows only the part around the error.
+    ///
+    /// ```text
+    /// 1 | {"a": 1]
+    ///   |        ^
+    /// ```
+    #[must_use]
+    pub fn excerpt(&self, input: &str) -> String {
+        let mut offset = self.offset.min(input.len());
+        while !input.is_char_boundary(offset) {
+            offset -= 1;
+        }
+        let start = input[..offset].rfind('\n').map_or(0, |at| at + 1);
+        let end = input[offset..]
+            .find('\n')
+            .map_or(input.len(), |at| offset + at);
+        let line: Vec<char> =
+            input[start..end].trim_end_matches('\r').chars().collect();
+        let at = input[start..offset].chars().count().min(line.len());
+        let first = at
+            .saturating_sub(EXCERPT / 2)
+            .min(line.len().saturating_sub(EXCERPT));
+        let last = (first + EXCERPT).min(line.len());
+        let (mut shown, mut under) = (String::new(), String::new());
+        if first > 0 {
+            shown.push_str("...");
+            under.push_str("   ");
+        }
+        for (index, &c) in line[first..last].iter().enumerate() {
+            // A character that moves the cursor would hide the caret.
+            shown.push(if c.is_control() && c != '\t' {
+                '\u{FFFD}'
+            } else {
+                c
+            });
+            if first + index < at {
+                under.push(if c == '\t' { '\t' } else { ' ' });
+            }
+        }
+        if last < line.len() {
+            shown.push_str("...");
+        }
+        let number = self.line.to_string();
+        let gutter = " ".repeat(number.len());
+        format!("{number} | {shown}\n{gutter} | {under}^")
+    }
 }
+
+/// The most characters of a line an excerpt shows.
+const EXCERPT: usize = 80;
 
 impl fmt::Display for Expected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -436,5 +488,50 @@ mod tests {
             error.to_string(),
             "unexpected end of the input at line 1, column 1"
         );
+    }
+
+    /// Returns the excerpt of the error at `offset` in `input`.
+    fn excerpt(input: &str, offset: usize) -> String {
+        Error::new(input, offset, Vec::new(), None).excerpt(input)
+    }
+
+    #[test]
+    fn shows_the_line_with_a_caret_under_the_error() {
+        assert_eq!(excerpt("{\"a\": 1]", 7), "1 | {\"a\": 1]\n  |        ^");
+        assert_eq!(excerpt("a\r\nbc?\r\nd", 5), "2 | bc?\n  |   ^");
+        assert_eq!(excerpt("ab\n", 3), "2 | \n  | ^");
+        assert_eq!(excerpt(&"\n".repeat(9), 9), "10 | \n   | ^");
+        // A tab stays, to keep the caret in line, and a character that moves
+        // the cursor does not.
+        assert_eq!(excerpt("\tx\u{1b}y", 3), "1 | \tx\u{FFFD}y\n  | \t  ^");
+    }
+
+    #[test]
+    fn shows_the_part_of_a_long_line_around_the_error() {
+        let line = format!("{}!{}", "a".repeat(200), "b".repeat(200));
+        assert_eq!(
+            excerpt(&line, 200),
+            format!(
+                "1 | ...{}!{}...\n  |    {}^",
+                "a".repeat(40),
+                "b".repeat(39),
+                " ".repeat(40)
+            )
+        );
+        let line = "a".repeat(100);
+        assert_eq!(
+            excerpt(&line, 100),
+            format!("1 | ...{}\n  |    {}^", "a".repeat(80), " ".repeat(80))
+        );
+    }
+
+    #[test]
+    fn shows_an_excerpt_of_other_text_without_failing() {
+        let error = Error::new("abcdef", 5, Vec::new(), None);
+        assert_eq!(error.excerpt(""), "1 | \n  | ^");
+        assert_eq!(error.excerpt("ab\u{e9}"), "1 | ab\u{e9}\n  |    ^");
+        // An offset inside a character points at the character.
+        let error = Error::new("abcdef", 3, Vec::new(), None);
+        assert_eq!(error.excerpt("ab\u{e9}"), "1 | ab\u{e9}\n  |   ^");
     }
 }

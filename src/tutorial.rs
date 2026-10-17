@@ -128,7 +128,8 @@
 //! # Errors
 //!
 //! An input that does not match tells where it stops matching, and what could
-//! have come there:
+//! have come there. `excerpt` gives the line of the error with a caret under
+//! where it is:
 //!
 //! ```
 //! # caiaphas::grammar!(pub mod setting {
@@ -138,12 +139,14 @@
 //! #      (* hide *) letter = ? U+0061..U+007A ?;
 //! #      (* hide *) digit = ? U+0030..U+0039 ?;"
 //! # });
-//! let error = "web=99999".parse::<setting::Setting>().unwrap_err();
+//! let input = "web=99999";
+//! let error = input.parse::<setting::Setting>().unwrap_err();
 //! assert_eq!(
 //!     error.to_string(),
 //!     "expected a port, found `99999` at line 1, column 5"
 //! );
 //! assert_eq!((error.line(), error.column()), (1, 5));
+//! assert_eq!(error.excerpt(input), "1 | web=99999\n  |     ^");
 //! ```
 //!
 //! A rule written with `(* recover *)` lets a parse go on past an error in it.
