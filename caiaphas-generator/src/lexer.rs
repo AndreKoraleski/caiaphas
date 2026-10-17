@@ -10,6 +10,7 @@ use std::{error::Error, fmt};
 
 use bracketed_textual_comment::ParseBracketedTextualCommentError;
 pub(crate) use commentless_symbol::ParseCommentlessSymbolError;
+use commentless_symbol::special_sequence::ParseSpecialSequenceError;
 pub(crate) use commentless_symbol::{
     CommentlessSymbol, Integer, MetaIdentifier, Pattern, SpecialSequence,
     TerminalString,
@@ -163,6 +164,10 @@ fn symbol_recovery_length(
             let quote = &line[..1];
             line[1..].find(quote).map_or(line.len(), |end| end + 2)
         }
+        // A pattern a `?` cut short goes on to where it was meant to end.
+        ParseCommentlessSymbolError::SpecialSequence(
+            ParseSpecialSequenceError::CutPattern(length),
+        ) => length,
         ParseCommentlessSymbolError::SpecialSequence(_) => input[first..]
             .find('?')
             .map_or(input.len(), |end| first + end + 1),
@@ -503,6 +508,21 @@ mod tests {
                 Err("? x ?"),
                 Ok(","),
                 Err("? U+D800 ?"),
+                Ok(","),
+                Ok("b"),
+                Ok(";")
+            ]
+        );
+    }
+
+    #[test]
+    fn goes_on_after_a_pattern_a_question_mark_cuts_short() {
+        assert_eq!(
+            outline("a = ? /x?y/ ?, b;"),
+            [
+                Ok("a"),
+                Ok("="),
+                Err("? /x?y/ ?"),
                 Ok(","),
                 Ok("b"),
                 Ok(";")

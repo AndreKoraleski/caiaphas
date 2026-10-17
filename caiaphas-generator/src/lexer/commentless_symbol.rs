@@ -140,6 +140,7 @@ impl ParseCommentlessSymbolError {
             }
             Self::NotCommentless(c) => Some(how_to_write_outside(c)),
             Self::TerminalString(error) => error.help(),
+            Self::SpecialSequence(error) => error.help(),
             _ => None,
         }
     }

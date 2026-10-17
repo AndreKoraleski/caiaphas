@@ -35,10 +35,17 @@ impl SpecialSequence {
     ) -> Result<(Self, usize), ParseSpecialSequenceError> {
         let length = length(input)?;
         let raw = input[1..length - 1].trim_matches(gap_separator::is_gap);
-        if let Some(text) = raw
-            .strip_prefix('/')
-            .and_then(|rest| rest.strip_suffix('/'))
-        {
+        if let Some(rest) = raw.strip_prefix('/') {
+            let Some(text) = rest.strip_suffix('/') else {
+                // A `?` inside a pattern ends the special sequence before the
+                // pattern does.
+                return Err(match meant_length(input, length) {
+                    Some(meant) => {
+                        ParseSpecialSequenceError::CutPattern(meant)
+                    }
+                    None => ParseSpecialSequenceError::UnclosedPattern,
+                });
+            };
             let pattern = pattern::parse(text)
                 .map_err(ParseSpecialSequenceError::InvalidPattern)?;
             return Ok((Self(pattern), length));
@@ -78,6 +85,24 @@ pub(crate) fn length(input: &str) -> Result<usize, ParseSpecialSequenceError> {
         }
         length += size;
     }
+}
+
+/// Returns how long the special sequence at the start of `input` was meant to
+/// be, when a `?` inside its pattern ended it at `length`: up to a `/` and a
+/// `?` after it, with only spaces or tabs between, on the same line.
+fn meant_length(input: &str, length: usize) -> Option<usize> {
+    let line = input.find('\n').unwrap_or(input.len());
+    let mut from = length;
+    while let Some(slash) = input[from..line].find('/') {
+        let after = from + slash + 1;
+        let rest = &input[after..line];
+        let gap = rest.len() - rest.trim_start_matches([' ', '\t']).len();
+        if rest[gap..].starts_with('?') {
+            return Some(after + gap + 1);
+        }
+        from = after;
+    }
+    None
 }
 
 /// Reads `U+XXXX` or `U+XXXX..U+YYYY`.
@@ -128,6 +153,11 @@ pub(crate) enum ParseSpecialSequenceError {
     ReversedRange(char, char),
     /// What is between the `/` is not a pattern, for this reason.
     InvalidPattern(&'static str),
+    /// A pattern starts with `/` but does not end with one.
+    UnclosedPattern,
+    /// A `?` inside a pattern ended the special sequence, which was meant to
+    /// be this long.
+    CutPattern(usize),
 }
 
 impl fmt::Display for ParseSpecialSequenceError {
@@ -150,6 +180,13 @@ impl fmt::Display for ParseSpecialSequenceError {
             Self::InvalidPattern(reason) => {
                 write!(f, "invalid pattern in a special sequence: {reason}")
             }
+            Self::UnclosedPattern => {
+                f.write_str("pattern in a special sequence has no closing `/`")
+            }
+            Self::CutPattern(_) => f.write_str(
+                "a `?` ends a special sequence, so this pattern stops before \
+                 its closing `/`",
+            ),
             Self::NotAScalarValue(value) => {
                 write!(f, "U+{value:04X} is not a Unicode scalar value")
             }
@@ -159,6 +196,23 @@ impl fmt::Display for ParseSpecialSequenceError {
                 u32::from(*start),
                 u32::from(*end)
             ),
+        }
+    }
+}
+
+impl ParseSpecialSequenceError {
+    /// Returns how to fix the special sequence, when there is a usual way.
+    pub(crate) fn help(self) -> Option<String> {
+        match self {
+            Self::CutPattern(_) => Some(
+                "write `{0,1}` for an optional part of a pattern, as in \
+                 `? /a{0,1}b/ ?`"
+                    .to_owned(),
+            ),
+            Self::UnclosedPattern => Some(
+                "end the pattern with `/`, as in `? /[a-z]+/ ?`".to_owned(),
+            ),
+            _ => None,
         }
     }
 }
@@ -334,6 +388,27 @@ mod tests {
             Err(ParseSpecialSequenceError::InvalidPattern(
                 "a class needs a `]`"
             ))
+        );
+    }
+
+    #[test]
+    fn tells_a_pattern_that_a_question_mark_cuts_short() {
+        assert_eq!(
+            SpecialSequence::read("? /a?b/ ?;"),
+            Err(ParseSpecialSequenceError::CutPattern(9))
+        );
+        assert_eq!(
+            SpecialSequence::read("?/[+-]?[0-9]+/?"),
+            Err(ParseSpecialSequenceError::CutPattern(15))
+        );
+        // Where no `/` and `?` follow on the line, the pattern is not closed.
+        assert_eq!(
+            SpecialSequence::read("? /[a-z]+ ?\nb = '/' ?"),
+            Err(ParseSpecialSequenceError::UnclosedPattern)
+        );
+        assert_eq!(
+            SpecialSequence::read("? / ?"),
+            Err(ParseSpecialSequenceError::UnclosedPattern)
         );
     }
 
