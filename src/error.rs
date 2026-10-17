@@ -128,6 +128,47 @@ impl Error {
         self.found.as_deref()
     }
 
+    /// Returns what the error says without where it is, for a message that
+    /// tells that its own way, such as `path:line:column: message`.
+    ///
+    /// ```
+    /// caiaphas::grammar!(mod pair { "pair = 'x', ',', 'y';" });
+    ///
+    /// let error = pair::Pair::parse("x;y").unwrap_err();
+    /// assert_eq!(error.message(), "expected `,`, found `;`");
+    /// let message = "expected `,`, found `;` at line 1, column 2";
+    /// assert_eq!(error.to_string(), message);
+    /// ```
+    #[must_use]
+    pub fn message(&self) -> String {
+        if self.too_deep {
+            return "the input nests too deeply to parse".to_owned();
+        }
+        let mut message = String::new();
+        if !self.expected.is_empty() {
+            message.push_str("expected ");
+            let parts = described(&self.expected);
+            for (index, part) in parts.iter().enumerate() {
+                if index > 0 {
+                    let last = index == parts.len() - 1;
+                    message.push_str(if last { " or " } else { ", " });
+                }
+                message.push_str(part);
+            }
+        }
+        let _ = match (self.expected.is_empty(), &self.found) {
+            (true, Some(found)) => {
+                write!(message, "unexpected `{}`", Shown(found))
+            }
+            (true, None) => write!(message, "unexpected end of the input"),
+            (false, Some(found)) => {
+                write!(message, ", found `{}`", Shown(found))
+            }
+            (false, None) => write!(message, ", found the end of the input"),
+        };
+        message
+    }
+
     /// Returns the line of `input` the error is on, with a caret under where
     /// it is, to show below the error. `input` is the text that was parsed. A
     /// long line shows only the part around the error.
@@ -191,31 +232,13 @@ impl fmt::Display for Shown<'_> {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.too_deep {
-            return write!(
-                f,
-                "the input nests too deeply to parse at line {}, column {}",
-                self.line, self.column
-            );
-        }
-        if !self.expected.is_empty() {
-            f.write_str("expected ")?;
-            let parts = described(&self.expected);
-            for (index, part) in parts.iter().enumerate() {
-                if index > 0 {
-                    let last = index == parts.len() - 1;
-                    f.write_str(if last { " or " } else { ", " })?;
-                }
-                f.write_str(part)?;
-            }
-        }
-        match (self.expected.is_empty(), &self.found) {
-            (true, Some(found)) => write!(f, "unexpected `{}`", Shown(found))?,
-            (true, None) => f.write_str("unexpected end of the input")?,
-            (false, Some(found)) => write!(f, ", found `{}`", Shown(found))?,
-            (false, None) => f.write_str(", found the end of the input")?,
-        }
-        write!(f, " at line {}, column {}", self.line, self.column)
+        write!(
+            f,
+            "{} at line {}, column {}",
+            self.message(),
+            self.line,
+            self.column
+        )
     }
 }
 
@@ -232,10 +255,10 @@ const CLASSES: &[(&[(char, char)], &str)] = &[
 ];
 
 /// Returns how to tell each of `expected`, with the ranges that make up a
-/// class of characters with a name told by that name, where the first of them
-/// is.
+/// class of characters with a name told by that name, and the ranges that hold
+/// every character but a few told by those few, where the first of them is.
 fn described(expected: &[Expected]) -> Vec<String> {
-    let mut named: Vec<Option<&str>> = vec![None; expected.len()];
+    let mut named: Vec<Option<String>> = vec![None; expected.len()];
     let mut taken = vec![false; expected.len()];
     for &(ranges, name) in CLASSES {
         let found: Option<Vec<usize>> = ranges
@@ -250,18 +273,66 @@ fn described(expected: &[Expected]) -> Vec<String> {
             for &index in &found {
                 taken[index] = true;
             }
-            named[found[0]] = Some(name);
+            named[found[0]] = Some(name.to_owned());
         }
+    }
+    let ranges: Vec<(usize, (char, char))> = expected
+        .iter()
+        .enumerate()
+        .filter_map(|(index, item)| match item {
+            Expected::Range(first, last) if !taken[index] => {
+                Some((index, (*first, *last)))
+            }
+            _ => None,
+        })
+        .collect();
+    let bounds: Vec<(char, char)> =
+        ranges.iter().map(|&(_, bounds)| bounds).collect();
+    if let Some(all_but) = all_but(&bounds) {
+        for &(index, _) in &ranges {
+            taken[index] = true;
+        }
+        named[ranges[0].0] = Some(all_but);
     }
     expected
         .iter()
         .enumerate()
-        .filter_map(|(index, item)| match (named[index], taken[index]) {
-            (Some(name), _) => Some(name.to_owned()),
-            (None, true) => None,
-            (None, false) => Some(item.to_string()),
+        .filter_map(|(index, item)| {
+            match (named[index].take(), taken[index]) {
+                (Some(name), _) => Some(name),
+                (None, true) => None,
+                (None, false) => Some(item.to_string()),
+            }
         })
         .collect()
+}
+
+/// Returns `any character but` the few characters that `ranges`, sorted and
+/// apart, leave out of every character, when they leave out a few.
+fn all_but(ranges: &[(char, char)]) -> Option<String> {
+    const FEW: usize = 3;
+    let (&(first, _), &(_, last)) = (ranges.first()?, ranges.last()?);
+    if ranges.len() < 2 || first != '\0' || last != char::MAX {
+        return None;
+    }
+    let mut left_out = Vec::new();
+    for pair in ranges.windows(2) {
+        let mut c = after(pair[0].1);
+        while c < pair[1].0 {
+            if left_out.len() == FEW {
+                return None;
+            }
+            left_out.push(format!("`{}`", Shown(&c.to_string())));
+            c = after(c);
+        }
+    }
+    let (last, rest) = left_out.split_last()?;
+    let told = if rest.is_empty() {
+        last.clone()
+    } else {
+        format!("{} or {last}", rest.join(", "))
+    };
+    Some(format!("any character but {told}"))
 }
 
 #[cfg(test)]
@@ -290,6 +361,39 @@ mod tests {
             [Expected::Text(","), Expected::Text("}")]
         );
         assert_eq!(error.found(), Some("]"));
+    }
+
+    #[test]
+    fn tells_every_character_but_a_few_by_those_few() {
+        let error = Error::new(
+            "\n",
+            0,
+            vec![
+                Expected::Range('\0', '\t'),
+                Expected::Range('\u{b}', char::MAX),
+            ],
+            None,
+        );
+        assert_eq!(
+            error.message(),
+            "expected any character but `\\n`, found `\\n`"
+        );
+        let error = Error::new(
+            "",
+            0,
+            vec![
+                Expected::Range('\0', '!'),
+                Expected::Range('#', '['),
+                Expected::Range(']', char::MAX),
+                Expected::Text("x"),
+            ],
+            None,
+        );
+        assert_eq!(
+            error.message(),
+            "expected `x` or any character but `\"` or `\\`, found the end \
+             of the input"
+        );
     }
 
     #[test]

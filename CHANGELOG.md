@@ -61,8 +61,11 @@ adhere to [Semantic Versioning][semver].
 - `Span` for where a rule matched in its input, and `Error` for where an input
   stops matching and what could have come there. `Error::expected` and
   `Error::found` give the same as values, with `Expected` at the root of the
-  crate. `Error::excerpt` gives the line of the error with a caret under it,
-  and `Span::excerpt` the line of a match with carets under its text.
+  crate. `Error::message` gives what the error says without where it is,
+  `Error::excerpt` the line of the error with a caret under it, and
+  `Span::excerpt` the line of a match with carets under its text. An error
+  that expects every character but a few names those few, as the end of a
+  quoted string does with `any character but` a line break.
 - The `caiaphas` command of the `caiaphas-cli` crate. `caiaphas check` checks
   grammar files without building anything, `caiaphas types` prints the types
   a grammar gives, `caiaphas parse` runs a grammar on inputs as its parser
