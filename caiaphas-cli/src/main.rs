@@ -4,6 +4,8 @@
 //! module would hold, runs a grammar on an input as its parser would, and
 //! explains each kind of finding.
 
+#[cfg(test)]
+mod differential;
 mod interpret;
 
 use std::{

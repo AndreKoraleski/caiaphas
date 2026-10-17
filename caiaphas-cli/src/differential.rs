@@ -1,0 +1,368 @@
+//! Tests that running a grammar's plan matches as its generated parser does:
+//! the same tree for each input that matches, and the same error for each that
+//! does not. The inputs come from the grammar itself, each followed by changes
+//! that make most of them wrong.
+
+use std::thread;
+
+use caiaphas::Error;
+use caiaphas_generator::plan::{self, Kind, Part, Plan};
+
+use crate::interpret::Program;
+
+/// Generates inputs from a plan, the same ones for the same seed.
+struct Inputs<'p> {
+    plan: &'p Plan,
+    state: u64,
+}
+
+/// How long an input gets before its parts stop being written out.
+const LENGTH: usize = 400;
+
+/// How deep the rules of an input nest before its parts stop being written.
+const NESTING: usize = 24;
+
+impl Inputs<'_> {
+    fn next(&mut self) -> u64 {
+        // A xorshift generator is enough to pick among a few ways.
+        self.state ^= self.state << 13;
+        self.state ^= self.state >> 7;
+        self.state ^= self.state << 17;
+        self.state
+    }
+
+    fn below(&mut self, count: usize) -> usize {
+        usize::try_from(self.next() % count.max(1) as u64).unwrap_or(0)
+    }
+
+    /// Adds a text the rule numbered `rule` may match to `input`.
+    fn rule(&mut self, rule: usize, depth: usize, input: &mut String) {
+        if depth < NESTING && input.len() < LENGTH {
+            self.part(&self.plan.rules[rule].expression, depth + 1, input);
+        }
+    }
+
+    fn part(&mut self, part: &Part, depth: usize, input: &mut String) {
+        match &part.kind {
+            Kind::Sequence(steps) => {
+                for step in steps {
+                    self.part(step, depth, input);
+                }
+            }
+            Kind::Choice(alternatives) => {
+                let alternative = self.below(alternatives.len());
+                self.part(&alternatives[alternative], depth, input);
+            }
+            Kind::Optional(sequence) => {
+                if self.below(2) == 0 {
+                    self.part(sequence, depth, input);
+                }
+            }
+            Kind::Repeat(sequence) => {
+                for _ in 0..self.below(4) {
+                    if input.len() >= LENGTH {
+                        break;
+                    }
+                    self.part(sequence, depth, input);
+                }
+            }
+            Kind::Times(times, primary) => {
+                for _ in 0..*times {
+                    self.part(primary, depth, input);
+                }
+            }
+            Kind::Except { factor, .. } => self.part(factor, depth, input),
+            Kind::Rule(rule) => self.rule(*rule, depth, input),
+            Kind::Text(text) => input.push_str(text),
+            Kind::Range(first, last) => {
+                let (first, last) = (u32::from(*first), u32::from(*last));
+                let picked = match self.below(3) {
+                    0 => first,
+                    1 => last,
+                    _ => first + (last - first) / 2,
+                };
+                input.push(char::from_u32(picked).unwrap_or('x'));
+            }
+            _ => {}
+        }
+    }
+
+    /// Returns `input` with one change: a character left out, doubled, or put
+    /// in from elsewhere in it.
+    fn changed(&mut self, input: &str) -> String {
+        let chars: Vec<char> = input.chars().collect();
+        if chars.is_empty() {
+            return "?".to_owned();
+        }
+        let at = self.below(chars.len());
+        let mut changed = chars.clone();
+        match self.below(3) {
+            0 => {
+                changed.remove(at);
+            }
+            1 => changed.insert(at, chars[at]),
+            _ => changed.insert(at, chars[self.below(chars.len())]),
+        }
+        changed.into_iter().collect()
+    }
+}
+
+/// Checks that the grammar `source`, run from its plan starting with the rule
+/// named `start`, matches as `generated` does, on inputs from `seed`.
+fn compare(
+    source: &'static str,
+    start: &str,
+    generated: fn(&str) -> Result<String, Error>,
+    seed: u64,
+) {
+    let plan = plan::of(source, "grammar.ebnf").expect("the grammar works");
+    let start = plan
+        .rules
+        .iter()
+        .position(|rule| rule.name == start)
+        .expect("the grammar has the rule");
+    let mut inputs = Inputs {
+        plan: &plan,
+        state: seed,
+    };
+    let mut all = Vec::new();
+    for _ in 0..60 {
+        let mut input = String::new();
+        inputs.rule(start, 0, &mut input);
+        let changed = inputs.changed(&input);
+        let changed_again = inputs.changed(&changed);
+        all.extend([input, changed, changed_again]);
+    }
+    all.push(String::new());
+    let program = Program::new(plan, start);
+    // Interpreted rules take more stack than generated ones.
+    thread::Builder::new()
+        .stack_size(256 << 20)
+        .spawn(move || {
+            for input in all {
+                let found = program
+                    .parse(&input, caiaphas::__private::DEPTH)
+                    .map_err(|error| error.to_string());
+                let expected =
+                    generated(&input).map_err(|error| error.to_string());
+                assert_eq!(found, expected, "input {input:?}");
+            }
+        })
+        .expect("a thread can start")
+        .join()
+        .expect("the interpreter matches as the generated parser does");
+}
+
+/// A test for each grammar file and rule a parse starts from, comparing the
+/// interpreter with the parser `grammar!` generates for it. The module of each
+/// grammar takes the name of its test.
+macro_rules! files {
+    ($($test:ident = $path:literal, $start:literal => $ty:ident;)*) => {
+        $(
+            caiaphas::grammar!(mod $test = $path);
+
+            #[test]
+            fn $test() {
+                compare(
+                    include_str!(concat!("../", $path)),
+                    $start,
+                    $test::$ty::__tree,
+                    0x9E37_79B9_7F4A_7C15,
+                );
+            }
+        )*
+    };
+}
+
+files! {
+    arithmetic = "../tests/grammars/arithmetic.ebnf",
+        "arithmetic" => Arithmetic;
+    declarations = "../tests/grammars/declarations.ebnf",
+        "program" => Program;
+    exclamations = "../tests/grammars/exclamations.ebnf",
+        "exclamation" => Exclamation;
+    going_back = "../tests/grammars/going_back.ebnf",
+        "maybe" => Maybe;
+    greedy = "../tests/grammars/greedy.ebnf",
+        "phrase" => Phrase;
+    hidden = "../tests/grammars/hidden.ebnf",
+        "pair" => Pair;
+    iso14977 = "../tests/grammars/iso14977.ebnf",
+        "syntax" => Syntax;
+    items = "../tests/grammars/items.ebnf",
+        "items" => Items;
+    json = "../tests/grammars/json.ebnf",
+        "json" => Json;
+    json_value = "../tests/grammars/json.ebnf",
+        "value" => Value;
+    letter_x = "../tests/grammars/letter_x.ebnf",
+        "letter x" => LetterX;
+    list = "../tests/grammars/list.ebnf",
+        "numbers" => Numbers;
+    marked = "../tests/grammars/marked.ebnf",
+        "marked" => Marked;
+    phrase = "../tests/grammars/phrase.ebnf",
+        "phrase" => Phrase;
+    shared = "../tests/grammars/shared.ebnf",
+        "shared" => Shared;
+    split = "../tests/grammars/split.ebnf",
+        "split" => Split;
+    starts = "../tests/grammars/starts.ebnf",
+        "starts" => Starts;
+    toml = "../tests/grammars/toml.ebnf",
+        "toml" => Toml;
+    twice = "../tests/grammars/twice.ebnf",
+        "twice" => Twice;
+    words = "../tests/grammars/words.ebnf",
+        "word" => Word;
+    calculator = "../examples/grammars/calculator.ebnf",
+        "calculation" => Calculation;
+    ini = "../examples/grammars/ini.ebnf",
+        "ini" => Ini;
+    json_example = "../examples/grammars/json.ebnf",
+        "json" => Json;
+}
+
+/// A test for each grammar written in the macro, comparing the interpreter
+/// with the parser `grammar!` generates for it. The module of each grammar
+/// takes the name of its test.
+macro_rules! written {
+    ($($test:ident { $grammar:tt }, $start:literal => $ty:ident;)*) => {
+        $(
+            caiaphas::grammar!(mod $test { $grammar });
+
+            #[test]
+            fn $test() {
+                let seed = 0x2545_F491_4F6C_DD1D;
+                compare($grammar, $start, $test::$ty::__tree, seed);
+            }
+        )*
+    };
+}
+
+written! {
+    assignment {
+        "assignment = name, '=', name; name = letter, {letter};
+         (* hide *) letter = ? U+0061..U+007A ?;"
+    }, "assignment" => Assignment;
+    grouped {
+        "sum = group, {'+', group};
+         (* inline *) group = '(', number, ')' | number;
+         number = digit, {digit};
+         (* hide *) digit = ? U+0030..U+0039 ?;"
+    }, "sum" => Sum;
+    remembered {
+        "pair = both, 'x' | both, 'y';
+         (* inline *) both = a, b; a = 'a'; b = 'b';"
+    }, "pair" => Pair;
+    parenthesized {
+        "sum = primary, {'+', primary};
+         primary = number | group;
+         (* inline *) group = '(', sum, ')';
+         number = ? /[0-9]+/ ?;"
+    }, "sum" => Sum;
+    closed {
+        "group = '(', 'x', close; (* hide *) close = ')', ';';"
+    }, "group" => Group;
+    settings {
+        "settings = setting, {';', setting};
+         setting = name, '=', value;
+         (* expect tied-branches: a flag is never a word *)
+         value = number | flag | word;
+         (* as u8 *) number = digit, {digit};
+         (* as bool *) flag = 'true' | 'false';
+         (* as String *) word = letter, {letter};
+         (* as String *) name = letter, {letter};
+         (* hide *) letter = ? U+0061..U+007A ?;
+         (* hide *) digit = ? U+0030..U+0039 ?;"
+    }, "settings" => Settings;
+    price {
+        "price = amount, ' ', currency;
+         (* as f64 *) amount = digit, {digit}, ['.', digit, {digit}];
+         currency = 'EUR' | 'USD';
+         (* hide *) digit = ? U+0030..U+0039 ?;"
+    }, "price" => Price;
+    bytes {
+        "(* expect ambiguous-split: the first byte takes what it can *)
+         pair = byte, byte; (* as u8 *) byte = digit, {digit};
+         (* hide *) digit = ? U+0030..U+0039 ?;"
+    }, "pair" => Pair;
+    leftover {
+        "(* greedy *) s = head, c;
+         head = [d], 'a', {'x'}, 'x';
+         d = c, 'y';
+         c = ? U+0061..U+0062 ?;"
+    }, "s" => S;
+    leftover_variant {
+        "(* greedy *) e = head | k;
+         head = [d], 'q', {'x'}, 'x';
+         d = c, 'y';
+         c = 'q';
+         k = 'w';"
+    }, "e" => E;
+    ends_apart {
+        "(* expect tied-branches: the first wins *)
+         s = a, 'ab' | a, 'b'; a = {'a'};"
+    }, "s" => S;
+    converted_character {
+        "s = {c}, 'x';
+         (* hide *) (* as u8 *) c = ? U+0030..U+0039 ? | 'a';"
+    }, "s" => S;
+    statement {
+        "statement = name, ' = ', name;
+         name = letters - keyword;
+         (* hide *) letters = letter, {letter};
+         (* hide *) keyword = 'let' | 'if';
+         (* hide *) letter = ? U+0061..U+007A ?;"
+    }, "statement" => Statement;
+    hidden_ranges {
+        "pair = 'x', (tail | single);
+         (* hide *) tail = ? U+0061..U+007A ?, '!';
+         (* hide *) single = ? U+0030..U+0039 ? | ',';"
+    }, "pair" => Pair;
+    comment {
+        "comment = '/*', body, '*/';
+         (* as String *) body = {character} - ({character}, '*/', {character});
+         (* hide *) character = ? U+0020..U+007E ?;"
+    }, "comment" => Comment;
+    first_everywhere {
+        "s = direct | optional | grouped | sequence;
+         direct = 'd', f, {'b'};
+         optional = 'o', [f], {'b'};
+         grouped = 'g', (f | 'c'), {'b'};
+         sequence = 's', (f, ['b']), {'b'};
+         (* match first *) f = 'a' | 'ab', ['b'];"
+    }, "s" => S;
+    address {
+        "address = byte, '.', byte, '.', byte, '.', byte;
+         (* hide *) (* as u8 *) byte = ? /\\d+/ ?;"
+    }, "address" => Address;
+    either_bracket {
+        "brackets = '(', [brackets], ')' | '(', [brackets], ')', ';';"
+    }, "brackets" => Brackets;
+    spaced_words {
+        "(* expect ambiguous-split: the first word takes what it can *)
+         words = word, {' ', word, ';'}, [' '];
+         word = letter, {letter | ' '};
+         (* hide *) letter = ? U+0061..U+007A ?;"
+    }, "words" => Words;
+    file {
+        "file = name, '.', extension;
+         name = character, {character};
+         extension = letter, {letter};
+         (* hide *) character = letter | '.';
+         (* hide *) letter = ? U+0061..U+007A ?;"
+    }, "file" => File;
+    longest_first {
+        "(* expect ambiguous-split: the first part takes what it can *)
+         s = a, b; a = 'x' | 'x', 'y'; b = ['y'], 'z';"
+    }, "s" => S;
+}
+
+written! {
+    greedy_first_match {
+        "s = k, ['f'], ';';
+         (* expect unreachable-alternative: the test reads both ways *)
+         (* greedy *) (* match first *) k = 'i' | 'if';"
+    }, "s" => S;
+}
