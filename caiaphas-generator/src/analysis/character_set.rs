@@ -1,7 +1,10 @@
 //! Character sets are what the analysis compares, kept as ranges so that a
 //! special sequence of a million characters stays small.
 
-use std::{fmt, ops::RangeInclusive};
+use std::{
+    fmt::{self, Write},
+    ops::RangeInclusive,
+};
 
 /// A set of characters, as sorted ranges that neither overlap nor touch.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -164,17 +167,24 @@ impl fmt::Display for CharacterSet {
 
 impl CharacterSet {
     /// Returns the set as a message tells it, such as `` `a`, `c` or `x` to
-    /// `z` ``.
+    /// `z` ``. A set of many ranges tells the first few and how many others it
+    /// has, so the message around it stays readable.
     pub(crate) fn described(&self) -> String {
         let shown = |c: char| match c {
             '`' => "`` ` ``".to_owned(),
             _ => format!("`{}`", shown(&c.to_string())),
         };
-        let count = self.ranges.len();
+        // Leaving out only one or two ranges would not shorten it much.
+        let others = match self.ranges.len() {
+            count if count > DESCRIBED + 2 => count - DESCRIBED,
+            _ => 0,
+        };
+        let ranges = &self.ranges[..self.ranges.len() - others];
+        let count = ranges.len();
         let mut described = String::new();
-        for (index, range) in self.ranges.iter().enumerate() {
+        for (index, range) in ranges.iter().enumerate() {
             if index > 0 {
-                described.push_str(if index == count - 1 {
+                described.push_str(if index == count - 1 && others == 0 {
                     " or "
                 } else {
                     ", "
@@ -187,9 +197,15 @@ impl CharacterSet {
                 described.push_str(&shown(last));
             }
         }
+        if others > 0 {
+            write!(described, " or {others} others").expect("a string writes");
+        }
         described
     }
 }
+
+/// How many ranges of a set of many a message tells.
+const DESCRIBED: usize = 4;
 
 /// Returns `text` with the characters that do not print escaped, so a tab
 /// reads `\t`, as the errors of a parser show it.
@@ -216,6 +232,25 @@ mod tests {
         ranges.iter().fold(CharacterSet::default(), |set, range| {
             set.union(&CharacterSet::from_range(range.clone()))
         })
+    }
+
+    #[test]
+    fn tells_the_first_few_ranges_of_many() {
+        assert_eq!(
+            set(&['a'..='a', 'c'..='e']).described(),
+            "`a` or `c` to `e`"
+        );
+        let many = set(&[
+            'a'..='a',
+            'c'..='c',
+            'e'..='e',
+            'g'..='g',
+            'i'..='i',
+            'k'..='m',
+        ]);
+        assert_eq!(many.described(), "`a`, `c`, `e`, `g`, `i` or `k` to `m`");
+        let more = many.union(&CharacterSet::single('o'));
+        assert_eq!(more.described(), "`a`, `c`, `e`, `g` or 3 others");
     }
 
     #[test]
