@@ -191,6 +191,15 @@ fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
          Returns where `input` stops matching a `{name}`, and what could \
          have come there instead."
     );
+    let at_documentation = format!(
+        " Returns the `{name}` that all of `input` matches, where `input` \
+         starts at `line` and `column` of a larger text, both counted from \
+         1, such as a line of a log or a block in another file. The lines \
+         and columns of its spans and error count from there, and offsets \
+         and ranges stay those in `input`.\n\n # Errors\n\n Returns where \
+         `input` stops matching a `{name}`, and what could have come there \
+         instead."
+    );
     let recovering_documentation = format!(
         " Returns the `{name}` that `input` matches once each error that a \
          rule written with `(* recover *)` can skip is skipped, if any, and \
@@ -253,6 +262,18 @@ fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
             __caiaphas::parse::<Start>(input, DEPTH).map(|tree| {
                 tree.value::<Self>()
             })
+        }
+
+        #[doc = #at_documentation]
+        pub fn parse_at(
+            input: &str,
+            line: usize,
+            column: usize,
+        ) -> ::core::result::Result<Self, ::caiaphas::Error> {
+            #start
+            __caiaphas::parse_at::<Start>(input, DEPTH, line, column).map(
+                |tree| tree.value::<Self>(),
+            )
         }
 
         #[doc = #recovering_documentation]

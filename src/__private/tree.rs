@@ -23,6 +23,16 @@ impl Tree {
         }
     }
 
+    /// Returns the tree of an input that starts at `line` and `column` of a
+    /// larger text, so the spans in it count from there.
+    #[must_use]
+    pub(super) fn starting_at(mut self, line: usize, column: usize) -> Self {
+        Arc::get_mut(&mut self.input)
+            .expect("no span holds the input before the tree gives values")
+            .start_at(line, column);
+        self
+    }
+
     /// Returns the tree as text, a node on each line under the node around it,
     /// with the name of its rule from `names`, where it starts and the text it
     /// matched. A tool that runs a grammar shows its trees this way.

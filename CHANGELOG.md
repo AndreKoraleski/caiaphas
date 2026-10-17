@@ -42,7 +42,8 @@ adhere to [Semantic Versioning][semver].
 - `Display` that writes the text of every type with `text()`, and `PartialEq`,
   `Eq` and `Hash` that compare and hash by it.
 - `parse` and `FromStr` on the type of every rule, so a part of a grammar can
-  be read and tested alone.
+  be read and tested alone, and `parse_at` for an input that starts partway
+  through a larger text, so its errors and spans count lines from there.
 - A limit on how deeply the matches of recursive rules nest, so that no input
   can make a parser run out of stack. A deeper input gives an error, and
   `Error::is_too_deep` tells which. `depth = N` in `grammar!` changes the

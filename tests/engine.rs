@@ -338,6 +338,22 @@ fn hashes_a_match_that_holds_a_value_without_hash() {
 }
 
 #[test]
+fn counts_lines_and_columns_from_where_an_input_starts() {
+    let error = lines::Entries::parse_at("x;xx", 9, 7).unwrap_err();
+    assert_eq!((error.line(), error.column(), error.offset()), (9, 10, 3));
+    assert_eq!(error.excerpt("x;xx"), "9 | x;xx\n  |    ^");
+    let error = lines::Log::parse_at("ab\n\ncd", 5000, 7).unwrap_err();
+    assert_eq!((error.line(), error.column()), (5001, 1));
+    let log = lines::Log::parse_at("ab\ncd", 5000, 7).unwrap();
+    let spans: Vec<(usize, usize)> = log
+        .line
+        .iter()
+        .map(|line| (line.span().line(), line.span().column()))
+        .collect();
+    assert_eq!(spans, [(5000, 7), (5001, 1)]);
+}
+
+#[test]
 fn parses_a_start_rule_from_a_str() {
     let parsed: list::Numbers = "1,2".parse().unwrap();
     assert_eq!(parsed.list.item.len(), 2);

@@ -95,6 +95,20 @@ pub fn parse<S: Start>(input: &str, depth: usize) -> Result<Tree, Error> {
     Err(parser.error())
 }
 
+/// Returns what [`parse`] does for an input that starts at `line` and `column`
+/// of a larger text, so the lines and columns of its spans and error count
+/// from there.
+pub fn parse_at<S: Start>(
+    input: &str,
+    depth: usize,
+    line: usize,
+    column: usize,
+) -> Result<Tree, Error> {
+    parse::<S>(input, depth)
+        .map(|tree| tree.starting_at(line, column))
+        .map_err(|error| error.starting_at(line, column))
+}
+
 /// Returns what [`parse`] does, but goes on past each error that a rule that
 /// recovers lets the parse skip, and gives every error found. The tree comes
 /// when the input matches once those errors are skipped.

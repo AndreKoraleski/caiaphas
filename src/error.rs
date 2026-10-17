@@ -3,7 +3,10 @@
 
 use std::fmt::{self, Write};
 
-use crate::{excerpt, span::line_and_column};
+use crate::{
+    excerpt,
+    span::{line_and_column, moved},
+};
 
 /// Error returned when an input does not match its grammar.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,6 +77,15 @@ impl Error {
             too_deep: true,
             ..Self::new(input, offset, Vec::new(), None)
         }
+    }
+
+    /// Returns the error of an input that starts at `line` and `column` of a
+    /// larger text, so its line and column count from there.
+    #[must_use]
+    pub(crate) fn starting_at(mut self, line: usize, column: usize) -> Self {
+        (self.line, self.column) =
+            moved((self.line, self.column), (line, column));
+        self
     }
 
     /// Returns whether the input nests more deeply than a parser follows, as

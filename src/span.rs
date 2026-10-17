@@ -28,6 +28,9 @@ pub(crate) struct Input {
     /// asks for its line, so that a span has no interior mutability and a type
     /// that holds one can key a map.
     line_starts: Box<[usize]>,
+    /// The line and column of a larger text the text starts at, both counted
+    /// from 1, so its own lines and columns count from there.
+    start: (usize, usize),
 }
 
 impl Input {
@@ -37,7 +40,13 @@ impl Input {
         Self {
             text: text.into(),
             line_starts: iter::once(0).chain(after_breaks).collect(),
+            start: (1, 1),
         }
+    }
+
+    /// Makes the text start at `line` and `column` of a larger text.
+    pub(crate) fn start_at(&mut self, line: usize, column: usize) {
+        self.start = (line, column);
     }
 
     pub(crate) fn as_str(&self) -> &str {
@@ -49,7 +58,8 @@ impl Input {
     fn line_and_column(&self, offset: usize) -> (usize, usize) {
         let line = self.line_starts.partition_point(|&start| start <= offset);
         let line_start = self.line_starts[line - 1];
-        (line, self.text[line_start..offset].chars().count() + 1)
+        let column = self.text[line_start..offset].chars().count() + 1;
+        moved((line, column), self.start)
     }
 }
 
@@ -108,6 +118,21 @@ impl Span {
             self.end,
         )
     }
+}
+
+/// Returns `position`, a line and a column in a text, as a line and a column
+/// of a larger text where that text starts at `start`. Only the first line
+/// starts past the first column.
+pub(crate) fn moved(
+    (line, column): (usize, usize),
+    (start_line, start_column): (usize, usize),
+) -> (usize, usize) {
+    let column = if line == 1 {
+        column + start_column.saturating_sub(1)
+    } else {
+        column
+    };
+    (line + start_line.saturating_sub(1), column)
 }
 
 /// Returns the line and column of the byte `offset` in `input`, both counted
@@ -183,6 +208,21 @@ mod tests {
         assert_eq!(at(2), (2, 1));
         assert_eq!(at(3), (3, 1));
         assert_eq!(at(5), (4, 1));
+    }
+
+    #[test]
+    fn counts_from_where_its_text_starts_in_a_larger_one() {
+        let mut input = Input::new("ab\ncd");
+        input.start_at(10, 5);
+        let input = Arc::new(input);
+        let at = |offset| {
+            let found = Span::new(Arc::clone(&input), offset..offset + 1);
+            (found.line(), found.column())
+        };
+        assert_eq!(at(1), (10, 6));
+        assert_eq!(at(4), (11, 2));
+        let found = Span::new(input, 3..5);
+        assert_eq!(found.excerpt(), "11 | cd\n   | ^^");
     }
 
     #[test]

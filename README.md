@@ -277,6 +277,10 @@ The span of every match has `excerpt()` too, with carets under the text it
 covers, so a program that finds something wrong in a match, such as a name it
 does not know, can tell it the same way.
 
+`parse_at(input, line, column)` reads an input that starts there in a larger
+text, such as a line of a log or a block in another file, so its errors and
+spans tell where in that text they are.
+
 A rule written with `(* recover *)` lets a parse go on past an error in it.
 Where a match of the rule fails partway, `parse_recovering` skips to its next
 match from the error on, and gives every error found, with the value of what
