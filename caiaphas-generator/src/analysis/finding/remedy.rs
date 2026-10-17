@@ -158,6 +158,14 @@ impl FindingKind {
             Self::IneffectiveAnnotation { .. } => {
                 "remove the `(* greedy *)`".to_owned()
             }
+            Self::UntracedChoice { .. } => {
+                "give what tells them apart a rule \
+                                            of its own, as `operator = '+' | \
+                                            '-';` does for `'+', term | '-', \
+                                            term`, so its type tells which \
+                                            matched"
+                    .to_owned()
+            }
             Self::GatheredField { held, .. } => format!(
                 "label each place with an inline rule of its own, as \
                  `(* inline *) first {0} = {0};` does, so each gets a field \

@@ -10,7 +10,7 @@ pub mod plan;
 mod rearrange;
 mod shape;
 
-pub(crate) use shape::gatherings;
+pub(crate) use shape::{gatherings, untraced_choices};
 
 use std::collections::{HashMap, hash_map::Entry};
 

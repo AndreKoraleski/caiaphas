@@ -113,6 +113,9 @@ pub(crate) enum FindingKind {
     /// A visible rule only ever matches one character and a repetition reads
     /// it, so every character it matches builds a value of its own.
     SingleCharacterRule { meta_identifier: MetaIdentifier },
+    /// The alternatives of a choice hold the same rules as often, so nothing
+    /// in the fields of the rule's type tells which of them matched.
+    UntracedChoice { meta_identifier: MetaIdentifier },
     /// Places of a sequence hold a rule a different number of times each, so
     /// the one field of the rule's struct for it gathers every match.
     GatheredField {

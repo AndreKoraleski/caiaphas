@@ -14,16 +14,17 @@
 //! contain itself holds itself in a box.
 
 mod counts;
+mod traces;
 
 use std::collections::HashSet;
 
 use crate::{
     generate::name,
     ir::{Expression, ExpressionKind, Grammar, RuleId, reachable},
-    span::Span,
 };
 use counts::{ONCE, Occurrences, occurrences};
 pub(crate) use counts::{labels, spliced};
+pub(crate) use traces::{gatherings, untraced_choices};
 
 /// The type a rule becomes.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -250,77 +251,6 @@ fn fields(
             }
         })
         .collect()
-}
-
-/// A rule that places of one sequence hold a different number of times each,
-/// in a struct whose field for it gathers every match.
-pub(crate) struct Gathering {
-    /// The rule of the struct.
-    pub(crate) rule: RuleId,
-    /// The rule the field holds, or the label that names it.
-    pub(crate) held: RuleId,
-    /// The sequence.
-    pub(crate) sequence: Span,
-    /// The parts of the sequence that hold the rule.
-    pub(crate) places: Vec<Span>,
-}
-
-/// Returns each rule that places of a sequence hold a different number of
-/// times each, in each struct of `grammar`. A list such as `item, {',', item}`
-/// is one place, since the repetitions after the first place repeat it.
-pub(crate) fn gatherings(grammar: &Grammar) -> Vec<Gathering> {
-    let labels = labels(grammar);
-    let mut gatherings = Vec::new();
-    for (position, shape) in shapes(grammar).iter().enumerate() {
-        if !matches!(shape, Some(Shape::Struct(_))) {
-            continue;
-        }
-        let rule = &grammar.syntax_rules[position];
-        rule.expression.visit(&mut |expression| {
-            let ExpressionKind::SingleDefinition(steps) = &expression.kind
-            else {
-                return;
-            };
-            let held: Vec<_> = steps
-                .iter()
-                .map(|step| occurrences(grammar, &labels, step))
-                .collect();
-            let mut seen = Vec::new();
-            for &(rule_id, _) in held.iter().flatten() {
-                if seen.contains(&rule_id) {
-                    continue;
-                }
-                seen.push(rule_id);
-                let places: Vec<(&Expression, Occurrences)> = steps
-                    .iter()
-                    .zip(&held)
-                    .filter_map(|(step, held)| {
-                        let &(_, count) = held
-                            .iter()
-                            .find(|&&(other, _)| other == rule_id)?;
-                        Some((step, count))
-                    })
-                    .collect();
-                let Some(((_, first), later)) = places.split_first() else {
-                    continue;
-                };
-                let list = later.iter().all(|(step, _)| {
-                    matches!(step.kind, ExpressionKind::RepeatedSequence(_))
-                });
-                let alike = later.iter().all(|(_, count)| count == first);
-                if later.is_empty() || list || alike {
-                    continue;
-                }
-                gatherings.push(Gathering {
-                    rule: RuleId(position),
-                    held: rule_id,
-                    sequence: expression.span,
-                    places: places.iter().map(|(step, _)| step.span).collect(),
-                });
-            }
-        });
-    }
-    gatherings
 }
 
 /// Returns the rules whose types `shape` holds.

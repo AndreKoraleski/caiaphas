@@ -158,6 +158,12 @@ impl fmt::Display for FindingKind {
                  it, so every character it matches builds a value of its own",
                 meta_identifier.spaced()
             ),
+            Self::UntracedChoice { meta_identifier } => write!(
+                f,
+                "nothing in the fields of `{}` tells which of these \
+                 alternatives matched",
+                meta_identifier.spaced()
+            ),
             Self::GatheredField {
                 meta_identifier,
                 held,

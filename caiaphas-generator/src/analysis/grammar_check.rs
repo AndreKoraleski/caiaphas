@@ -21,6 +21,7 @@ mod tied_branches;
 mod unproductive_rule;
 mod unreachable_alternative;
 mod unreachable_rule;
+mod untraced_choice;
 
 use crate::{
     analysis::{facts::Facts, finding::Finding},
@@ -51,5 +52,6 @@ pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     unreachable_alternative::check,
     single_character_rule::check,
     gathered_field::check,
+    untraced_choice::check,
     nondeterministic_choice::check,
 ];

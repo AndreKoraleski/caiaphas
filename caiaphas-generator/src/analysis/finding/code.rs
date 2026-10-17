@@ -59,6 +59,7 @@ finding_codes! {
     MixedClassRange => "mixed-class-range",
     IneffectiveAnnotation => "ineffective-annotation",
     MisspelledAnnotation => "misspelled-annotation",
+    UntracedChoice => "untraced-choice",
     SeveralStartRules => "several-start-rules",
     SingleCharacterRule => "single-character-rule",
     GatheredField => "gathered-field",
@@ -99,6 +100,7 @@ impl FindingCode {
             | Self::MixedClassRange
             | Self::IneffectiveAnnotation
             | Self::MisspelledAnnotation
+            | Self::UntracedChoice
             | Self::UnfulfilledExpectation => Severity::Warning,
             Self::SingleCharacterRule
             | Self::GatheredField
@@ -158,6 +160,9 @@ impl FindingCode {
             Self::GatheredField => {
                 Some("the field holds every match, in order")
             }
+            Self::UntracedChoice => Some(
+                "only the text of a match tells which alternative matched",
+            ),
             Self::AmbiguousSplit => Some(
                 "the parser gives each part the most text it can while the \
                  rest still matches",

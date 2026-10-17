@@ -47,7 +47,22 @@ fn accepts_json_where_one_character_decides_each_choice() {
 }
 
 #[test]
-fn accepts_arithmetic_with_repetition_for_each_operator() {
+fn accepts_arithmetic_with_a_rule_for_each_operator() {
+    let source = "
+        grammar = expression;
+        expression = term, {additive, term};
+        term = factor, {multiplicative, factor};
+        factor = number | '(', expression, ')';
+        additive = '+' | '-';
+        multiplicative = '*' | '/';
+        number = digit, {digit};
+        digit = ? U+0030..U+0039 ?;
+    ";
+    assert_eq!(summary(source), Vec::<String>::new());
+}
+
+#[test]
+fn finds_operators_that_no_field_keeps() {
     let source = "
         grammar = expression;
         expression = term, {('+' | '-'), term};
@@ -56,7 +71,15 @@ fn accepts_arithmetic_with_repetition_for_each_operator() {
         number = digit, {digit};
         digit = ? U+0030..U+0039 ?;
     ";
-    assert_eq!(summary(source), Vec::<String>::new());
+    assert_eq!(
+        summary(source),
+        [
+            "('+' | '-'): nothing in the fields of `expression` tells which \
+             of these alternatives matched [\"'+'\", \"'-'\"]",
+            "('*' | '/'): nothing in the fields of `term` tells which of \
+             these alternatives matched [\"'*'\", \"'/'\"]",
+        ]
+    );
 }
 
 #[test]

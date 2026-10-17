@@ -233,6 +233,16 @@ const CASES: &[Case] = &[
                the rules that read it keep its text",
     },
     Case {
+        source: "sum = term, {('+' | '-'), term}; term = 'x';",
+        code: FindingCode::UntracedChoice,
+        severity: Severity::Warning,
+        message: "nothing in the fields of `sum` tells which of these \
+                  alternatives matched",
+        help: "give what tells them apart a rule of its own, as `operator \
+               = '+' | '-';` does for `'+', term | '-', term`, so its type \
+               tells which matched",
+    },
+    Case {
         source: "call = name, '(', [name, {',', name}], ')'; name = 'x';",
         code: FindingCode::GatheredField,
         severity: Severity::Suggestion,

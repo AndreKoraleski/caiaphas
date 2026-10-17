@@ -173,6 +173,16 @@ any other, so caiaphas reads the rule as if it were not there, but a typo in
 an annotation changes the rule's type. Write the annotation as it is spelled,
 as `(* hide *)`, or more words for an ordinary comment.
 
+## untraced-choice
+
+Warning. A choice stands between places that hold rules, and its alternatives
+hold the same rules as often, as `'+'` and `'-'` do in
+`sum = term, {('+' | '-'), term};`,
+so nothing in the fields of the rule's type tells which of them matched, and
+only its text does. Give what tells them apart a rule of its own, which
+becomes an enum:
+`sum = term, {operator, term}; operator = '+' | '-';`.
+
 ## several-start-rules
 
 Suggestion. No rule uses a rule besides the first start rule, as no rule uses

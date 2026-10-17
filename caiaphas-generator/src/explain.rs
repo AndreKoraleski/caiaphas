@@ -199,6 +199,12 @@ mod tests {
             "number = digit, {digit}; digit = ? U+0030..U+0039 ?;",
         ),
         fixed(
+            "untraced-choice",
+            "sum = term, {('+' | '-'), term};",
+            "sum = term, {('+' | '-'), term}; term = ? /[0-9]+/ ?;",
+            "sum = term, {operator, term}; operator = '+' | '-';",
+        ),
+        fixed(
             "gathered-field",
             "call = name, '(', [name, {',', name}], ')';",
             "call = name, '(', [name, {',', name}], ')'; \
