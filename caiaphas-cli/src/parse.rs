@@ -1,21 +1,24 @@
-//! `caiaphas parse` runs a grammar on an input as its generated parser would,
-//! and prints the tree of what matches and every error found.
+//! `caiaphas parse` runs a grammar on inputs as its generated parser would. It
+//! prints the tree of what matches and every error found, or for several
+//! inputs, whether each matches.
 
 use std::{
     ffi::OsString,
     io::{self, Read},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::ExitCode,
     thread,
 };
+
+use caiaphas::Error;
 
 use crate::{interpret::Program, read};
 
 /// A call of `caiaphas parse`.
 pub(crate) struct Parse {
     grammar: PathBuf,
-    /// The file of the input, or `None` for standard input.
-    input: Option<PathBuf>,
+    /// The file of each input, or `None` for standard input.
+    inputs: Vec<Option<PathBuf>>,
     /// The name of the rule to parse with, if not the first start rule.
     rule: Option<String>,
 }
@@ -36,19 +39,24 @@ impl Parse {
         }
         let mut paths = paths.into_iter();
         let grammar = paths.next()?;
-        let input = paths.next().filter(|path| path.as_os_str() != "-");
-        if paths.next().is_some() {
+        let mut inputs: Vec<Option<PathBuf>> = paths
+            .map(|path| (path.as_os_str() != "-").then_some(path))
+            .collect();
+        if inputs.is_empty() {
+            inputs.push(None);
+        }
+        // Standard input can only be read once.
+        if inputs.iter().filter(|input| input.is_none()).count() > 1 {
             return None;
         }
         Some(Self {
             grammar,
-            input,
+            inputs,
             rule,
         })
     }
 
-    /// Runs the grammar on the input, and prints the tree of what matches and
-    /// every error found.
+    /// Runs the grammar on the inputs, and prints what it finds.
     pub(crate) fn run(self) -> ExitCode {
         let source = match read(&self.grammar) {
             Ok(source) => source,
@@ -89,16 +97,6 @@ impl Parse {
                 found
             }
         };
-        // The input is read last, so a grammar's problems show without waiting
-        // for standard input.
-        let input =
-            match self.input.as_deref().map_or_else(standard_input, read) {
-                Ok(input) => input,
-                Err(error) => {
-                    eprintln!("error: {error}");
-                    return ExitCode::FAILURE;
-                }
-            };
         let program = Program::new(plan, start);
         for ty in program.unchecked() {
             eprintln!(
@@ -107,31 +105,76 @@ impl Parse {
             );
         }
         // An interpreted rule takes more stack than a generated one, so the
-        // parse runs where there is plenty.
-        let (tree, errors, input) = thread::Builder::new()
+        // parses run where there is plenty.
+        let inputs = self.inputs;
+        thread::Builder::new()
             .stack_size(STACK)
-            .spawn(move || {
-                let (tree, errors) = program.parse_recovering(&input, DEPTH);
-                (tree, errors, input)
-            })
+            .spawn(move || report(program, &inputs))
             .expect("a thread can start")
             .join()
-            .expect("a parse does not panic");
+            .expect("a parse does not panic")
+    }
+}
+
+/// Parses each of `inputs` with `program` and prints what it finds: the tree
+/// of what matches for one input, and whether each matches for several, with
+/// every error. The inputs are read here, so a grammar's problems show without
+/// waiting for standard input.
+fn report(program: &'static Program, inputs: &[Option<PathBuf>]) -> ExitCode {
+    let several = inputs.len() > 1;
+    let mut matching = 0;
+    for path in inputs {
+        let input = match path.as_deref().map_or_else(standard_input, read) {
+            Ok(input) => input,
+            Err(error) => {
+                eprintln!("error: {error}");
+                continue;
+            }
+        };
+        let (tree, errors) = program.parse_recovering(&input, DEPTH);
         // A grammar whose rules recover gives the tree of what still matches
         // with the errors it skipped.
-        if let Some(tree) = tree {
+        if let Some(tree) = tree.filter(|_| !several) {
             print!("{tree}");
         }
         for error in &errors {
-            eprintln!("error: {error}");
-            eprintln!("{}", error.excerpt(&input));
+            point(error, path.as_deref(), &input);
         }
         if errors.is_empty() {
-            ExitCode::SUCCESS
-        } else {
-            ExitCode::FAILURE
+            matching += 1;
+            if several {
+                let name = path.as_deref().map(Path::display);
+                match name {
+                    Some(name) => println!("ok {name}"),
+                    None => println!("ok standard input"),
+                }
+            }
         }
     }
+    if several {
+        println!("{matching} of {} inputs match", inputs.len());
+    }
+    if matching == inputs.len() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
+}
+
+/// Prints `error` of `input`, with where it is in the file at `path`, if the
+/// input comes from one, and the line it is on.
+fn point(error: &Error, path: Option<&Path>, input: &str) {
+    eprintln!("error: {error}");
+    if let Some(path) = path {
+        let gutter = " ".repeat(error.line().to_string().len());
+        eprintln!(
+            "{gutter}--> {}:{}:{}",
+            path.display(),
+            error.line(),
+            error.column()
+        );
+    }
+    eprintln!("{}", error.excerpt(input));
 }
 
 /// How many matches of recursive rules a parse follows inside one another, as

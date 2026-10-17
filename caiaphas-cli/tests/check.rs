@@ -93,7 +93,7 @@ fn tells_how_to_call_it() {
         &["check"],
         &["build"],
         &["parse"],
-        &["parse", "a", "b", "c"],
+        &["parse", "a", "-", "-"],
         &["parse", "a", "--rule"],
     ] {
         let output = caiaphas(arguments);
@@ -203,11 +203,33 @@ fn points_at_where_an_input_stops_matching() {
         caiaphas(&["parse", path.to_str().unwrap(), input.to_str().unwrap()]);
     assert_eq!(output.status.code(), Some(1));
     let errors = String::from_utf8(output.stderr).unwrap();
+    let expected = format!(
+        "error: expected a digit or the end of the input, found `\\n` at line \
+         1, column 6\n --> {}:1:6\n1 | ab=12\n  |      ^\n",
+        input.display()
+    );
+    assert!(errors.ends_with(&expected), "{errors}");
+}
+
+#[test]
+fn tells_whether_each_of_several_inputs_matches() {
+    let path = grammar("several", PAIRS);
+    let good = input("several-good", "ab=12");
+    let bad = input("several-bad", "ab=");
+    let output = caiaphas(&[
+        "parse",
+        path.to_str().unwrap(),
+        good.to_str().unwrap(),
+        bad.to_str().unwrap(),
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(
+        printed(&output),
+        format!("ok {}\n1 of 2 inputs match\n", good.display())
+    );
+    let errors = String::from_utf8(output.stderr).unwrap();
     assert!(
-        errors.ends_with(
-            "error: expected a digit or the end of the input, found `\\n` at \
-             line 1, column 6\n1 | ab=12\n  |      ^\n"
-        ),
+        errors.contains(&format!(" --> {}:1:4\n", bad.display())),
         "{errors}"
     );
 }
@@ -285,11 +307,14 @@ fn prints_every_error_a_rule_that_recovers_skips() {
          line 1:1 \"a = 1\"\n  line 3:1 \"b = 2\"\n  line 5:1 \"c = 3\"\n"
     );
     let errors = String::from_utf8(output.stderr).unwrap();
+    let file = input.display();
     assert_eq!(
         errors,
-        "error: expected ` = ` or a lowercase letter, found `\\n` at line 2, \
-         column 7\n2 | broken\n  |       ^\n\
-         error: expected ` = ` or a lowercase letter, found `\\n` at line 4, \
-         column 6\n4 | worse\n  |      ^\n"
+        format!(
+            "error: expected ` = ` or a lowercase letter, found `\\n` at line \
+             2, column 7\n --> {file}:2:7\n2 | broken\n  |       ^\n\
+             error: expected ` = ` or a lowercase letter, found `\\n` at line \
+             4, column 6\n --> {file}:4:6\n4 | worse\n  |      ^\n"
+        )
     );
 }

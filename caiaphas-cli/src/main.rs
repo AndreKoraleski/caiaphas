@@ -22,7 +22,7 @@ use parse::Parse;
 const USAGE: &str = "\
 usage: caiaphas check <grammar>...
        caiaphas types <grammar>
-       caiaphas parse <grammar> [<input>] [--rule <name>]
+       caiaphas parse <grammar> [<input>...] [--rule <name>]
        caiaphas explain [<code>]";
 
 const HELP: &str = "\
@@ -33,13 +33,14 @@ caiaphas parse runs a grammar on an input, from a file or standard input, as
 its generated parser would, and prints the tree of the match or where it
 stops matching. It goes on past each error that a rule written with
 (* recover *) skips, and prints every error with the tree of what matches.
+Given several inputs, it tells whether each matches instead of its tree.
 --rule parses with another rule than the first start rule.
 caiaphas explain tells what a finding means, given its code, such as
 tied-branches, and lists every code without one.
 
 usage: caiaphas check <grammar>...
        caiaphas types <grammar>
-       caiaphas parse <grammar> [<input>] [--rule <name>]
+       caiaphas parse <grammar> [<input>...] [--rule <name>]
        caiaphas explain [<code>]
 
 It exits with 1 when a grammar cannot be read, has a problem that would stop
