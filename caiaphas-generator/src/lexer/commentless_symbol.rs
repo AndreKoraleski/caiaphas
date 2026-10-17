@@ -15,7 +15,10 @@ pub(crate) use special_sequence::{Pattern, SpecialSequence};
 use terminal_string::ParseTerminalStringError;
 pub(crate) use terminal_string::TerminalString;
 
-use crate::lexer::terminal_character::{Symbol, TerminalCharacter};
+use crate::lexer::{
+    shown,
+    terminal_character::{Symbol, TerminalCharacter},
+};
 
 /// A commentless symbol is one of the symbols a grammar is made of once its
 /// gaps and comments are removed.
@@ -118,7 +121,7 @@ impl fmt::Display for ParseCommentlessSymbolError {
         match self {
             Self::EndOfInput => f.write_str("expected a symbol"),
             Self::InvalidCharacter(c) | Self::NotCommentless(c) => {
-                write!(f, "unexpected character {c:?}")
+                write!(f, "unexpected character {}", shown(*c))
             }
             Self::UnmatchedEndCommentSymbol => {
                 f.write_str("`*)` without a matching `(*`")
@@ -374,11 +377,11 @@ mod tests {
             (ParseCommentlessSymbolError::EndOfInput, "expected a symbol"),
             (
                 ParseCommentlessSymbolError::InvalidCharacter('é'),
-                "unexpected character 'é'",
+                "unexpected character `é`",
             ),
             (
                 ParseCommentlessSymbolError::NotCommentless('@'),
-                "unexpected character '@'",
+                "unexpected character `@`",
             ),
             (
                 ParseCommentlessSymbolError::UnmatchedEndCommentSymbol,

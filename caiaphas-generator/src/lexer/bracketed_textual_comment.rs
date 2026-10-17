@@ -7,7 +7,7 @@ use crate::lexer::{
         special_sequence::{self, ParseSpecialSequenceError},
         terminal_string::{self, ParseTerminalStringError},
     },
-    gap_separator,
+    gap_separator, shown,
     terminal_character::{Symbol, TerminalCharacter},
 };
 
@@ -105,7 +105,11 @@ impl fmt::Display for ParseBracketedTextualCommentError {
                 f.write_str("comment has no closing `*)`")
             }
             Self::InvalidCharacter(c) => {
-                write!(f, "{c:?} is not a valid character in a comment")
+                write!(
+                    f,
+                    "{} is not a valid character in a comment",
+                    shown(*c)
+                )
             }
             Self::TerminalString(ParseTerminalStringError::NoClosingQuote) => {
                 f.write_str(
@@ -113,11 +117,9 @@ impl fmt::Display for ParseBracketedTextualCommentError {
                      never closes",
                 )
             }
-            Self::TerminalString(_) => {
-                f.write_str("invalid terminal string in a comment")
-            }
-            Self::SpecialSequence(_) => {
-                f.write_str("invalid special sequence in a comment")
+            // What is wrong with them says what they are.
+            Self::TerminalString(_) | Self::SpecialSequence(_) => {
+                f.write_str("invalid comment")
             }
         }
     }
@@ -299,7 +301,7 @@ mod tests {
             ),
             (
                 ParseBracketedTextualCommentError::InvalidCharacter('é'),
-                "'é' is not a valid character in a comment",
+                "`é` is not a valid character in a comment",
             ),
             (
                 ParseBracketedTextualCommentError::TerminalString(
@@ -312,13 +314,13 @@ mod tests {
                 ParseBracketedTextualCommentError::TerminalString(
                     ParseTerminalStringError::Empty,
                 ),
-                "invalid terminal string in a comment",
+                "invalid comment",
             ),
             (
                 ParseBracketedTextualCommentError::SpecialSequence(
                     ParseSpecialSequenceError::NoClosingSymbol,
                 ),
-                "invalid special sequence in a comment",
+                "invalid comment",
             ),
         ];
         for (error, message) in cases {

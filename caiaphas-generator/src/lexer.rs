@@ -146,7 +146,19 @@ impl Iterator for Lexer<'_> {
 /// Returns how much of `input` to skip after `error`, so that reading goes on
 /// where the next token most likely starts.
 ///
-/// Skips at least one character, so the lexer always moves.
+/// Skips at least one character, so the lexer always moves. Returns how a
+/// message shows the character `c`: in backticks, or as its code point where
+/// it does not print, since a grammar writes no escapes.
+pub(crate) fn shown(c: char) -> String {
+    match c {
+        '`' => "`` ` ``".to_owned(),
+        _ if c.is_control() || (c.is_whitespace() && c != ' ') => {
+            format!("U+{:04X}", u32::from(c))
+        }
+        _ => format!("`{c}`"),
+    }
+}
+
 fn symbol_recovery_length(
     error: ParseCommentlessSymbolError,
     input: &str,

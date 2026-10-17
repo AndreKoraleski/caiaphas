@@ -2,7 +2,7 @@
 
 use std::{error::Error, fmt};
 
-use crate::lexer::terminal_character::TerminalCharacter;
+use crate::lexer::{shown, terminal_character::TerminalCharacter};
 
 /// A terminal string stands for its characters exactly as written.
 ///
@@ -87,7 +87,8 @@ impl fmt::Display for ParseTerminalStringError {
             Self::Empty => f.write_str("terminal string is empty"),
             Self::InvalidCharacter(c) => write!(
                 f,
-                "{c:?} is not a valid character in a terminal string"
+                "{} is not a valid character in a terminal string",
+                shown(*c)
             ),
         }
     }
@@ -234,7 +235,7 @@ mod tests {
             (ParseTerminalStringError::Empty, "terminal string is empty"),
             (
                 ParseTerminalStringError::InvalidCharacter('é'),
-                "'é' is not a valid character in a terminal string",
+                "`é` is not a valid character in a terminal string",
             ),
         ];
         for (error, message) in cases {

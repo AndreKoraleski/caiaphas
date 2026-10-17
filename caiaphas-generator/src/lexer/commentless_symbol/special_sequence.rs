@@ -15,7 +15,7 @@ use std::{error::Error, fmt, ops::RangeInclusive};
 pub(crate) use pattern::Pattern;
 
 use crate::lexer::{
-    gap_separator,
+    gap_separator, shown,
     terminal_character::{Symbol, TerminalCharacter},
 };
 
@@ -171,7 +171,8 @@ impl fmt::Display for ParseSpecialSequenceError {
             }
             Self::InvalidCharacter(c) => write!(
                 f,
-                "{c:?} is not a valid character in a special sequence"
+                "{} is not a valid character in a special sequence",
+                shown(*c)
             ),
             Self::Unsupported => f.write_str(
                 "special sequence must hold a code point such as U+00E9, a \
@@ -438,7 +439,7 @@ mod tests {
             ),
             (
                 ParseSpecialSequenceError::InvalidCharacter('é'),
-                "'é' is not a valid character in a special sequence",
+                "`é` is not a valid character in a special sequence",
             ),
             (
                 ParseSpecialSequenceError::Unsupported,

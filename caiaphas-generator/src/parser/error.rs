@@ -187,7 +187,7 @@ mod tests {
         let (_, errors) = parse("(* '' *) a = 'x';");
         assert_eq!(
             Diagnostic::from(errors[0]).message,
-            "invalid terminal string in a comment: terminal string is empty"
+            "invalid comment: terminal string is empty"
         );
     }
 
@@ -284,7 +284,7 @@ mod tests {
         }
         assert_eq!(
             parse("a = @;").1[0].to_string(),
-            "unexpected character '@'"
+            "unexpected character `@`"
         );
     }
 
