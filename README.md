@@ -79,6 +79,11 @@ if let Value::Object(object) = &document.value {
 
 Each rule ends with `;` or `.`, and whitespace is text like any other. A hidden
 rule, such as `ws` in the [overview](#overview), keeps it out of the types.
+Spaces in the grammar itself never count, even inside a name, so
+`syntax rule` and `syntaxrule` name one rule, and a space the input holds is
+written in quotes, as `' '`. An input often ends with a line break, and on
+Windows a line breaks with `\r\n`, so a grammar of lines reads a break as
+`? /\r{0,1}\n/ ?` and its last line with `(newline | ? end ?)`.
 
 | Written              | Matches                                 |
 |----------------------|-----------------------------------------|
@@ -107,9 +112,10 @@ no terminal string holds, such as `é` or a tab.
 
 A regular expression holds characters, classes such as `[a-z_]`, `[^"]`, `.`,
 `\d`, `\w` and `\s`, choices with `|`, groups, and repetitions with `*`, `+`,
-`{n}`, `{n,}` and `{n,m}`. `U+XXXX` stands for a code point, and `{0,1}` for
-an optional part, since a `?` would end the special sequence. It matches as
-the grammar it stands for would:
+`{n}`, `{n,}` and `{n,m}`, where `.` is any character, a line break too.
+`U+XXXX` stands for a code point, and `{0,1}` for an optional part, since a
+`?` would end the special sequence. It matches as the grammar it stands for
+would:
 
 ```ebnf
 assignment = name, ' = ', number;
@@ -307,7 +313,9 @@ For the lines `a = 1`, `broken` and `b = 2`, it gives the lines `a` and `b`
 and the error on line 2. A recovery starts in the rule that fails, so a
 missing separator between two matches that are whole stops the parse there.
 A skip can also end inside brackets the rule did not open, and add an error
-after the real one.
+after the real one. A rule recovers best when its matches start with what no
+other place starts with and end where a separator or the input does, as a
+line or a statement that ends with `;` does.
 
 ## Macro
 
@@ -392,13 +400,17 @@ cargo run --example calculator -- "1.5 + 2 * (3 - 4)"
 * Left recursion is an error. Its message tells how to write the rule as a
   repetition.
 * There is no separate lexer, so a grammar describes its whitespace.
-* An exception cannot use a recursive rule after the `-`.
+* An exception cannot use a recursive rule after the `-`. That is stricter
+  than §4.7 of the standard, which takes any rule that could be written out
+  without rule names, as `a = 'x', [a];` could as `'x', {'x'}`.
 * A parser reads the whole input as a `&str`, and stops at the first place it
   cannot match unless a rule [recovers](#errors) there.
 * Matches of recursive rules nest at most 512 deep, or as deep as the
-  macro's `depth` says, so a parser never runs out of stack. A deeper input
-  gives an error whose `is_too_deep()` holds, and a list written as a
-  repetition never nests.
+  macro's `depth` says, so a parser never runs out of stack. Each match of a
+  rule that can reach itself, inside another, counts once, so a JSON array in
+  an array takes two, its value and the array, and 512 allows 256 brackets. A
+  deeper input gives an error whose `is_too_deep()` holds, and a list written
+  as a repetition never nests.
 
 ## Minimum supported Rust version
 

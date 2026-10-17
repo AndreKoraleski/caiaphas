@@ -34,8 +34,13 @@
 //!
 //! # Grammars
 //!
-//! A grammar works on characters, so it describes its whitespace too. Each
-//! rule ends with `;` or `.`:
+//! A grammar works on characters, so it describes its whitespace too. Spaces
+//! in the grammar itself never count, even inside a name, so `syntax rule` and
+//! `syntaxrule` name one rule, and a space the input holds is written in
+//! quotes, as `' '`. An input often ends with a line break, and on Windows a
+//! line breaks with `\r\n`, so a grammar of lines reads a break as
+//! `? /\r{0,1}\n/ ?` and its last line with `(newline | ? end ?)`. Each rule
+//! ends with `;` or `.`:
 //!
 //! | Written           | Matches                                      |
 //! |-------------------|----------------------------------------------|
@@ -61,9 +66,10 @@
 //!
 //! A regular expression holds characters, classes such as `[a-z_]`, `[^"]`,
 //! `.`, `\d`, `\w` and `\s`, choices with `|`, groups, and repetitions with
-//! `*`, `+`, `{n}`, `{n,}` and `{n,m}`. `U+XXXX` stands for a code point, and
-//! `{0,1}` for an optional part, since a `?` would end the special sequence.
-//! It matches as the grammar it stands for would:
+//! `*`, `+`, `{n}`, `{n,}` and `{n,m}`, where `.` is any character, a line
+//! break too. `U+XXXX` stands for a code point, and `{0,1}` for an optional
+//! part, since a `?` would end the special sequence. It matches as the grammar
+//! it stands for would:
 //!
 //! ```
 //! caiaphas::grammar!(mod assignment {
@@ -195,17 +201,20 @@
 //! ```
 //!
 //! A span has `excerpt` too, for a program's own message about a match, such
-//! as a port it does not allow:
+//! as a port it does not allow. `(* as caiaphas::Spanned<u16> *)` keeps where
+//! the port was read along with its value:
 //!
 //! ```
-//! # caiaphas::grammar!(pub mod setting {
-//! #     "setting = name, '=', port;
-//! #      (* as String *) name = letter, {letter};
-//! #      port = digit, {digit};
-//! #      (* hide *) letter = ? U+0061..U+007A ?;
-//! #      (* hide *) digit = ? U+0030..U+0039 ?;"
-//! # });
+//! caiaphas::grammar!(pub mod setting {
+//!     "setting = name, '=', port;
+//!      (* as String *) name = letter, {letter};
+//!      (* as caiaphas::Spanned<u16> *) port = digit, {digit};
+//!      (* hide *) letter = ? U+0061..U+007A ?;
+//!      (* hide *) digit = ? U+0030..U+0039 ?;"
+//! });
+//!
 //! let setting: setting::Setting = "web=0".parse().unwrap();
+//! assert_eq!(*setting.port, 0);
 //! assert_eq!(setting.port.span().excerpt(), "1 | web=0\n  |     ^");
 //! ```
 //!
@@ -232,6 +241,10 @@
 //!     "expected ` = ` or a lowercase letter, found `=` at line 1, column 2"
 //! );
 //! ```
+//!
+//! A rule recovers best when its matches start with what no other place starts
+//! with and end where a separator or the input does, as a line or a statement
+//! that ends with `;` does.
 //!
 //! # Matching
 //!
