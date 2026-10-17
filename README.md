@@ -334,8 +334,8 @@ array 1:1 "[1, true]"
   value 1:5 "true"
 $ printf '[1, tru]' | caiaphas parse grammars/json.ebnf --rule array
 error: expected a value, found `t` at line 1, column 5
-   1 | [1, tru]
-     |     ^
+1 | [1, tru]
+  |     ^
 ```
 
 ## Examples

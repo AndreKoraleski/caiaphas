@@ -285,7 +285,7 @@ impl Parse {
             }
             Err((error, input)) => {
                 eprintln!("error: {error}");
-                eprintln!("{}", pointed(&input, error.line(), error.column()));
+                eprintln!("{}", error.excerpt(&input));
                 ExitCode::FAILURE
             }
         }
@@ -303,18 +303,6 @@ const STACK: usize = 256 << 20;
 /// spaced.
 fn words(name: &str) -> Vec<&str> {
     name.split_whitespace().collect()
-}
-
-/// Returns the line `line` of `input` with a caret under the column `column`,
-/// both counted from 1.
-fn pointed(input: &str, line: usize, column: usize) -> String {
-    let text = input.lines().nth(line - 1).unwrap_or_default();
-    let before: String = text
-        .chars()
-        .take(column - 1)
-        .map(|c| if c == '\t' { '\t' } else { ' ' })
-        .collect();
-    format!("{line:>4} | {text}\n     | {before}^")
 }
 
 /// Returns what standard input holds, or why it cannot be read.

@@ -206,7 +206,7 @@ fn points_at_where_an_input_stops_matching() {
     assert!(
         errors.ends_with(
             "error: expected a digit or the end of the input, found `\\n` at \
-             line 1, column 6\n   1 | ab=12\n     |      ^\n"
+             line 1, column 6\n1 | ab=12\n  |      ^\n"
         ),
         "{errors}"
     );
