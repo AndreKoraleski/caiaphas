@@ -28,6 +28,9 @@ pub struct Module {
     /// Each change to the grammar that would make its parser faster, as text
     /// that shows where in the grammar it is.
     pub suggestions: Vec<String>,
+    /// The declaration of each type of the module, after the rule it comes
+    /// from, as Rust writes it.
+    pub types: String,
 }
 
 /// How to generate the module that parses a grammar.
@@ -82,6 +85,7 @@ pub fn generate(
     Ok(Module {
         items: code::module(&grammar, matched, &shapes, source, options.depth),
         suggestions: render(suggestions),
+        types: code::outline(&grammar, &shapes, source),
     })
 }
 

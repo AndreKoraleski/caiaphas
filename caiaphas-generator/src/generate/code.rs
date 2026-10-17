@@ -4,7 +4,10 @@
 //! Generated code names everything outside the module by its full path, so
 //! that a rule named `String` or `Debug` cannot change what it means.
 
+mod outline;
 mod types;
+
+pub(crate) use outline::outline;
 
 use std::fmt::Write;
 
@@ -32,6 +35,24 @@ struct Names {
     textual: Vec<bool>,
 }
 
+impl Names {
+    /// Returns the names of the types and fields of the rules of `grammar`,
+    /// whose types `shapes` tells.
+    fn new(grammar: &Grammar, shapes: &[Option<Shape>]) -> Self {
+        let written_names = grammar
+            .syntax_rules
+            .iter()
+            .map(|rule| rule.meta_identifier.written());
+        Self {
+            types: written_names.clone().map(name::type_name).collect(),
+            fields: written_names.map(name::field_name).collect(),
+            values: grammar.syntax_rules.iter().map(value_type).collect(),
+            hashable: hashable(shapes),
+            textual: textual(shapes),
+        }
+    }
+}
+
 /// Returns the items of the module that parses `grammar`, with a type for each
 /// rule that has a shape in `shapes`. The parser matches `matched`: `grammar`
 /// or the same rules rearranged. Each type's docs quote its rule from
@@ -44,17 +65,7 @@ pub(crate) fn module(
     source: &str,
     depth: Option<usize>,
 ) -> TokenStream {
-    let written_names = grammar
-        .syntax_rules
-        .iter()
-        .map(|rule| rule.meta_identifier.written());
-    let names = Names {
-        types: written_names.clone().map(name::type_name).collect(),
-        fields: written_names.map(name::field_name).collect(),
-        values: grammar.syntax_rules.iter().map(value_type).collect(),
-        hashable: hashable(shapes),
-        textual: textual(shapes),
-    };
+    let names = Names::new(grammar, shapes);
     let facts = Facts::new(matched);
     let general = general_rules(&facts);
     // Only a rule whose node a type reads builds one. An inline rule's node
