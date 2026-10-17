@@ -102,9 +102,9 @@
 //!
 //! - A rule whose alternatives are each a rule or a word becomes an enum. An
 //!   inline rule that holds one rule once, as in `group = '(', sum, ')'`, can
-//!   be an alternative too, and gives the variant `Group(Sum)`. So does a
-//!   group of rules among parts that hold nothing, as `(a | b), ws` with `ws`
-//!   hidden.
+//!   be an alternative too, and gives the variant `Group(Sum)`. A group of
+//!   rules among parts that hold nothing, as in `(a | b), ws` with `ws`
+//!   hidden, becomes an enum too.
 //! - Any other rule becomes a struct. A field holds `T`, `Option<T>`, `Vec<T>`
 //!   or `[T; N]`, as many times as the rule can hold it, and a type that could
 //!   contain itself holds itself in a `Box`.
