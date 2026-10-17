@@ -19,4 +19,6 @@ mod span;
 mod spelling;
 
 pub use explain::{codes, explain, findings, similar_code};
+#[doc(hidden)]
+pub use generate::plan;
 pub use generate::{Module, Options, Report, check, generate};

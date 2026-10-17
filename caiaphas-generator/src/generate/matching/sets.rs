@@ -14,7 +14,9 @@ use crate::{
 /// What a parser notes as expected where a set of characters fails.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expectation {
+    /// This text.
     Text(String),
+    /// Any one character from the first to the last.
     Range(char, char),
     /// A hidden rule that reads a range, by its name.
     Rule(String),

@@ -214,7 +214,10 @@ impl ExactWriter<'_> {
 
     /// Returns whether `expression` builds the node of any rule. A hidden rule
     /// has none, and neither does an exception.
-    fn builds_nodes(&self, expression: &Expression) -> bool {
+    pub(in crate::generate) fn builds_nodes(
+        &self,
+        expression: &Expression,
+    ) -> bool {
         match &expression.kind {
             ExpressionKind::MetaIdentifier(RuleId(position)) => {
                 !self.writer.facts.grammar().syntax_rules[*position].hidden
@@ -228,7 +231,10 @@ impl ExactWriter<'_> {
 
     /// Returns whether `expression` has at most one end at any position. A
     /// step that has one goes on from it without choosing.
-    fn has_one_end(&self, expression: &Expression) -> bool {
+    pub(in crate::generate) fn has_one_end(
+        &self,
+        expression: &Expression,
+    ) -> bool {
         if self.writer.single(expression).is_some() {
             return true;
         }

@@ -9,6 +9,7 @@
 mod expression;
 mod sets;
 
+pub use sets::Expectation;
 pub(super) use sets::pattern;
 
 use proc_macro2::{Ident, Literal, TokenStream};
@@ -37,32 +38,14 @@ pub(crate) fn functions(
     builds: &[bool],
 ) -> TokenStream {
     let grammar: &Grammar = facts.grammar();
-    let mut remembers = revisited_rules(facts);
-    let mut committed = vec![false; general.len()];
-    for (rule, &is_general) in grammar.syntax_rules.iter().zip(general) {
-        rule.expression
-            .visit_meta_identifiers(&mut |RuleId(read), _| {
-                if is_general {
-                    remembers[read] = true;
-                } else {
-                    committed[read] |= general[read];
-                }
-            });
-    }
-    // A rule that builds no node and reads none that does needs no account of
-    // the nodes matched inside it.
-    let leaves: Vec<bool> = (0..grammar.syntax_rules.len())
-        .map(|position| {
-            let reached = grammar.reached_from([RuleId(position)]);
-            reached
-                .iter()
-                .zip(builds)
-                .all(|(&reached, &builds)| !(reached && builds))
-        })
-        .collect();
-    let recursive = grammar.recursive_rules();
-    let ordered = exact::ordered_rules(grammar, general);
-    let settled = exact::settled_rules(facts, general);
+    let Decisions {
+        remembers,
+        committed,
+        leaves,
+        recursive,
+        ordered,
+        settled,
+    } = Decisions::new(facts, general, builds);
     let functions =
         grammar
             .syntax_rules
@@ -97,6 +80,69 @@ pub(crate) fn functions(
                 quote! { #functions #committing }
             });
     quote! { #(#functions)* }
+}
+
+/// What the code of each rule of a grammar depends on besides the rule itself,
+/// by the rule's position.
+pub(in crate::generate) struct Decisions {
+    /// Whether the rule remembers its match at each position, since it can be
+    /// tried there again.
+    pub(in crate::generate) remembers: Vec<bool>,
+    /// Whether the rule tries every way and a rule that takes each way as it
+    /// comes reads it.
+    pub(in crate::generate) committed: Vec<bool>,
+    /// Whether the rule builds no node and reads no rule that does.
+    pub(in crate::generate) leaves: Vec<bool>,
+    /// Whether the rule can reach itself.
+    pub(in crate::generate) recursive: Vec<bool>,
+    /// What [`exact::ordered_rules`] tells.
+    pub(in crate::generate) ordered: Vec<bool>,
+    /// What [`exact::settled_rules`] tells.
+    pub(in crate::generate) settled: Vec<bool>,
+}
+
+impl Decisions {
+    /// Returns the decisions about the grammar `facts` answers about, where
+    /// `general` marks the rules that try every way and `builds` those that
+    /// build a node.
+    pub(in crate::generate) fn new(
+        facts: &Facts<'_>,
+        general: &[bool],
+        builds: &[bool],
+    ) -> Self {
+        let grammar: &Grammar = facts.grammar();
+        let mut remembers = revisited_rules(facts);
+        let mut committed = vec![false; general.len()];
+        for (rule, &is_general) in grammar.syntax_rules.iter().zip(general) {
+            rule.expression
+                .visit_meta_identifiers(&mut |RuleId(read), _| {
+                    if is_general {
+                        remembers[read] = true;
+                    } else {
+                        committed[read] |= general[read];
+                    }
+                });
+        }
+        // A rule that builds no node and reads none that does needs no account
+        // of the nodes matched inside it.
+        let leaves = (0..grammar.syntax_rules.len())
+            .map(|position| {
+                let reached = grammar.reached_from([RuleId(position)]);
+                reached
+                    .iter()
+                    .zip(builds)
+                    .all(|(&reached, &builds)| !(reached && builds))
+            })
+            .collect();
+        Self {
+            remembers,
+            committed,
+            leaves,
+            recursive: grammar.recursive_rules(),
+            ordered: exact::ordered_rules(grammar, general),
+            settled: exact::settled_rules(facts, general),
+        }
+    }
 }
 
 /// Returns `body`, the code of a rule's function that gives an `output`, kept

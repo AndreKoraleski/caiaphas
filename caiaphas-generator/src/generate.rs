@@ -5,6 +5,8 @@ mod code;
 mod exact;
 mod matching;
 mod name;
+#[doc(hidden)]
+pub mod plan;
 mod rearrange;
 mod shape;
 

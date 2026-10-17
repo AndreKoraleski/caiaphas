@@ -409,7 +409,10 @@ impl ExactWriter<'_> {
 
     /// Returns whether the ends of `expression` keep the order of a rule that
     /// takes the first match, since it reads one.
-    fn keeps_order(&self, expression: &Expression) -> bool {
+    pub(in crate::generate) fn keeps_order(
+        &self,
+        expression: &Expression,
+    ) -> bool {
         let mut keeps = false;
         expression.visit_meta_identifiers(&mut |RuleId(read), _| {
             keeps |= self.ordered[read];
