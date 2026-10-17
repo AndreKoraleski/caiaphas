@@ -15,9 +15,14 @@ const PATHS: &[&str] = &[
     "std::path::",
 ];
 
-/// Returns `ty` without the path to it in the standard library.
+/// Returns `ty` without the path to it in the standard library, and the type a
+/// `Spanned` one holds, since it reads the text as that type does.
 fn last_part(ty: &str) -> &str {
     let ty = ty.strip_prefix("::").unwrap_or(ty);
+    let ty = ty
+        .strip_prefix("caiaphas::Spanned<")
+        .and_then(|rest| rest.strip_suffix('>'))
+        .map_or(ty, |inner| inner.trim().strip_prefix("::").unwrap_or(inner));
     PATHS
         .iter()
         .find_map(|path| ty.strip_prefix(path))

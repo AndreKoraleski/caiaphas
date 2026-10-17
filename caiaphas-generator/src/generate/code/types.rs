@@ -188,6 +188,7 @@ pub(super) fn enumeration(
     let name = &names.types[position];
     let mut declarations = Vec::new();
     let mut texts = Some(Vec::new());
+    let mut spans = Some(Vec::new());
     let mut by_rule = Vec::new();
     let mut by_text = Vec::new();
     for variant in variants {
@@ -206,10 +207,25 @@ pub(super) fn enumeration(
                     #[doc = #documentation]
                     #variant(#ty)
                 });
-                if let Some(value) = &names.values[held] {
-                    // A value has no text, so neither does the enum, nor one
-                    // that holds it.
+                // A value has no text or span, unless it is a spanned one, so
+                // neither does the enum, nor one that holds it.
+                if !names.textual[held] {
                     texts = None;
+                }
+                if !names.spanning[held] {
+                    spans = None;
+                }
+                if let Some(texts) = &mut texts {
+                    texts.push(
+                        quote! { Self::#variant(inner) => inner.text() },
+                    );
+                }
+                if let Some(spans) = &mut spans {
+                    spans.push(
+                        quote! { Self::#variant(inner) => inner.span() },
+                    );
+                }
+                if let Some(value) = &names.values[held] {
                     by_rule.push(quote! {
                         #index => Self::#variant(
                             <__caiaphas::Converted<#value> as
@@ -217,14 +233,6 @@ pub(super) fn enumeration(
                         )
                     });
                 } else {
-                    if !names.textual[held] {
-                        texts = None;
-                    }
-                    if let Some(texts) = &mut texts {
-                        texts.push(
-                            quote! { Self::#variant(inner) => inner.text() },
-                        );
-                    }
                     by_rule.push(quote! {
                         #index => Self::#variant(
                             __caiaphas::FromNode::from_node(child),
@@ -243,6 +251,8 @@ pub(super) fn enumeration(
                 if let Some(texts) = &mut texts {
                     texts.push(quote! { Self::#variant => #word });
                 }
+                // A word has no place of its own to give.
+                spans = None;
                 by_text.push(quote! { #word => Self::#variant });
             }
         }
@@ -259,6 +269,16 @@ pub(super) fn enumeration(
             }
         }
     });
+    let span = spans.map(|spans| {
+        quote! {
+            /// Returns where this rule matched in its input.
+            pub fn span(&self) -> &::caiaphas::Span {
+                match self {
+                    #(#spans,)*
+                }
+            }
+        }
+    });
     quote! {
         #[doc = #documentation]
         #derives
@@ -270,6 +290,8 @@ pub(super) fn enumeration(
             #parse
 
             #text
+
+            #span
         }
 
         #traits

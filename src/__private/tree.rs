@@ -3,7 +3,10 @@
 use std::{fmt::Write, str::FromStr, sync::Arc};
 
 use super::nodes::{Nodes, Store, Width};
-use crate::span::{Input, Span};
+use crate::{
+    Spanned,
+    span::{Input, Span},
+};
 
 /// The rules an input matched, each with the rules it matched inside it.
 #[derive(Debug)]
@@ -217,12 +220,42 @@ pub trait FromNode {
 #[derive(Debug)]
 pub struct Converted<T>(pub T);
 
-impl<T: FromStr> FromNode for Converted<T> {
+impl<T: Convert> FromNode for Converted<T> {
     fn from_node<W: Width>(node: Node<'_, W>) -> Self {
+        Self(T::convert(node))
+    }
+}
+
+/// What the text of a rule converts to, as `(* as T *)` names it: a type that
+/// reads it with `FromStr`, or a [`Spanned`] one, which keeps where it is too.
+pub trait Convert: Sized {
+    /// Returns whether `text` converts.
+    fn accepts(text: &str) -> bool;
+
+    /// Returns the value of the text of `node`, which converts.
+    fn convert<W: Width>(node: Node<'_, W>) -> Self;
+}
+
+impl<T: FromStr> Convert for T {
+    fn accepts(text: &str) -> bool {
+        text.parse::<T>().is_ok()
+    }
+
+    fn convert<W: Width>(node: Node<'_, W>) -> Self {
         match node.text().parse() {
-            Ok(value) => Self(value),
+            Ok(value) => value,
             Err(_) => unreachable!("the parser made sure the type reads it"),
         }
+    }
+}
+
+impl<T: FromStr> Convert for Spanned<T> {
+    fn accepts(text: &str) -> bool {
+        T::accepts(text)
+    }
+
+    fn convert<W: Width>(node: Node<'_, W>) -> Self {
+        Spanned::new(T::convert(node), node.span())
     }
 }
 

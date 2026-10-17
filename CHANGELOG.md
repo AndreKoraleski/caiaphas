@@ -35,6 +35,9 @@ adhere to [Semantic Versioning][semver].
   - `(* as T *)` makes the type of a rule a Rust type read from its text.
   - `(* greedy *)` makes a rule take each way as it comes and never go back, so
     its parser stays fast.
+- `Spanned<T>`, which `(* as caiaphas::Spanned<T> *)` gives: a value with where
+  it was read, that otherwise reads as the `T` it holds. An enum has `span()`
+  when each of its variants has one.
 - Fields of `[T; N]` for a rule held the same number of times on every way, and
   `char()` on the type of a rule that only ever matches one character.
 - Docs on each type that quote its rule, and begin with the comments right

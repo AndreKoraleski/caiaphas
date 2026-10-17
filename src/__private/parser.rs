@@ -5,14 +5,14 @@ mod exact;
 mod recovery;
 mod runs;
 
-use std::{ops::Range, str::FromStr};
+use std::ops::Range;
 
 use rustc_hash::FxHashMap;
 
 use super::{
     Expected, Match, Rule,
     nodes::{Nodes, Width},
-    tree::Tree,
+    tree::{Convert, Tree},
 };
 pub use ends::Ends;
 use exact::RememberedEnds;
@@ -303,13 +303,13 @@ impl<'i, const REPORTS: bool, W: Width> Parser<'i, REPORTS, W> {
     /// Returns whether `T` reads the text `rule` matched from `position` to
     /// `end`. When it does not, notes the rule there as expected, with that
     /// text as what was found.
-    pub fn accepts<T: FromStr>(
+    pub fn accepts<T: Convert>(
         &mut self,
         rule: &Rule,
         position: usize,
         end: usize,
     ) -> bool {
-        if self.input[position..end].parse::<T>().is_ok() {
+        if T::accepts(&self.input[position..end]) {
             return true;
         }
         self.reject(rule, position, end);

@@ -18,7 +18,7 @@ use crate::{
     analysis::{Facts, general_rules},
     generate::{
         exact, matching, name,
-        shape::{self, Shape},
+        shape::{self, Shape, Variant},
     },
     ir::{Grammar, Rule, RuleId},
 };
@@ -31,6 +31,8 @@ struct Names {
     values: Vec<Option<TokenStream>>,
     /// Whether each rule's type has `text()`.
     textual: Vec<bool>,
+    /// Whether each rule's type has `span()`.
+    spanning: Vec<bool>,
 }
 
 impl Names {
@@ -46,6 +48,7 @@ impl Names {
             fields: written_names.map(name::field_name).collect(),
             values: grammar.syntax_rules.iter().map(value_type).collect(),
             textual: textual(shapes),
+            spanning: spanning(shapes),
         }
     }
 }
@@ -156,11 +159,36 @@ pub(super) fn value_type(rule: &Rule) -> Option<TokenStream> {
 }
 
 /// Returns whether the type of each rule has `text()`. A converted rule's type
-/// does not, and an enum has it when every type it holds has it.
+/// does unless it is a `Spanned` one, and an enum has it when every type it
+/// holds has it.
 fn textual(shapes: &[Option<Shape>]) -> Vec<bool> {
-    let mut textual: Vec<bool> = shapes
+    through_enums(shapes, |_| true)
+}
+
+/// Returns whether the type of each rule has `span()`, as for `text()`, but an
+/// enum with a variant for a word has none.
+fn spanning(shapes: &[Option<Shape>]) -> Vec<bool> {
+    through_enums(shapes, |variants| {
+        variants
+            .iter()
+            .all(|variant| matches!(variant, Variant::Rule { .. }))
+    })
+}
+
+/// Returns whether the type of each rule has a method that a struct has, a
+/// converted type has when it is a `Spanned` one, and an enum has when
+/// `variants` allows its own and every type it holds has the method.
+fn through_enums(
+    shapes: &[Option<Shape>],
+    variants: impl Fn(&[Variant]) -> bool,
+) -> Vec<bool> {
+    let mut has: Vec<bool> = shapes
         .iter()
-        .map(|shape| !matches!(shape, Some(Shape::Converted(_))))
+        .map(|shape| match shape {
+            Some(Shape::Converted(ty)) => keeps_span(ty),
+            Some(Shape::Enum(own)) => variants(own),
+            _ => true,
+        })
         .collect();
     let mut changed = true;
     while changed {
@@ -169,17 +197,23 @@ fn textual(shapes: &[Option<Shape>]) -> Vec<bool> {
             let Some(shape @ Shape::Enum(_)) = shape else {
                 continue;
             };
-            if textual[position]
-                && shape::held(shape)
-                    .iter()
-                    .any(|&RuleId(rule)| !textual[rule])
+            if has[position]
+                && shape::held(shape).iter().any(|&RuleId(rule)| !has[rule])
             {
-                textual[position] = false;
+                has[position] = false;
                 changed = true;
             }
         }
     }
-    textual
+    has
+}
+
+/// Returns whether the type `ty` a conversion names is a `Spanned` one, which
+/// keeps the text it was read from and where.
+pub(super) fn keeps_span(ty: &str) -> bool {
+    let ty = ty.strip_prefix("::").unwrap_or(ty);
+    ty.strip_prefix("caiaphas::Spanned<")
+        .is_some_and(|rest| rest.ends_with('>'))
 }
 
 /// Returns the `parse` function of the rule `rule_id`, written `rule`. With

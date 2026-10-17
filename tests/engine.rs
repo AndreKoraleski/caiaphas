@@ -353,6 +353,30 @@ fn counts_lines_and_columns_from_where_an_input_starts() {
     assert_eq!(spans, [(5000, 7), (5001, 1)]);
 }
 
+caiaphas::grammar!(mod spanned {
+    "assignment = name, '=', value;
+     value = name | number;
+     (* as caiaphas::Spanned<String> *) name = ? /[a-z]+/ ?;
+     (* as caiaphas::Spanned<u8> *) number = ? /[0-9]+/ ?;
+     words = word, {' ', word};
+     word = name | 'IF';"
+});
+
+#[test]
+fn keeps_where_a_spanned_value_was_read() {
+    let parsed = spanned::Assignment::parse("ab=cd").unwrap();
+    assert_eq!(parsed.name, "ab".to_owned());
+    let spanned::Value::Name(name) = &parsed.value else {
+        panic!("the value is a name");
+    };
+    assert_eq!((name.text(), name.span().column()), ("cd", 4));
+    assert_eq!(parsed.value.span().range(), 3..5);
+    assert_eq!(parsed.value.text(), "cd");
+    assert!(spanned::Assignment::parse("ab=300").is_err());
+    let words = spanned::Words::parse("IF ab").unwrap();
+    assert_eq!(words.word[1].text(), "ab");
+}
+
 #[test]
 fn parses_a_start_rule_from_a_str() {
     let parsed: list::Numbers = "1,2".parse().unwrap();

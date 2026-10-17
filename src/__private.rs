@@ -18,7 +18,7 @@ mod tree;
 pub use nodes::{Nodes, Store, Width};
 use parser::Recoveries;
 pub use parser::{Ends, Parser, RuleStart};
-pub use tree::{Converted, FromNode, Node, Tree};
+pub use tree::{Convert, Converted, FromNode, Node, Tree};
 
 pub use crate::error::Expected;
 use crate::{Recovered, error::Error};

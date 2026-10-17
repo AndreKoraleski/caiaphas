@@ -495,6 +495,10 @@ written! {
         "(* expect ambiguous-split: each round takes what it can *)
          s = {a}, ';'; a = ['x'], ['y'];"
     } [";", "x;", "xy;", "yx;", "xyxy;", "y"], "s" => S;
+    spanned_values {
+        "s = {number, ' '};
+         (* as caiaphas::Spanned<u8> *) number = ? /[0-9]+/ ?;"
+    } ["1 255 ", "256 ", "12 300 "], "s" => S;
     not_keywords {
         "s = {statement};
          statement = keyword, [' '], name, ';' | name, ';';

@@ -29,6 +29,7 @@ mod error;
 mod excerpt;
 mod recovered;
 mod span;
+mod spanned;
 
 #[doc(hidden)]
 pub mod __private;
@@ -38,3 +39,4 @@ pub use caiaphas_macros::grammar;
 pub use error::{Error, Expected};
 pub use recovered::Recovered;
 pub use span::Span;
+pub use spanned::Spanned;

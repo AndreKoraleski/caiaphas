@@ -166,9 +166,10 @@ pub struct Square { pub size: [u32; 2] }
   when the rule always holds it `N` times. A type that could contain itself
   holds itself in a `Box`.
 * Every struct gives the text it matched with `text()`, and where with
-  `span()`. An enum has `text()` too, unless a variant holds an `(* as T *)`
-  value. A type with `text()` displays as that text, and a rule that only
-  ever matches one character also has `char()`.
+  `span()`. An enum has both too, unless a variant holds an `(* as T *)`
+  value, and `span()` unless a variant stands for a word. A type with `text()`
+  displays as that text, and a rule that only ever matches one character also
+  has `char()`.
 * A comment right before a rule, with no empty line between, begins the docs
   of its type, unless it is an [annotation](#annotations). The docs then
   quote the rule.
@@ -199,6 +200,10 @@ annotation, such as `(* hidde *)`, gets a warning.
 named as where `grammar!` is called, such as `String`, `f64`,
 `std::net::Ipv4Addr` or a type of your own, generic or not. Text the type does
 not read fails to match there, as `300` does for a `u8`.
+
+`(* as caiaphas::Spanned<T> *)` keeps where the value was read too, with
+`span()` and `text()`, and otherwise reads as the `T` it holds, so a program
+can point at a value it finds wrong, such as a name it does not know.
 
 With `(* hide *)` too, a rule keeps no value but still checks its text, so
 `address` here holds no fields and still turns down `10.0.0.256`:
