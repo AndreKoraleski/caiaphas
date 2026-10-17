@@ -38,6 +38,10 @@ pub struct Options {
     /// without changing the types. The `shared-start` suggestions are then
     /// left out.
     pub optimize: bool,
+    /// How many matches of recursive rules the parser follows inside one
+    /// another before it stops with an error, instead of running out of stack.
+    /// `None` keeps the runtime's default.
+    pub depth: Option<usize>,
 }
 
 /// Returns the module that parses the grammar `source`, or every problem that
@@ -76,7 +80,7 @@ pub fn generate(
     let rearranged = options.optimize.then(|| rearrange::rearranged(&grammar));
     let matched = rearranged.as_ref().unwrap_or(&grammar);
     Ok(Module {
-        items: code::module(&grammar, matched, &shapes, source),
+        items: code::module(&grammar, matched, &shapes, source, options.depth),
         suggestions: render(suggestions),
     })
 }
@@ -288,10 +292,17 @@ mod tests {
     fn leaves_out_the_suggestions_it_takes_care_of_when_optimizing() {
         let source = "s = a, 'x' | a, 'y'; a = 'z';";
         let suggestions = |optimize| {
-            generate(source, "g.ebnf", Options { optimize })
-                .unwrap()
-                .suggestions
-                .len()
+            generate(
+                source,
+                "g.ebnf",
+                Options {
+                    optimize,
+                    depth: None,
+                },
+            )
+            .unwrap()
+            .suggestions
+            .len()
         };
         assert_eq!(suggestions(false), 1);
         assert_eq!(suggestions(true), 0);

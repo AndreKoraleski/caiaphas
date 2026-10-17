@@ -35,12 +35,14 @@ struct Names {
 /// Returns the items of the module that parses `grammar`, with a type for each
 /// rule that has a shape in `shapes`. The parser matches `matched`: `grammar`
 /// or the same rules rearranged. Each type's docs quote its rule from
-/// `source`.
+/// `source`. Its parsers follow `depth` matches of recursive rules inside one
+/// another, or as many as the runtime does by default.
 pub(crate) fn module(
     grammar: &Grammar,
     matched: &Grammar,
     shapes: &[Option<Shape>],
     source: &str,
+    depth: Option<usize>,
 ) -> TokenStream {
     let written_names = grammar
         .syntax_rules
@@ -111,11 +113,22 @@ pub(crate) fn module(
         };
         Some(quote! { #type_code #from_str })
     });
+    let depth = depth.map_or_else(
+        || quote! { __caiaphas::DEPTH },
+        |depth| {
+            let depth = proc_macro2::Literal::usize_unsuffixed(depth);
+            quote! { #depth }
+        },
+    );
     quote! {
         use ::caiaphas::__private as __caiaphas;
         // A conversion names its type as where the macro is called.
         #[allow(unused_imports, clippy::wildcard_imports)]
         use super::*;
+
+        /// How many matches of recursive rules the parsers follow inside one
+        /// another.
+        const DEPTH: usize = #depth;
 
         #functions
 
@@ -223,8 +236,9 @@ fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
     let (parse, recovering) = if general {
         let (ends, build) =
             (exact::ends_name(rule_id), exact::build_name(rule_id));
-        let functions =
-            quote! { input, #ends::<false>, #build::<false>, #ends::<true> };
+        let functions = quote! {
+            input, DEPTH, #ends::<false>, #build::<false>, #ends::<true>
+        };
         (
             quote! { __caiaphas::parse_by_ends(#functions) },
             quote! { __caiaphas::parse_by_ends_recovering(#functions) },
@@ -232,7 +246,7 @@ fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
     } else {
         let function = matching::function_name(rule_id);
         let functions =
-            quote! { input, #function::<false>, #function::<true> };
+            quote! { input, DEPTH, #function::<false>, #function::<true> };
         (
             quote! { __caiaphas::parse(#functions) },
             quote! { __caiaphas::parse_recovering(#functions) },

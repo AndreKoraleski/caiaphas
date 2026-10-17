@@ -54,6 +54,12 @@ pub struct Rule {
     pub start: bool,
 }
 
+/// How many matches of recursive rules a parser follows inside one another,
+/// unless its grammar's `depth` says otherwise. Each takes some stack, and
+/// this many fit in the smallest stack a program usually has, even in a build
+/// that is not optimized.
+pub const DEPTH: usize = 512;
+
 /// The function that matches a rule at a position.
 pub type RuleFunction<const REPORTS: bool> =
     fn(&mut Parser<'_, REPORTS>, usize) -> Match;
@@ -63,16 +69,17 @@ pub type RuleFunction<const REPORTS: bool> =
 /// where and why.
 pub fn parse(
     input: &str,
+    depth: usize,
     rule: RuleFunction<false>,
     explain: RuleFunction<true>,
 ) -> Result<Tree, Error> {
-    let mut parser = Parser::new(input);
+    let mut parser = Parser::new(input, depth);
     match rule(&mut parser, 0) {
         Some((end, node)) if end == input.len() && !parser.went_too_deep() => {
             Ok(parser.tree(node.expect("a start rule is never hidden")))
         }
         _ => {
-            let mut parser = Parser::new(input);
+            let mut parser = Parser::new(input, depth);
             if let Some((end, _)) = explain(&mut parser, 0) {
                 debug_assert!(end < input.len(), "both parses match alike");
                 parser.note(end, Expected::End);
@@ -96,16 +103,17 @@ pub type BuildFunction =
 /// as `ends` does to say where and why.
 pub fn parse_by_ends(
     input: &str,
+    depth: usize,
     ends: EndsFunction<false>,
     build: BuildFunction,
     explain: EndsFunction<true>,
 ) -> Result<Tree, Error> {
-    let mut parser = Parser::new(input);
+    let mut parser = Parser::new(input, depth);
     if ends(&mut parser, 0).contains(input.len()) && !parser.went_too_deep() {
         let root = build(&mut parser, 0, input.len());
         return Ok(parser.tree(root.expect("a start rule is never hidden")));
     }
-    let mut parser = Parser::new(input);
+    let mut parser = Parser::new(input, depth);
     for end in explain(&mut parser, 0).iter() {
         debug_assert!(end < input.len(), "both parses match alike");
         parser.note(end, Expected::End);
@@ -118,11 +126,13 @@ pub fn parse_by_ends(
 /// when the input matches once those errors are skipped.
 pub fn parse_recovering(
     input: &str,
+    depth: usize,
     rule: RuleFunction<false>,
     explain: RuleFunction<true>,
 ) -> (Option<Tree>, Vec<Error>) {
     parser::recovering(
         input,
+        depth,
         |parser| match rule(parser, 0) {
             Some((end, node)) if end == input.len() => node,
             _ => None,
@@ -135,12 +145,14 @@ pub fn parse_recovering(
 /// [`parse_recovering`] does.
 pub fn parse_by_ends_recovering(
     input: &str,
+    depth: usize,
     ends: EndsFunction<false>,
     build: BuildFunction,
     explain: EndsFunction<true>,
 ) -> (Option<Tree>, Vec<Error>) {
     parser::recovering(
         input,
+        depth,
         |parser| {
             ends(parser, 0)
                 .contains(input.len())

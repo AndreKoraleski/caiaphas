@@ -53,15 +53,13 @@ pub struct Parser<'i, const REPORTS: bool> {
     scanning: bool,
     /// How many matches of recursive rules are inside one another here.
     depth: usize,
+    /// How many matches of recursive rules the parser follows inside one
+    /// another.
+    limit: usize,
     /// Where the matches of recursive rules first nested more deeply than
-    /// [`DEPTH`], if they did.
+    /// `limit`, if they did.
     too_deep: Option<usize>,
 }
-
-/// How many matches of recursive rules a parser follows inside one another.
-/// Each takes some stack, and this many fit in the smallest stack a program
-/// usually has, even in a build that is not optimized.
-const DEPTH: usize = 512;
 
 /// What a rule matched at a position, and whether the rule was noted as
 /// expected there.
@@ -84,7 +82,9 @@ pub struct RuleStart {
 }
 
 impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
-    pub(super) fn new(input: &'i str) -> Self {
+    /// Returns a parser of `input` that follows `limit` matches of recursive
+    /// rules inside one another.
+    pub(super) fn new(input: &'i str, limit: usize) -> Self {
         Self {
             input,
             nodes: Vec::new(),
@@ -99,6 +99,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
             candidates: Vec::new(),
             scanning: false,
             depth: 0,
+            limit,
             too_deep: None,
         }
     }
@@ -127,7 +128,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         if self.too_deep.is_some() {
             return false;
         }
-        if self.depth == DEPTH {
+        if self.depth == self.limit {
             self.too_deep = Some(position);
             return false;
         }
@@ -452,6 +453,6 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     /// nothing about why the input does not match.
     #[must_use]
     pub fn within(&self, end: usize) -> Parser<'i, false> {
-        Parser::new(&self.input[..end])
+        Parser::new(&self.input[..end], self.limit)
     }
 }
