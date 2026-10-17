@@ -93,6 +93,8 @@ rule, such as `ws` in the [overview](#overview), keeps it out of the types.
 | `? U+00E9 ?`         | the character `é`                       |
 | `? U+0061..U+007A ?` | any character from `a` to `z`           |
 | `? /[a-z_]+/ ?`      | what the regular expression matches     |
+| `? not /[a-z]/ ?`    | nothing, where no letter comes next     |
+| `? end ?`            | nothing, where the input ends           |
 | `(* note *)`         | nothing, as a comment                   |
 
 The standard's other spellings work too: `/` or `!` for `|`, `(/ /)` for
@@ -113,6 +115,20 @@ the grammar it stands for would:
 assignment = name, ' = ', number;
 name = ? /[a-z_][a-z0-9_]*/ ?;
 number = ? /\d+(\.\d+){0,1}/ ?;
+```
+
+After `not`, a special sequence matches nothing, and only where what it holds
+does not match what comes next. `? end ?` matches nothing, and only where the
+input ends. Here a keyword is never the start of a longer name, and the last
+line needs no line break:
+
+```ebnf
+log = {line, (newline | ? end ?)};
+line = word, {' ', word};
+word = keyword | name;
+keyword = ('if' | 'do'), ? not /[a-z]/ ?;
+name = ? /[a-z]+/ ?;
+(* hide *) newline = ? U+000A ?;
 ```
 
 ## Types

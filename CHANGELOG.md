@@ -23,6 +23,8 @@ adhere to [Semantic Versioning][semver].
   comment marks a warning as intended, and suggestions stop it with `suggest`.
 - Special sequences that hold a code point, a range of them, or a regular
   expression between two `/`, such as `? /[a-z_]+/ ?`.
+- `? not /[a-z]/ ?`, which matches nothing where what it holds does not match
+  what comes next, and `? end ?`, which matches nothing where the input ends.
 - Alternatives that start alike, as in `a, x | a, y`, read that start once,
   as `a, (x | y)` does, without changing the types.
 - Annotations, each a comment right before a rule that holds exactly it; any

@@ -50,6 +50,8 @@
 //! | `? U+00E9 ?`      | the character `é`                            |
 //! | `? U+0061..U+007A ?` | any character from `a` to `z`             |
 //! | `? /[a-z_]+/ ?`   | what the regular expression matches          |
+//! | `? not /[a-z]/ ?` | nothing, where no letter comes next          |
+//! | `? end ?`         | nothing, where the input ends                |
 //! | `(* note *)`      | nothing, as a comment                        |
 //!
 //! ISO 14977 leaves the meaning of a special sequence, written between `?`, to
@@ -72,6 +74,30 @@
 //!
 //! let parsed = assignment::Assignment::parse("pi = 3.14").unwrap();
 //! assert_eq!((parsed.name.text(), parsed.number.text()), ("pi", "3.14"));
+//! ```
+//!
+//! After `not`, a special sequence matches nothing, and only where what it
+//! holds does not match what comes next. `? end ?` matches nothing, and only
+//! where the input ends. Here a keyword is never the start of a longer name,
+//! and the last line needs no line break:
+//!
+//! ```
+//! caiaphas::grammar!(mod log {
+//!     r"log = {line, (newline | ? end ?)};
+//!       line = word, {' ', word};
+//!       word = keyword | name;
+//!       keyword = ('if' | 'do'), ? not /[a-z]/ ?;
+//!       name = ? /[a-z]+/ ?;
+//!       (* hide *) newline = ? U+000A ?;"
+//! });
+//!
+//! let parsed = log::Log::parse("if x\ndo ifx").unwrap();
+//! let keywords: Vec<bool> = parsed.line[1]
+//!     .word
+//!     .iter()
+//!     .map(|word| matches!(word, log::Word::Keyword(_)))
+//!     .collect();
+//! assert_eq!(keywords, [true, false]);
 //! ```
 //!
 //! # Types
