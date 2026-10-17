@@ -11,9 +11,12 @@
 //! match is parsed again, noting what could have come at each failure, to say
 //! why. The function of each rule is generic over which of the two it does.
 
+mod nodes;
 mod parser;
 mod tree;
 
+pub use nodes::{Nodes, Store, Width};
+use parser::Recoveries;
 pub use parser::{Ends, Parser, RuleStart};
 pub use tree::{Converted, FromNode, Node, Tree};
 
@@ -60,61 +63,37 @@ pub struct Rule {
 /// that is not optimized.
 pub const DEPTH: usize = 512;
 
-/// The function that matches a rule at a position.
-pub type RuleFunction<const REPORTS: bool> =
-    fn(&mut Parser<'_, REPORTS>, usize) -> Match;
+/// The start rule a parse matches the whole input with. Each grammar compiles
+/// it for each width of node a parser can have.
+pub trait Start {
+    /// Returns the root node of the input of `parser`, when the rule matches
+    /// all of it.
+    fn root<W: Width>(parser: &mut Parser<'_, false, W>) -> Option<usize>;
 
-/// Returns the tree of `input` matched in full by the rule whose function is
-/// `rule`. When `input` does not match, `explain` matches it again to say
-/// where and why.
-pub fn parse(
-    input: &str,
-    depth: usize,
-    rule: RuleFunction<false>,
-    explain: RuleFunction<true>,
-) -> Result<Tree, Error> {
-    let mut parser = Parser::new(input, depth);
-    match rule(&mut parser, 0) {
-        Some((end, node)) if end == input.len() && !parser.went_too_deep() => {
-            Ok(parser.tree(node.expect("a start rule is never hidden")))
-        }
-        _ => {
-            let mut parser = Parser::new(input, depth);
-            if let Some((end, _)) = explain(&mut parser, 0) {
-                debug_assert!(end < input.len(), "both parses match alike");
-                parser.note(end, Expected::End);
-            }
-            Err(parser.error())
-        }
+    /// Matches the input of `parser` again, noting why the rule does not match
+    /// all of it, and returns where its matches end.
+    fn explain(parser: &mut Parser<'_, true, u64>) -> Vec<usize>;
+}
+
+/// Returns the root node of an input of `length` bytes, when `found` is a
+/// match of all of it.
+#[must_use]
+pub fn whole(found: Match, length: usize) -> Option<usize> {
+    match found {
+        Some((end, node)) if end == length => node,
+        _ => None,
     }
 }
 
-/// The function of a rule that tells where its matches at a position can end.
-pub type EndsFunction<const REPORTS: bool> =
-    fn(&mut Parser<'_, REPORTS>, usize) -> Ends;
-
-/// The function of a rule that builds the node of its match from a position to
-/// an end it can have there. A hidden rule has no node.
-pub type BuildFunction =
-    fn(&mut Parser<'_, false>, usize, usize) -> Option<usize>;
-
-/// Returns the tree of `input` matched in full by the rule whose functions are
-/// `ends` and `build`. When `input` does not match, `explain` matches it again
-/// as `ends` does to say where and why.
-pub fn parse_by_ends(
-    input: &str,
-    depth: usize,
-    ends: EndsFunction<false>,
-    build: BuildFunction,
-    explain: EndsFunction<true>,
-) -> Result<Tree, Error> {
-    let mut parser = Parser::new(input, depth);
-    if ends(&mut parser, 0).contains(input.len()) && !parser.went_too_deep() {
-        let root = build(&mut parser, 0, input.len());
-        return Ok(parser.tree(root.expect("a start rule is never hidden")));
+/// Returns the tree of `input` matched in full by the start rule `S`. When
+/// `input` does not match, the rule matches it again to say where and why. The
+/// parser follows `depth` matches of recursive rules inside one another.
+pub fn parse<S: Start>(input: &str, depth: usize) -> Result<Tree, Error> {
+    if let Some(tree) = matched::<S>(input, depth, &Recoveries::default()) {
+        return Ok(tree);
     }
     let mut parser = Parser::new(input, depth);
-    for end in explain(&mut parser, 0).iter() {
+    for end in S::explain(&mut parser) {
         debug_assert!(end < input.len(), "both parses match alike");
         parser.note(end, Expected::End);
     }
@@ -124,43 +103,60 @@ pub fn parse_by_ends(
 /// Returns what [`parse`] does, but goes on past each error that a rule that
 /// recovers lets the parse skip, and gives every error found. The tree comes
 /// when the input matches once those errors are skipped.
-pub fn parse_recovering(
+#[must_use]
+pub fn parse_recovering<S: Start>(
     input: &str,
     depth: usize,
-    rule: RuleFunction<false>,
-    explain: RuleFunction<true>,
 ) -> (Option<Tree>, Vec<Error>) {
-    parser::recovering(
-        input,
-        depth,
-        |parser| match rule(parser, 0) {
-            Some((end, node)) if end == input.len() => node,
-            _ => None,
-        },
-        |parser| explain(parser, 0).map(|(end, _)| end).into_iter().collect(),
-    )
+    parser::recovering::<S>(input, depth)
 }
 
-/// Returns what [`parse_by_ends`] does, going on past errors as
-/// [`parse_recovering`] does.
-pub fn parse_by_ends_recovering(
+/// Returns the tree of `input` when the start rule `S` matches all of it,
+/// built by the parser of the narrowest width that holds its nodes. Rules that
+/// recover go on as `recoveries` tells.
+pub(crate) fn matched<S: Start>(
     input: &str,
     depth: usize,
-    ends: EndsFunction<false>,
-    build: BuildFunction,
-    explain: EndsFunction<true>,
-) -> (Option<Tree>, Vec<Error>) {
-    parser::recovering(
-        input,
-        depth,
-        |parser| {
-            ends(parser, 0)
-                .contains(input.len())
-                .then(|| build(parser, 0, input.len()))
-                .flatten()
-        },
-        |parser| explain(parser, 0).iter().collect(),
-    )
+    recoveries: &Recoveries,
+) -> Option<Tree> {
+    let length = input.len();
+    if nodes::fits::<u8>(length) {
+        if let Ok(tree) = matched_in::<S, u8>(input, depth, recoveries) {
+            return tree;
+        }
+    }
+    if nodes::fits::<u16>(length) {
+        if let Ok(tree) = matched_in::<S, u16>(input, depth, recoveries) {
+            return tree;
+        }
+    }
+    if nodes::fits::<u32>(length) {
+        if let Ok(tree) = matched_in::<S, u32>(input, depth, recoveries) {
+            return tree;
+        }
+    }
+    matched_in::<S, u64>(input, depth, recoveries)
+        .ok()
+        .flatten()
+}
+
+/// Returns what [`matched`] does with a parser of width `W`, or `Err` when its
+/// nodes outgrow the width.
+fn matched_in<S: Start, W: Width>(
+    input: &str,
+    depth: usize,
+    recoveries: &Recoveries,
+) -> Result<Option<Tree>, ()> {
+    let mut parser = Parser::<false, W>::new(input, depth);
+    parser.recover_as(recoveries.clone());
+    let root = S::root(&mut parser);
+    if parser.overflowed() {
+        return Err(());
+    }
+    if parser.went_too_deep() {
+        return Ok(None);
+    }
+    Ok(root.map(|root| parser.tree(root)))
 }
 
 /// Returns the value and errors of a parse that recovers.

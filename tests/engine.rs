@@ -697,3 +697,17 @@ fn follows_as_many_nested_matches_as_the_depth_of_its_grammar() {
             .is_too_deep()
     );
 }
+
+caiaphas::grammar!(mod stacked {
+    "s = a, {'x', a}; a = b; b = c; c = ['y'];"
+});
+
+#[test]
+fn builds_the_tree_of_an_input_with_more_nodes_than_bytes() {
+    for length in [60, 300, 70_000] {
+        let input = "x".repeat(length);
+        let parsed = stacked::S::parse(&input).unwrap();
+        assert_eq!(parsed.a.len(), length + 1);
+        assert!(parsed.a.iter().all(|a| a.b.c.text().is_empty()));
+    }
+}

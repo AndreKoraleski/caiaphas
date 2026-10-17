@@ -205,7 +205,7 @@ impl FunctionWriter<'_> {
                 if found.is_some() {
                     return found;
                 }
-                parser.recover(&RULE, start, #function::<REPORTS>)
+                parser.recover(&RULE, start, #function::<REPORTS, W>)
             }
         } else {
             quote! { parser.finish_rule(&RULE, start, end) }
@@ -240,8 +240,8 @@ impl FunctionWriter<'_> {
         );
         quote! {
             #[doc(hidden)]
-            fn #function<const REPORTS: bool>(
-                parser: &mut __caiaphas::Parser<'_, REPORTS>,
+            fn #function<const REPORTS: bool, W: __caiaphas::Width>(
+                parser: &mut __caiaphas::Parser<'_, REPORTS, W>,
                 position: usize,
             ) -> __caiaphas::Match {
                 #constant

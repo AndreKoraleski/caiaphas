@@ -12,9 +12,11 @@ use std::mem;
 
 use rustc_hash::FxHashMap;
 
-use super::{Ends, Parser, Remembered, RuleStart, exact::RememberedEnds};
+use super::{
+    Ends, Parser, Remembered, RuleStart, Width, exact::RememberedEnds,
+};
 use crate::{
-    __private::{Expected, Match, Rule, Tree},
+    __private::{Expected, Match, Rule, Start, Tree, matched},
     error::Error,
 };
 
@@ -23,7 +25,7 @@ const ERRORS: usize = 100;
 
 /// How a rule that recovers goes on where its match from a place failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Recovery {
+pub(crate) enum Recovery {
     /// It looks for its next match from this place on.
     From(usize),
     /// It takes its match from this place.
@@ -34,7 +36,7 @@ pub(super) enum Recovery {
 
 /// The places each rule that recovers goes on from, by the rule's number and
 /// where its match failed.
-pub(super) type Recoveries = FxHashMap<(usize, usize), Recovery>;
+pub(crate) type Recoveries = FxHashMap<(usize, usize), Recovery>;
 
 /// A match of a rule that recovers, which failed partway.
 #[derive(Debug, Clone, Copy)]
@@ -47,7 +49,7 @@ pub(super) struct Candidate {
     reached: usize,
 }
 
-impl<const REPORTS: bool> Parser<'_, REPORTS> {
+impl<const REPORTS: bool, W: Width> Parser<'_, REPORTS, W> {
     /// Returns what `rule` matches where its match from `start` failed, for a
     /// rule that recovers: its match from the place it goes on from, when
     /// there is one. `again` matches the rule.
@@ -175,20 +177,13 @@ impl<const REPORTS: bool> Parser<'_, REPORTS> {
 
 /// Returns the tree of `input` and every error in it, the tree only when the
 /// input matches once each error is recovered from, following `depth` matches
-/// of recursive rules inside one another. `root` matches the input and returns
-/// its root node when all of it matches, and `explain` matches it again,
-/// noting why it does not, and returns where its matches end.
-pub(crate) fn recovering(
+/// of recursive rules inside one another. `S` is the start rule.
+pub(crate) fn recovering<S: Start>(
     input: &str,
     depth: usize,
-    root: impl Fn(&mut Parser<'_, false>) -> Option<usize>,
-    explain: impl Fn(&mut Parser<'_, true>) -> Vec<usize>,
 ) -> (Option<Tree>, Vec<Error>) {
-    let mut parser = Parser::new(input, depth);
-    if let Some(node) = root(&mut parser) {
-        if !parser.went_too_deep() {
-            return (Some(parser.tree(node)), Vec::new());
-        }
+    if let Some(tree) = matched::<S>(input, depth, &Recoveries::default()) {
+        return (Some(tree), Vec::new());
     }
     let mut recoveries = Recoveries::default();
     let mut errors: Vec<Error> = Vec::new();
@@ -196,18 +191,16 @@ pub(crate) fn recovering(
         // A parse that notes why it fails finds where each rule goes on, since
         // it sees how far each match gets. A parse that only matches then
         // builds the tree from the same places.
-        let mut parser = Parser::recovering(input, depth, recoveries);
-        let ends = explain(&mut parser);
+        let mut parser =
+            Parser::<true, u64>::recovering(input, depth, recoveries);
+        let ends = S::explain(&mut parser);
         // An input that nests too deeply cannot be parsed further on either.
         if parser.went_too_deep() {
             errors.push(parser.error());
             return (None, errors);
         }
         if ends.contains(&input.len()) {
-            let mut parser =
-                Parser::recovering(input, depth, parser.recoveries);
-            let tree = root(&mut parser).map(|node| parser.tree(node));
-            return (tree, errors);
+            return (matched::<S>(input, depth, &parser.recoveries), errors);
         }
         for end in ends {
             parser.note(end, Expected::End);
@@ -238,7 +231,12 @@ pub(crate) fn recovering(
     }
 }
 
-impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
+impl<'i, const REPORTS: bool, W: Width> Parser<'i, REPORTS, W> {
+    /// Hands the parser the places where each rule that recovers goes on.
+    pub(crate) fn recover_as(&mut self, recoveries: Recoveries) {
+        self.recoveries = recoveries;
+    }
+
     /// Returns a parser of `input` whose rules that recover go on as
     /// `recoveries` tells, following `depth` matches of recursive rules inside
     /// one another.

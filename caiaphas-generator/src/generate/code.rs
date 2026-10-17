@@ -233,41 +233,72 @@ fn parse(rule: &Rule, rule_id: RuleId, general: bool) -> TokenStream {
          rule written with `(* recover *)` can skip is skipped, if any, and \
          every error found."
     );
-    let (parse, recovering) = if general {
+    let (root, explain) = if general {
         let (ends, build) =
             (exact::ends_name(rule_id), exact::build_name(rule_id));
-        let functions = quote! {
-            input, DEPTH, #ends::<false>, #build::<false>, #ends::<true>
-        };
         (
-            quote! { __caiaphas::parse_by_ends(#functions) },
-            quote! { __caiaphas::parse_by_ends_recovering(#functions) },
+            quote! {
+                let length = parser.length();
+                if #ends::<false, W>(parser, 0).contains(length) {
+                    #build::<false, W>(parser, 0, length)
+                } else {
+                    ::core::option::Option::None
+                }
+            },
+            quote! { #ends::<true, u64>(parser, 0).iter().collect() },
         )
     } else {
         let function = matching::function_name(rule_id);
-        let functions =
-            quote! { input, DEPTH, #function::<false>, #function::<true> };
         (
-            quote! { __caiaphas::parse(#functions) },
-            quote! { __caiaphas::parse_recovering(#functions) },
+            quote! {
+                let found = #function::<false, W>(parser, 0);
+                __caiaphas::whole(found, parser.length())
+            },
+            quote! {
+                #function::<true, u64>(parser, 0)
+                    .map(|(end, _)| end)
+                    .into_iter()
+                    .collect()
+            },
         )
+    };
+    // The runtime compiles the rule for each width of node, so it names the
+    // rule through a type.
+    let start = quote! {
+        struct Start;
+
+        impl __caiaphas::Start for Start {
+            fn root<W: __caiaphas::Width>(
+                parser: &mut __caiaphas::Parser<'_, false, W>,
+            ) -> ::core::option::Option<usize> {
+                #root
+            }
+
+            fn explain(
+                parser: &mut __caiaphas::Parser<'_, true, u64>,
+            ) -> ::std::vec::Vec<usize> {
+                #explain
+            }
+        }
     };
     quote! {
         #[doc = #documentation]
         pub fn parse(
             input: &str,
         ) -> ::core::result::Result<Self, ::caiaphas::Error> {
-            #parse
-                .map(|tree| {
-                    <Self as __caiaphas::FromNode>::from_node(tree.root())
-                })
+            #start
+            __caiaphas::parse::<Start>(input, DEPTH).map(|tree| {
+                tree.value::<Self>()
+            })
         }
 
         #[doc = #recovering_documentation]
         pub fn parse_recovering(input: &str) -> ::caiaphas::Recovered<Self> {
-            let (tree, errors) = #recovering;
+            #start
+            let (tree, errors) =
+                __caiaphas::parse_recovering::<Start>(input, DEPTH);
             let value = tree.map(|tree| {
-                <Self as __caiaphas::FromNode>::from_node(tree.root())
+                tree.value::<Self>()
             });
             __caiaphas::recovered(value, errors)
         }

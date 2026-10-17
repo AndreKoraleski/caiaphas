@@ -148,7 +148,7 @@ impl ExactWriter<'_> {
                     if ends.first().is_some() {
                         return ends;
                     }
-                    parser.recover_ends(&RULE, start, #ends::<REPORTS>)
+                    parser.recover_ends(&RULE, start, #ends::<REPORTS, W>)
                 },
                 Some(quote! {
                     let position = parser.recovered(&RULE, position);
@@ -175,8 +175,8 @@ impl ExactWriter<'_> {
         );
         let ends_function = quote! {
             #[doc(hidden)]
-            fn #ends<const REPORTS: bool>(
-                parser: &mut __caiaphas::Parser<'_, REPORTS>,
+            fn #ends<const REPORTS: bool, W: __caiaphas::Width>(
+                parser: &mut __caiaphas::Parser<'_, REPORTS, W>,
                 position: usize,
             ) -> __caiaphas::Ends {
                 #constant
@@ -191,8 +191,8 @@ impl ExactWriter<'_> {
             #ends_function
 
             #[doc(hidden)]
-            fn #build<const REPORTS: bool>(
-                parser: &mut __caiaphas::Parser<'_, REPORTS>,
+            fn #build<const REPORTS: bool, W: __caiaphas::Width>(
+                parser: &mut __caiaphas::Parser<'_, REPORTS, W>,
                 position: usize,
                 end: usize,
             ) -> ::core::option::Option<usize> {
@@ -218,8 +218,8 @@ impl ExactWriter<'_> {
         };
         quote! {
             #[doc(hidden)]
-            fn #function<const REPORTS: bool>(
-                parser: &mut __caiaphas::Parser<'_, REPORTS>,
+            fn #function<const REPORTS: bool, W: __caiaphas::Width>(
+                parser: &mut __caiaphas::Parser<'_, REPORTS, W>,
                 position: usize,
             ) -> __caiaphas::Match {
                 let end = #ends(parser, position).first()?;

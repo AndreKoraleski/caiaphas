@@ -5,12 +5,12 @@ use std::collections::BTreeMap;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use super::{Ends, Parser, RuleStart};
+use super::{Ends, Parser, RuleStart, Width};
 use crate::__private::{Expected, Rule};
 
 /// What tells where a step of a sequence can end from where it starts.
-pub type Step<'s, 'i, const REPORTS: bool> =
-    &'s dyn Fn(&mut Parser<'i, REPORTS>, usize) -> Ends;
+pub type Step<'s, 'i, const REPORTS: bool, W> =
+    &'s dyn Fn(&mut Parser<'i, REPORTS, W>, usize) -> Ends;
 
 /// Where a rule's matches at a position can end, and whether the rule was
 /// noted as expected there.
@@ -20,7 +20,7 @@ pub(super) struct RememberedEnds {
     pub(super) noted: bool,
 }
 
-impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
+impl<'i, const REPORTS: bool, W: Width> Parser<'i, REPORTS, W> {
     /// Returns every place where a run of characters from `position` that
     /// `contains` holds for can end, the furthest first, and notes each of
     /// `expected` at the furthest.
@@ -196,7 +196,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     /// first end it prefers that the steps after it can go on from to `end`.
     pub fn split(
         &mut self,
-        steps: &[Step<'_, 'i, REPORTS>],
+        steps: &[Step<'_, 'i, REPORTS, W>],
         position: usize,
         end: usize,
     ) -> Vec<usize> {
@@ -212,7 +212,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     /// many steps were left, and where, for each try that could not.
     fn leads(
         &mut self,
-        steps: &[Step<'_, 'i, REPORTS>],
+        steps: &[Step<'_, 'i, REPORTS, W>],
         start: usize,
         end: usize,
         failed: &mut FxHashSet<(usize, usize)>,

@@ -10,27 +10,28 @@ use rustc_hash::FxHashMap;
 
 use super::{
     Expected, Match, Rule,
-    tree::{NodeData, Tree},
+    nodes::{Nodes, Width},
+    tree::Tree,
 };
 pub use ends::Ends;
 use exact::RememberedEnds;
-pub(crate) use recovery::recovering;
-use recovery::{Candidate, Recoveries};
+use recovery::Candidate;
+pub(crate) use recovery::{Recoveries, recovering};
 
 use crate::error::Error;
 
 /// Matches the rules of a grammar against an input and builds the tree of the
 /// match. When `REPORTS` is true, it also notes what could have been read at
-/// each failure, to tell why the input does not match.
+/// each failure, to tell why the input does not match. The positions and
+/// indices of its nodes are of width `W`.
 #[derive(Debug)]
-pub struct Parser<'i, const REPORTS: bool> {
+pub struct Parser<'i, const REPORTS: bool, W> {
     input: &'i str,
-    nodes: Vec<NodeData>,
-    /// The children of every node, as in [`Tree`].
-    children: Vec<usize>,
-    /// The nodes matched inside the rules being matched, those of each rule
-    /// after those of the rules around it.
-    matched: Vec<usize>,
+    /// The nodes built, and those matched inside the rules being matched.
+    nodes: Nodes<W>,
+    /// Whether there came to be more nodes than `W` counts, so the parser
+    /// stopped building them.
+    overflowed: bool,
     /// What each rule that remembers its matches matched at each position. The
     /// keys are small numbers an input cannot pick freely, so a fast hasher
     /// that does not resist collisions suits them.
@@ -81,15 +82,14 @@ pub struct RuleStart {
     noted: usize,
 }
 
-impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
+impl<'i, const REPORTS: bool, W: Width> Parser<'i, REPORTS, W> {
     /// Returns a parser of `input` that follows `limit` matches of recursive
     /// rules inside one another.
     pub(super) fn new(input: &'i str, limit: usize) -> Self {
         Self {
             input,
-            nodes: Vec::new(),
-            children: Vec::new(),
-            matched: Vec::new(),
+            nodes: Nodes::new(),
+            overflowed: false,
             remembered: FxHashMap::default(),
             remembered_ends: FxHashMap::default(),
             furthest: 0,
@@ -114,6 +114,18 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
                 self.rejected,
             ),
         }
+    }
+
+    /// Returns the length of the input in bytes.
+    #[must_use]
+    pub fn length(&self) -> usize {
+        self.input.len()
+    }
+
+    /// Returns whether there came to be more nodes than the parser's width
+    /// counts, so that a wider parser has to build them.
+    pub(super) fn overflowed(&self) -> bool {
+        self.overflowed
     }
 
     /// Returns whether matches nested too deeply, so that no match counts.
@@ -143,7 +155,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
 
     /// Returns the tree of the nodes built, from the node `root`.
     pub(super) fn tree(self, root: usize) -> Tree {
-        Tree::new(self.input, self.nodes, self.children, root)
+        Tree::new(self.input, W::store(self.nodes), root)
     }
 
     /// Notes that `expected` could have been read at `position`.
@@ -298,18 +310,18 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     /// [`Parser::truncate`] when what comes next does not match.
     #[must_use]
     pub fn mark(&self) -> usize {
-        self.matched.len()
+        self.nodes.mark()
     }
 
     /// Forgets the nodes matched since `mark`.
     pub fn truncate(&mut self, mark: usize) {
-        self.matched.truncate(mark);
+        self.nodes.truncate(mark);
     }
 
     /// Forgets the nodes from `mark` to `start` of a branch that a longer one
     /// replaced.
     pub fn discard(&mut self, mark: usize, start: usize) {
-        self.matched.drain(mark..start);
+        self.nodes.discard(mark, start);
     }
 
     /// Adds the node of the rule's match `found` to the nodes matched so far,
@@ -323,7 +335,9 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     /// Adds the node a rule built to the nodes matched so far. A hidden rule
     /// builds none.
     pub fn add_node(&mut self, node: Option<usize>) {
-        self.matched.extend(node);
+        if let Some(node) = node {
+            self.nodes.add(node);
+        }
     }
 
     /// Returns what `rule` matched at `position`, when it remembers that. When
@@ -342,7 +356,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     pub fn start_rule(&self, position: usize) -> RuleStart {
         RuleStart {
             position,
-            mark: self.matched.len(),
+            mark: self.nodes.mark(),
             furthest: self.furthest,
             noted: self.expected.len(),
         }
@@ -358,7 +372,7 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         end: Option<usize>,
     ) -> Match {
         if end.is_none() {
-            self.matched.truncate(start.mark);
+            self.nodes.truncate(start.mark);
         }
         let found = end.map(|end| {
             (end, self.node(rule, start.position..end, start.mark))
@@ -423,36 +437,27 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         range: Range<usize>,
         mark: usize,
     ) -> Option<usize> {
-        if !rule.builds {
-            self.matched.truncate(mark);
+        if !rule.builds || self.overflowed {
+            self.nodes.truncate(mark);
             return None;
         }
-        // A child of an inline rule stands where its node would.
-        let first = self.children.len();
-        for child in self.matched.drain(mark..) {
-            let data = &self.nodes[child];
-            if data.inline {
-                self.children.extend_from_within(data.children.clone());
-            } else {
-                self.children.push(child);
-            }
+        let number = u32::try_from(rule.number)
+            .expect("a grammar has fewer rules than `u32` holds");
+        let node = self.nodes.node(number, rule.inline, &range, mark);
+        // A parser whose nodes outgrow its width only goes on matching, and a
+        // wider one builds the tree.
+        if node.is_none() {
+            self.overflowed = true;
+            self.nodes.truncate(mark);
         }
-        self.nodes.push(NodeData {
-            rule: u32::try_from(rule.number)
-                .expect("a grammar has fewer rules than `u32` holds"),
-            inline: rule.inline,
-            start: range.start,
-            end: range.end,
-            children: first..self.children.len(),
-        });
-        Some(self.nodes.len() - 1)
+        node
     }
 
     /// Returns a parser of the input up to `end`, for an exception. An
     /// exception only reads what its factor matched, and its failures tell
     /// nothing about why the input does not match.
     #[must_use]
-    pub fn within(&self, end: usize) -> Parser<'i, false> {
+    pub fn within(&self, end: usize) -> Parser<'i, false, W> {
         Parser::new(&self.input[..end], self.limit)
     }
 }

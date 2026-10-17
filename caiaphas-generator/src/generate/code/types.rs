@@ -164,7 +164,9 @@ pub(super) fn structure(
         #display
 
         impl __caiaphas::FromNode for #name {
-            fn from_node(node: __caiaphas::Node<'_>) -> Self {
+            fn from_node<W: __caiaphas::Width>(
+                node: __caiaphas::Node<'_, W>,
+            ) -> Self {
                 Self {
                     #(#field_names: #builds,)*
                     span: __caiaphas::TextSpan(node.span()),
@@ -273,7 +275,9 @@ pub(super) fn enumeration(
         #display
 
         impl __caiaphas::FromNode for #name {
-            fn from_node(node: __caiaphas::Node<'_>) -> Self {
+            fn from_node<W: __caiaphas::Width>(
+                node: __caiaphas::Node<'_, W>,
+            ) -> Self {
                 match node.child() {
                     ::core::option::Option::Some(child) => match child.rule() {
                         #(#by_rule,)*

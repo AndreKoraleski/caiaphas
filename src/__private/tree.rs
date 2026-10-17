@@ -1,98 +1,98 @@
 //! Generated code turns the tree a parser builds into its own types.
 
-use std::{ops::Range, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
+use super::nodes::{Nodes, Store, Width};
 use crate::span::{Input, Span};
 
 /// The rules an input matched, each with the rules it matched inside it.
 #[derive(Debug)]
 pub struct Tree {
     input: Arc<Input>,
-    nodes: Vec<NodeData>,
-    /// The children of every node, those of each node next to each other.
-    children: Vec<usize>,
+    nodes: Store,
     root: usize,
 }
 
 impl Tree {
-    /// Returns the tree of `input` from the node `root`, with the children of
-    /// every node of `nodes` in `children`.
-    pub(super) fn new(
-        input: &str,
-        nodes: Vec<NodeData>,
-        children: Vec<usize>,
-        root: usize,
-    ) -> Self {
+    /// Returns the tree of `input` from the node `root` of `nodes`.
+    pub(super) fn new(input: &str, nodes: Store, root: usize) -> Self {
         Self {
             input: Arc::new(Input::new(input)),
             nodes,
-            children,
             root,
         }
     }
 
+    /// Returns the value of type `T` that the root of the tree builds. Each
+    /// width of node has a `T` built for it, so reading the nodes never asks
+    /// which width they have.
     #[must_use]
-    pub fn root(&self) -> Node<'_> {
-        Node {
-            tree: self,
-            index: self.root,
+    pub fn value<T: FromNode>(&self) -> T {
+        let input = &self.input;
+        let index = self.root;
+        match &self.nodes {
+            Store::W8(nodes) => T::from_node(Node {
+                input,
+                nodes,
+                index,
+            }),
+            Store::W16(nodes) => T::from_node(Node {
+                input,
+                nodes,
+                index,
+            }),
+            Store::W32(nodes) => T::from_node(Node {
+                input,
+                nodes,
+                index,
+            }),
+            Store::W64(nodes) => T::from_node(Node {
+                input,
+                nodes,
+                index,
+            }),
         }
     }
 }
 
-/// The rule a node matched, where, and where its children are.
-#[derive(Debug)]
-pub(super) struct NodeData {
-    pub(super) rule: u32,
-    /// Whether the node stands for its children in the node around it.
-    pub(super) inline: bool,
-    pub(super) start: usize,
-    pub(super) end: usize,
-    /// Where the node's children are in the children of its tree.
-    pub(super) children: Range<usize>,
-}
-
-/// A rule an input matched, in its [`Tree`].
+/// A rule an input matched, among nodes of width `W`.
 #[derive(Debug, Clone, Copy)]
-pub struct Node<'t> {
-    tree: &'t Tree,
+pub struct Node<'t, W> {
+    input: &'t Arc<Input>,
+    nodes: &'t Nodes<W>,
     index: usize,
 }
 
-impl<'t> Node<'t> {
-    fn data(&self) -> &'t NodeData {
-        &self.tree.nodes[self.index]
-    }
-
+impl<'t, W: Width> Node<'t, W> {
     /// Returns the number of the rule this node matched.
     #[must_use]
     pub fn rule(&self) -> usize {
-        self.data().rule as usize
+        self.nodes.rule(self.index)
     }
 
     #[must_use]
     pub fn span(&self) -> Span {
-        let data = self.data();
-        Span::new(Arc::clone(&self.tree.input), data.start..data.end)
+        Span::new(Arc::clone(self.input), self.nodes.range(self.index))
     }
 
     #[must_use]
     pub fn text(&self) -> &'t str {
-        let data = self.data();
-        &self.tree.input.as_str()[data.start..data.end]
+        &self.input.as_str()[self.nodes.range(self.index)]
     }
 
     /// Returns the nodes of the rules matched inside this one, in order.
-    pub fn children(&self) -> impl Iterator<Item = Node<'t>> + use<'t> {
-        let tree = self.tree;
-        tree.children[self.data().children.clone()]
-            .iter()
-            .map(move |&index| Node { tree, index })
+    pub fn children(&self) -> impl Iterator<Item = Node<'t, W>> + use<'t, W> {
+        let (input, nodes) = (self.input, self.nodes);
+        nodes.children(self.index).iter().map(move |index| Node {
+            input,
+            nodes,
+            index: index.get(),
+        })
     }
 
     /// Returns the only rule matched inside this one, if any.
     #[must_use]
-    pub fn child(&self) -> Option<Node<'t>> {
+    pub fn child(&self) -> Option<Node<'t, W>> {
         self.children().next()
     }
 
@@ -139,7 +139,7 @@ impl<'t> Node<'t> {
 /// since every generated type implements it.
 #[doc(hidden)]
 pub trait FromNode {
-    fn from_node(node: Node<'_>) -> Self;
+    fn from_node<W: Width>(node: Node<'_, W>) -> Self;
 }
 
 /// The value that the type of a rule reads from the text the rule matched. The
@@ -148,7 +148,7 @@ pub trait FromNode {
 pub struct Converted<T>(pub T);
 
 impl<T: FromStr> FromNode for Converted<T> {
-    fn from_node(node: Node<'_>) -> Self {
+    fn from_node<W: Width>(node: Node<'_, W>) -> Self {
         match node.text().parse() {
             Ok(value) => Self(value),
             Err(_) => unreachable!("the parser made sure the type reads it"),
@@ -157,7 +157,7 @@ impl<T: FromStr> FromNode for Converted<T> {
 }
 
 impl<T: FromNode> FromNode for Box<T> {
-    fn from_node(node: Node<'_>) -> Self {
+    fn from_node<W: Width>(node: Node<'_, W>) -> Self {
         Box::new(T::from_node(node))
     }
 }
