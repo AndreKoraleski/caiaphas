@@ -61,6 +61,10 @@ pub struct Parser<'i, const REPORTS: bool, W> {
     /// Where the matches of recursive rules first nested more deeply than
     /// `limit`, if they did.
     too_deep: Option<usize>,
+    /// The run each place in the grammar that reads a run up to a match of a
+    /// middle last read whole, from where to where, for a parse that notes why
+    /// it fails.
+    runs: FxHashMap<usize, (usize, usize)>,
 }
 
 /// What a rule matched at a position, and whether the rule was noted as
@@ -102,6 +106,7 @@ impl<'i, const REPORTS: bool, W: Width> Parser<'i, REPORTS, W> {
             depth: 0,
             limit,
             too_deep: None,
+            runs: FxHashMap::default(),
         }
     }
 

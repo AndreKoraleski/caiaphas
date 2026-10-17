@@ -4,9 +4,83 @@
 use std::collections::BTreeMap;
 
 use super::{Ends, Parser, Width};
-use crate::__private::Expected;
+use crate::__private::{Expected, Rule};
 
-impl<const REPORTS: bool, W: Width> Parser<'_, REPORTS, W> {
+impl<'i, const REPORTS: bool, W: Width> Parser<'i, REPORTS, W> {
+    /// Returns what [`span_ends`](Self::span_ends) does, less every end from
+    /// the first place where a match of `middle` inside the run ends. This is
+    /// what an exception that takes away any run holding such a match leaves,
+    /// such as `{c} - ({c}, '*)', {c})`. The run is read once, up to that
+    /// place, and `middle` is tried at each place before it, in a parser that
+    /// notes nothing.
+    ///
+    /// A parse that notes why it fails notes what reading the whole run and
+    /// taking those ends away for `rule` from `position` would. It reads each
+    /// run once for each `site`, a number of the place in the grammar.
+    #[allow(clippy::too_many_arguments)]
+    pub fn span_ends_before(
+        &mut self,
+        rule: &Rule,
+        site: usize,
+        position: usize,
+        contains: impl Fn(char) -> bool,
+        expected: &[Expected],
+        mut middle: impl FnMut(&mut Parser<'i, false, W>, usize) -> Ends,
+    ) -> Ends {
+        let input = self.input;
+        let run_end = REPORTS.then(|| {
+            // A run ends at the same place from anywhere inside it.
+            match self.runs.get(&site) {
+                Some(&(start, end)) if (start..=end).contains(&position) => {
+                    self.fail(end, expected);
+                    end
+                }
+                _ => {
+                    let end = self.span(position, &contains, expected);
+                    self.runs.insert(site, (position, end));
+                    end
+                }
+            }
+        });
+        let mut within = self.within(input.len());
+        // The first place a match of `middle` inside the run ends, and where
+        // the run ends when no such match ends before.
+        let mut first = usize::MAX;
+        let mut end = None;
+        let mut at = position;
+        while at < first {
+            for found in middle(&mut within, at).iter() {
+                if found < first && input[at..found].chars().all(&contains) {
+                    first = found;
+                }
+            }
+            match input[at..].chars().next() {
+                Some(c) if contains(c) => at += c.len_utf8(),
+                _ => {
+                    end = Some(at);
+                    break;
+                }
+            }
+        }
+        // Taking every end from `first` on away notes what taking the furthest
+        // away does, since that comes first and the rest add nothing new.
+        if let Some(run_end) = run_end.filter(|&run_end| first <= run_end) {
+            self.excluded(rule, position, run_end);
+        }
+        let mut ends = Ends::none();
+        let last = match end {
+            Some(end) if first == usize::MAX => {
+                ends.add(end);
+                end
+            }
+            _ => first,
+        };
+        for (offset, _) in input[position..last].char_indices().rev() {
+            ends.add(position + offset);
+        }
+        ends
+    }
+
     /// Returns every place where a run of characters from `position` that
     /// `contains` holds for can end, the furthest first, and notes each of
     /// `expected` at the furthest.
