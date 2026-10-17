@@ -26,6 +26,7 @@
 //! [findings]: https://docs.rs/caiaphas-generator/latest/caiaphas_generator/findings/
 
 mod error;
+mod recovered;
 mod span;
 
 #[doc(hidden)]
@@ -34,4 +35,5 @@ pub mod tutorial;
 
 pub use caiaphas_macros::grammar;
 pub use error::{Error, Expected};
+pub use recovered::Recovered;
 pub use span::Span;

@@ -16,8 +16,8 @@ pub type Step<'s, 'i, const REPORTS: bool> =
 /// noted as expected there.
 #[derive(Debug, Clone)]
 pub(super) struct RememberedEnds {
-    ends: Ends,
-    noted: bool,
+    pub(super) ends: Ends,
+    pub(super) noted: bool,
 }
 
 impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {

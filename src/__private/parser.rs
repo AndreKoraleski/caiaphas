@@ -2,6 +2,7 @@
 
 mod ends;
 mod exact;
+mod recovery;
 
 use std::{ops::Range, str::FromStr};
 
@@ -13,6 +14,8 @@ use super::{
 };
 pub use ends::Ends;
 use exact::RememberedEnds;
+pub(crate) use recovery::recovering;
+use recovery::{Candidate, Recoveries};
 
 use crate::error::Error;
 
@@ -41,6 +44,13 @@ pub struct Parser<'i, const REPORTS: bool> {
     /// Where the text ends that a rule matched at the furthest position, when
     /// its type did not read it.
     rejected: Option<usize>,
+    /// Where each rule that recovers goes on from where its match failed.
+    recoveries: Recoveries,
+    /// The matches of rules that recover that failed partway.
+    candidates: Vec<Candidate>,
+    /// Whether the parser is looking for where a rule goes on from, so no rule
+    /// recovers.
+    scanning: bool,
 }
 
 /// What a rule matched at a position, and whether the rule was noted as
@@ -75,6 +85,9 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
             furthest: 0,
             rejected: None,
             expected: Vec::new(),
+            recoveries: Recoveries::default(),
+            candidates: Vec::new(),
+            scanning: false,
         }
     }
 
