@@ -89,8 +89,6 @@ impl FunctionWriter<'_> {
                     }
                 }
             }
-            // The analysis makes sure the body of a repeated sequence cannot
-            // match nothing, so each round goes on.
             ExpressionKind::RepeatedSequence(expression) => {
                 if let Some((pattern, expected)) = self.set_parts(expression) {
                     return quote! {
