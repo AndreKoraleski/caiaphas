@@ -8,6 +8,8 @@ use std::{
     sync::Arc,
 };
 
+use crate::excerpt;
+
 /// Where something a parser read is in its input, with the text there.
 ///
 /// Every span of a parse shares its input, so cloning one is cheap.
@@ -82,6 +84,29 @@ impl Span {
     #[must_use]
     pub fn column(&self) -> usize {
         self.input.line_and_column(self.start).1
+    }
+
+    /// Returns the line the span starts on, with carets under the text it
+    /// covers there, as [`Error::excerpt`](crate::Error::excerpt) shows an
+    /// error. It suits a message about what a parse found, such as a name a
+    /// program does not know.
+    ///
+    /// ```
+    /// caiaphas::grammar!(mod sum {
+    ///     "sum = name, {' + ', name}; (* as String *) name = ? /[a-z]+/ ?;"
+    /// });
+    ///
+    /// let sum: sum::Sum = "a + bc".parse().unwrap();
+    /// assert_eq!(sum.span().excerpt(), "1 | a + bc\n  | ^^^^^^");
+    /// ```
+    #[must_use]
+    pub fn excerpt(&self) -> String {
+        excerpt::excerpt(
+            self.input.as_str(),
+            self.line(),
+            self.start,
+            self.end,
+        )
     }
 }
 

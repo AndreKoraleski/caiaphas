@@ -26,6 +26,7 @@
 //! [findings]: https://docs.rs/caiaphas-generator/latest/caiaphas_generator/findings/
 
 mod error;
+mod excerpt;
 mod recovered;
 mod span;
 

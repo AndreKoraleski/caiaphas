@@ -3,7 +3,7 @@
 
 use std::fmt::{self, Write};
 
-use crate::span::line_and_column;
+use crate::{excerpt, span::line_and_column};
 
 /// Error returned when an input does not match its grammar.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,48 +126,9 @@ impl Error {
     /// ```
     #[must_use]
     pub fn excerpt(&self, input: &str) -> String {
-        let mut offset = self.offset.min(input.len());
-        while !input.is_char_boundary(offset) {
-            offset -= 1;
-        }
-        let start = input[..offset].rfind('\n').map_or(0, |at| at + 1);
-        let end = input[offset..]
-            .find('\n')
-            .map_or(input.len(), |at| offset + at);
-        let line: Vec<char> =
-            input[start..end].trim_end_matches('\r').chars().collect();
-        let at = input[start..offset].chars().count().min(line.len());
-        let first = at
-            .saturating_sub(EXCERPT / 2)
-            .min(line.len().saturating_sub(EXCERPT));
-        let last = (first + EXCERPT).min(line.len());
-        let (mut shown, mut under) = (String::new(), String::new());
-        if first > 0 {
-            shown.push_str("...");
-            under.push_str("   ");
-        }
-        for (index, &c) in line[first..last].iter().enumerate() {
-            // A character that moves the cursor would hide the caret.
-            shown.push(if c.is_control() && c != '\t' {
-                '\u{FFFD}'
-            } else {
-                c
-            });
-            if first + index < at {
-                under.push(if c == '\t' { '\t' } else { ' ' });
-            }
-        }
-        if last < line.len() {
-            shown.push_str("...");
-        }
-        let number = self.line.to_string();
-        let gutter = " ".repeat(number.len());
-        format!("{number} | {shown}\n{gutter} | {under}^")
+        excerpt::excerpt(input, self.line, self.offset, self.offset)
     }
 }
-
-/// The most characters of a line an excerpt shows.
-const EXCERPT: usize = 80;
 
 impl fmt::Display for Expected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
