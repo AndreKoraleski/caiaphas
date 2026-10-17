@@ -29,11 +29,12 @@ const HELP: &str = "\
 caiaphas check prints every finding the grammar! macro would report about each
 ISO/IEC 14977 EBNF grammar, suggestions included. caiaphas types prints the
 Rust types the macro would generate for a grammar, each after its rule.
-caiaphas parse runs a grammar on an input, from a file or standard input, as
-its generated parser would, and prints the tree of the match or where it
-stops matching. It goes on past each error that a rule written with
-(* recover *) skips, and prints every error with the tree of what matches.
-Given several inputs, it tells whether each matches instead of its tree.
+caiaphas parse runs a grammar on an input, from a file, each file of a
+directory or standard input, as its generated parser would, and prints the
+tree of the match or where it stops matching. It goes on past each error that
+a rule written with (* recover *) skips, and prints every error with the tree
+of what matches. Given several inputs, it tells whether each matches instead
+of its tree.
 --rule parses with another rule than the first start rule.
 caiaphas explain tells what a finding means, given its code, such as
 tied-branches, and lists every code without one.
@@ -51,7 +52,18 @@ fn main() -> ExitCode {
     // A path need not be text, so the arguments are read as the system gives
     // them.
     let mut arguments = env::args_os().skip(1);
-    match arguments.next().as_deref().and_then(OsStr::to_str) {
+    let command = arguments.next();
+    let arguments: Vec<_> = arguments.collect();
+    // `--help` after a command asks for help, not for a file of that name.
+    if arguments
+        .iter()
+        .any(|argument| argument == "--help" || argument == "-h")
+    {
+        println!("{HELP}");
+        return ExitCode::SUCCESS;
+    }
+    let mut arguments = arguments.into_iter();
+    match command.as_deref().and_then(OsStr::to_str) {
         Some("check") => {
             let paths: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
             if paths.is_empty() {
@@ -131,7 +143,8 @@ fn check(paths: &[PathBuf]) -> ExitCode {
                 for finding in &report.findings {
                     println!("{finding}\n");
                 }
-                found |= !report.findings.is_empty();
+                found |=
+                    report.findings.iter().any(|finding| has_code(finding));
                 failed |= report.stops_build;
             }
             Err(error) => {
@@ -151,6 +164,14 @@ fn check(paths: &[PathBuf]) -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+/// Returns whether `finding` has a code, as `warning[tied-branches]` does,
+/// that `caiaphas explain` tells more about.
+fn has_code(finding: &str) -> bool {
+    finding
+        .split_once(": ")
+        .is_some_and(|(kind, _)| kind.ends_with(']'))
 }
 
 /// Prints the types the grammar in the file at `path` gives. Fails when it

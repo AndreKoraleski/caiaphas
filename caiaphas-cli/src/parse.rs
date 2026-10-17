@@ -4,6 +4,7 @@
 
 use std::{
     ffi::OsString,
+    fs,
     io::{self, Read},
     path::{Path, PathBuf},
     process::ExitCode,
@@ -84,6 +85,16 @@ impl Parse {
                     .position(|planned| words(&planned.name) == words(rule));
                 let Some(found) = found else {
                     eprintln!("error: the grammar has no rule `{rule}`");
+                    let typed: Vec<String> = plan
+                        .rules
+                        .iter()
+                        .filter(|planned| planned.typed)
+                        .map(|planned| format!("`{}`", planned.name))
+                        .collect();
+                    eprintln!(
+                        "help: a parse can start from {}",
+                        typed.join(", ")
+                    );
                     return ExitCode::FAILURE;
                 };
                 // Only a rule with a type has a parse of its own.
@@ -106,7 +117,7 @@ impl Parse {
         }
         // An interpreted rule takes more stack than a generated one, so the
         // parses run where there is plenty.
-        let inputs = self.inputs;
+        let inputs = files(self.inputs);
         thread::Builder::new()
             .stack_size(STACK)
             .spawn(move || report(program, &inputs))
@@ -114,6 +125,29 @@ impl Parse {
             .join()
             .expect("a parse does not panic")
     }
+}
+
+/// Returns `inputs` with each directory among them replaced by the files in
+/// it, in order of their names, so a folder of samples is parsed whole.
+fn files(inputs: Vec<Option<PathBuf>>) -> Vec<Option<PathBuf>> {
+    let mut files = Vec::new();
+    for input in inputs {
+        let entries = input
+            .as_deref()
+            .filter(|path| path.is_dir())
+            .and_then(|path| fs::read_dir(path).ok());
+        let Some(entries) = entries else {
+            files.push(input);
+            continue;
+        };
+        let mut inside: Vec<PathBuf> = entries
+            .filter_map(|entry| Some(entry.ok()?.path()))
+            .filter(|path| path.is_file())
+            .collect();
+        inside.sort();
+        files.extend(inside.into_iter().map(Some));
+    }
+    files
 }
 
 /// Parses each of `inputs` with `program` and prints what it finds: the tree

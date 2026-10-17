@@ -101,6 +101,21 @@ fn tells_how_to_call_it() {
     }
     assert!(printed(&caiaphas(&["--help"])).contains("usage:"));
     assert!(printed(&caiaphas(&["--version"])).starts_with("caiaphas "));
+    for command in ["check", "types", "parse", "explain"] {
+        let output = caiaphas(&[command, "--help"]);
+        assert!(output.status.success(), "{command}");
+        assert!(printed(&output).contains("usage:"), "{command}");
+    }
+}
+
+#[test]
+fn tells_of_explain_only_after_a_finding_with_a_code() {
+    let path = grammar("no-code", "s = a;");
+    let output = caiaphas(&["check", path.to_str().unwrap()]);
+    assert!(!printed(&output).contains("caiaphas explain"));
+    let path = grammar("code", "s = s, 'x' | 'y';");
+    let output = caiaphas(&["check", path.to_str().unwrap()]);
+    assert!(printed(&output).contains("caiaphas explain"));
 }
 
 #[test]
@@ -212,6 +227,27 @@ fn points_at_where_an_input_stops_matching() {
 }
 
 #[test]
+fn parses_each_file_of_a_directory() {
+    let path = grammar("folder", PAIRS);
+    let folder =
+        env::temp_dir().join(format!("caiaphas-{}-folder", process::id()));
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("a.txt"), "ab=1").unwrap();
+    fs::write(folder.join("b.txt"), "cd=2").unwrap();
+    let output =
+        caiaphas(&["parse", path.to_str().unwrap(), folder.to_str().unwrap()]);
+    assert!(output.status.success());
+    assert_eq!(
+        printed(&output),
+        format!(
+            "ok {}\nok {}\n2 of 2 inputs match\n",
+            folder.join("a.txt").display(),
+            folder.join("b.txt").display()
+        )
+    );
+}
+
+#[test]
 fn tells_whether_each_of_several_inputs_matches() {
     let path = grammar("several", PAIRS);
     let good = input("several-good", "ab=12");
@@ -255,7 +291,11 @@ fn fails_at_a_rule_a_parse_cannot_start_from() {
     let path = grammar("no-rule", PAIRS);
     let input = input("no-rule", "12");
     for (rule, error) in [
-        ("pairs", "error: the grammar has no rule `pairs`\n"),
+        (
+            "pairs",
+            "error: the grammar has no rule `pairs`\nhelp: a parse can start \
+             from `pair`, `value`\n",
+        ),
         (
             "point",
             "error: `point` has no type of its own, so a parse cannot \
