@@ -126,11 +126,24 @@
 //! assert_eq!(area, 12);
 //! ```
 //!
-//! - A rule whose alternatives are each a rule or a word becomes an enum. An
-//!   inline rule that holds one rule once, as in `group = '(', sum, ')'`, can
-//!   be an alternative too, and gives the variant `Group(Sum)`. A group of
-//!   rules among parts that hold nothing, as in `(a | b), ws` with `ws`
-//!   hidden, becomes an enum too.
+//! - A rule whose alternatives are each a rule or a terminal string with a
+//!   name becomes an enum. A word gives its name in upper camel case, so
+//!   `'not in'` gives `NotIn`, and each character of punctuation the name it
+//!   has here, so `'<='` gives `LessEquals`: `Bang` for `!`, `Quote` for `"`,
+//!   `Hash` for `#`, `Dollar` for `$`, `Percent` for `%`, `Ampersand` for `&`,
+//!   `Apostrophe` for `'`, `OpenParen` for `(`, `CloseParen` for `)`, `Star`
+//!   for `*`, `Plus` for `+`, `Comma` for `,`, `Minus` for `-`, `Dot` for `.`,
+//!   `Slash` for `/`, `Colon` for `:`, `Semicolon` for `;`, `Less` for `<`,
+//!   `Equals` for `=`, `Greater` for `>`, `Question` for `?`, `At` for `@`,
+//!   `OpenBracket` for `[`, `Backslash` for `\`, `CloseBracket` for `]`,
+//!   `Caret` for `^`, `Underscore` for `_`, `Backtick` for a backtick,
+//!   `OpenBrace` for `{`, `Pipe` for `|`, `CloseBrace` for `}` and `Tilde` for
+//!   `~`. A terminal string that starts with a digit or holds any other
+//!   character has no name, and neither do two that would share one, so their
+//!   rule is a struct. An inline rule that holds one rule once, as in
+//!   `group = '(', sum, ')'`, can be an alternative too, and gives the variant
+//!   `Group(Sum)`. A group of rules among parts that hold nothing, as in
+//!   `(a | b), ws` with `ws` hidden, becomes an enum too.
 //! - Any other rule becomes a struct. A field holds `T`, `Option<T>`, `Vec<T>`
 //!   or `[T; N]`, as many times as the rule can hold it, and a type that could
 //!   contain itself holds itself in a `Box`.

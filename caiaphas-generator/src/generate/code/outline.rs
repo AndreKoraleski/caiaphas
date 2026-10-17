@@ -115,8 +115,8 @@ fn variant_declaration(
                 held(grammar, names, *rule, *boxed)
             )
         }
-        Variant::Word(word) => name::word_variant(word)
-            .expect("a word variant is named after its word")
+        Variant::Terminal(terminal) => name::terminal_variant(terminal)
+            .expect("a terminal variant has a name")
             .to_string(),
     }
 }

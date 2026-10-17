@@ -40,13 +40,71 @@ pub(crate) fn field_name(written: &str) -> Ident {
     ident(&written.to_snake_case())
 }
 
-/// Returns the name of the variant for the terminal string `text`, when the
-/// text is a word that a name can be made of.
-pub(crate) fn word_variant(text: &str) -> Option<Ident> {
-    let mut chars = text.chars();
-    let is_word = chars.next().is_some_and(|c| c.is_ascii_alphabetic())
-        && chars.all(|c| c.is_ascii_alphanumeric());
-    is_word.then(|| type_name(text))
+/// The name of each character of punctuation in the name of a variant.
+const PUNCTUATION: &[(char, &str)] = &[
+    ('!', "Bang"),
+    ('"', "Quote"),
+    ('#', "Hash"),
+    ('$', "Dollar"),
+    ('%', "Percent"),
+    ('&', "Ampersand"),
+    ('\'', "Apostrophe"),
+    ('(', "OpenParen"),
+    (')', "CloseParen"),
+    ('*', "Star"),
+    ('+', "Plus"),
+    (',', "Comma"),
+    ('-', "Minus"),
+    ('.', "Dot"),
+    ('/', "Slash"),
+    (':', "Colon"),
+    (';', "Semicolon"),
+    ('<', "Less"),
+    ('=', "Equals"),
+    ('>', "Greater"),
+    ('?', "Question"),
+    ('@', "At"),
+    ('[', "OpenBracket"),
+    ('\\', "Backslash"),
+    (']', "CloseBracket"),
+    ('^', "Caret"),
+    ('_', "Underscore"),
+    ('`', "Backtick"),
+    ('{', "OpenBrace"),
+    ('|', "Pipe"),
+    ('}', "CloseBrace"),
+    ('~', "Tilde"),
+];
+
+/// Returns the name of the variant for the terminal string `text`, when every
+/// part of it has one: each word in upper camel case, and each character of
+/// punctuation by its name, so `<=` gives `LessEquals` and `not in` gives
+/// `NotIn`. A word that starts with a digit has none, so no variant is named
+/// after a number.
+pub(crate) fn terminal_variant(text: &str) -> Option<Ident> {
+    let mut name = String::new();
+    let mut rest = text;
+    while let Some(c) = rest.chars().next() {
+        if c == ' ' {
+            rest = &rest[1..];
+            continue;
+        }
+        if c.is_ascii_alphanumeric() {
+            let end = rest
+                .find(|c: char| !c.is_ascii_alphanumeric())
+                .unwrap_or(rest.len());
+            if c.is_ascii_digit() {
+                return None;
+            }
+            name.push_str(&rest[..end].to_upper_camel_case());
+            rest = &rest[end..];
+            continue;
+        }
+        let &(_, part) = PUNCTUATION.iter().find(|&&(known, _)| known == c)?;
+        name.push_str(part);
+        rest = &rest[c.len_utf8()..];
+    }
+    (!name.is_empty()).then(|| ident(&name))
 }
 
 fn ident(name: &str) -> Ident {
@@ -101,12 +159,19 @@ mod tests {
     }
 
     #[test]
-    fn names_variants_after_words() {
-        let name = |text| word_variant(text).map(|name| name.to_string());
+    fn names_variants_after_words_and_punctuation() {
+        let name = |text| terminal_variant(text).map(|name| name.to_string());
         assert_eq!(name("true").as_deref(), Some("True"));
         assert_eq!(name("isNull").as_deref(), Some("IsNull"));
-        assert_eq!(name("+"), None);
+        assert_eq!(name("not in").as_deref(), Some("NotIn"));
+        assert_eq!(name("+").as_deref(), Some("Plus"));
+        assert_eq!(name("<=").as_deref(), Some("LessEquals"));
+        assert_eq!(name("is_a").as_deref(), Some("IsUnderscoreA"));
+        assert_eq!(name("x2").as_deref(), Some("X2"));
         assert_eq!(name("2x"), None);
+        assert_eq!(name("1"), None);
+        assert_eq!(name("é"), None);
+        assert_eq!(name(" "), None);
         assert_eq!(name(""), None);
     }
 }

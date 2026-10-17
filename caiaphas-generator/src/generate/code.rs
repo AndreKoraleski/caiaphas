@@ -167,7 +167,7 @@ fn textual(shapes: &[Option<Shape>]) -> Vec<bool> {
 }
 
 /// Returns whether the type of each rule has `span()`, as for `text()`, but an
-/// enum with a variant for a word has none.
+/// enum with a variant for a terminal string has none.
 fn spanning(shapes: &[Option<Shape>]) -> Vec<bool> {
     through_enums(shapes, |variants| {
         variants

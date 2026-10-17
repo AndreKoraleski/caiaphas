@@ -1,16 +1,17 @@
 //! Shapes tell which Rust type each rule of a grammar becomes.
 //!
-//! A rule whose alternatives are each another rule or a word becomes an enum
-//! with a variant for each, and so does a group of rules among parts that hold
-//! nothing, as in `(a | b), ws` with `ws` hidden. Any other rule becomes a
-//! struct with a field for each rule it holds, typed by how many times it can
-//! hold it, and a rule it always holds the same number of times becomes an
-//! array. A rule that holds an inline rule holds what the inline rule holds
-//! instead, as if its definition were written there, and when that is one
-//! rule, the inline rule labels it: the field takes the inline rule's name, so
-//! two places that hold the same rule can have fields of their own. Hidden and
-//! inline rules get no type, and neither do rules that no start rule holds. A
-//! type that could contain itself holds itself in a box.
+//! A rule whose alternatives are each another rule or a terminal string with a
+//! name, such as `'true'` or `'<='`, becomes an enum with a variant for each,
+//! and so does a group of rules among parts that hold nothing, as in
+//! `(a | b), ws` with `ws` hidden. Any other rule becomes a struct with a
+//! field for each rule it holds, typed by how many times it can hold it, and a
+//! rule it always holds the same number of times becomes an array. A rule that
+//! holds an inline rule holds what the inline rule holds instead, as if its
+//! definition were written there, and when that is one rule, the inline rule
+//! labels it: the field takes the inline rule's name, so two places that hold
+//! the same rule can have fields of their own. Hidden and inline rules get no
+//! type, and neither do rules that no start rule holds. A type that could
+//! contain itself holds itself in a box.
 
 mod counts;
 
@@ -68,8 +69,9 @@ pub(crate) enum Variant {
         named: RuleId,
         boxed: bool,
     },
-    /// Stands for a terminal string that is a word.
-    Word(String),
+    /// Stands for a terminal string with a name, as words and punctuation
+    /// have.
+    Terminal(String),
 }
 
 /// Returns the shape of each rule's type, or `None` for a rule without one.
@@ -110,8 +112,9 @@ fn shape(
 
 /// Returns the variants of a sequence whose one part that holds a rule is a
 /// group of alternatives, as in `(a | b), ws` with `ws` hidden, when each of
-/// them holds a rule. A word variant is told by the text of the whole match,
-/// and the other parts add to that text, so a word leaves the rule a struct.
+/// them holds a rule. A terminal variant is told by the text of the whole
+/// match, and the other parts add to that text, so a terminal string leaves
+/// the rule a struct.
 fn grouped_variants(
     grammar: &Grammar,
     labels: &[Option<RuleId>],
@@ -137,8 +140,9 @@ fn grouped_variants(
 }
 
 /// Returns a variant for each alternative of `expression`, when each is a rule
-/// with a type, an inline rule that labels one such rule held once, or a word,
-/// and no two variants would share a name or the rule they hold.
+/// with a type, an inline rule that labels one such rule held once, or a
+/// terminal string with a name, and no two variants would share a name or the
+/// rule they hold.
 fn variants(
     grammar: &Grammar,
     labels: &[Option<RuleId>],
@@ -189,7 +193,8 @@ fn variants(
                     )
                 }
                 ExpressionKind::TerminalString(text) => {
-                    (Variant::Word(text.clone()), name::word_variant(text)?)
+                    let name = name::terminal_variant(text)?;
+                    (Variant::Terminal(text.clone()), name)
                 }
                 _ => return None,
             };
@@ -328,7 +333,7 @@ pub(super) fn held(shape: &Shape) -> Vec<RuleId> {
             .iter()
             .filter_map(|variant| match variant {
                 Variant::Rule { rule, .. } => Some(*rule),
-                Variant::Word(_) => None,
+                Variant::Terminal(_) => None,
             })
             .collect(),
         Shape::Converted(_) => Vec::new(),
@@ -447,7 +452,9 @@ mod tests {
                                         )
                                     }
                                 }
-                                Variant::Word(word) => format!("{word:?}"),
+                                Variant::Terminal(terminal) => {
+                                    format!("{terminal:?}")
+                                }
                             })
                             .collect();
                         format!("enum {{{}}}", variants.join(", "))
@@ -646,13 +653,23 @@ mod tests {
     }
 
     #[test]
+    fn names_a_variant_after_the_punctuation_it_matches() {
+        assert_eq!(
+            shapes_of("operator = '+' | '-' | '<=' | 'not in';")[0],
+            shape("operator", "enum {\"+\", \"-\", \"<=\", \"not in\"}")
+        );
+        // `+` and `plus` would share a name.
+        assert_eq!(shapes_of("s = '+' | 'plus';")[0], shape("s", "struct {}"));
+    }
+
+    #[test]
     fn makes_a_struct_when_variants_would_share_a_name_or_have_none() {
         assert_eq!(
             shapes_of("s = object | 'object'; object = 'x';")[0],
             shape("s", "struct {object Optional}")
         );
         assert_eq!(
-            shapes_of("s = a | '+'; a = 'x';")[0],
+            shapes_of("s = a | '1'; a = 'x';")[0],
             shape("s", "struct {a Optional}")
         );
         assert_eq!(

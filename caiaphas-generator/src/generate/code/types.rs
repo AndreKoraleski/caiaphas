@@ -254,20 +254,20 @@ pub(super) fn enumeration(
                 let index = label.unwrap_or(index);
                 by_rule.push(quote! { #index => Self::#variant(#read) });
             }
-            Variant::Word(word) => {
-                let variant = name::word_variant(word)
-                    .expect("a word variant is named after its word");
-                let documentation = format!(" Matched `{word}`.");
+            Variant::Terminal(terminal) => {
+                let variant = name::terminal_variant(terminal)
+                    .expect("a terminal variant has a name");
+                let documentation = format!(" Matched `{terminal}`.");
                 declarations.push(quote! {
                     #[doc = #documentation]
                     #variant
                 });
                 if let Some(texts) = &mut texts {
-                    texts.push(quote! { Self::#variant => #word });
+                    texts.push(quote! { Self::#variant => #terminal });
                 }
-                // A word has no place of its own to give.
+                // A terminal string has no place of its own to give.
                 spans = None;
-                by_text.push(quote! { #word => Self::#variant });
+                by_text.push(quote! { #terminal => Self::#variant });
             }
         }
     }

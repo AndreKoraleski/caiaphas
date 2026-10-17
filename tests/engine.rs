@@ -291,6 +291,19 @@ fn gives_a_rule_that_holds_an_inline_rule_what_it_holds() {
     assert_eq!((pair.a.text(), pair.b.text()), ("a", "b"));
 }
 
+caiaphas::grammar!(mod operators {
+    "comparison = term, operator, term;
+     operator = '<' | '<=' | '==';
+     term = ? /[a-z]+/ ?;"
+});
+
+#[test]
+fn names_a_variant_after_the_punctuation_it_matches() {
+    let comparison = operators::Comparison::parse("a<=b").unwrap();
+    assert_eq!(comparison.operator, operators::Operator::LessEquals);
+    assert_eq!(comparison.operator.text(), "<=");
+}
+
 caiaphas::grammar!(mod labeled {
     "function = name, '(', [parameter, {',', parameter}], ')';
      (* inline *) name = identifier;

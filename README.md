@@ -152,12 +152,14 @@ pub struct Circle { pub size: u32 }
 pub struct Square { pub size: [u32; 2] }
 ```
 
-* A rule whose alternatives are each another rule or a word, such as
-  `'true'`, becomes an enum, and any other rule a struct. An alternative can
-  also be an inline rule that holds one rule once, so with
-  `(* inline *) group = '(', sum, ')';` it gives the variant `Group(Sum)`. A
-  group of rules among parts that hold nothing, such as `(a | b), ws` with
-  `ws` hidden, becomes an enum too.
+* A rule whose alternatives are each another rule or a terminal string with a
+  name becomes an enum, and any other rule a struct. A word gives its name in
+  upper camel case and punctuation a name of its own, as the tutorial lists,
+  so `'true'` gives `True` and `'<='` gives `LessEquals`, and a number gives
+  none. An alternative can also be an inline rule that holds one rule once, so
+  with `(* inline *) group = '(', sum, ')';` it gives the variant
+  `Group(Sum)`. A group of rules among parts that hold nothing, such as
+  `(a | b), ws` with `ws` hidden, becomes an enum too.
 * A type is named in upper camel case and a field in snake case, so
   `syntax rule` gives `SyntaxRule` and `syntax_rule`. A word Rust keeps, such
   as `type`, becomes `r#type`, and `self` and `span` become `self_` and
@@ -167,9 +169,9 @@ pub struct Square { pub size: [u32; 2] }
   holds itself in a `Box`.
 * Every struct gives the text it matched with `text()`, and where with
   `span()`. An enum has both too, unless a variant holds an `(* as T *)`
-  value, and `span()` unless a variant stands for a word. A type with `text()`
-  displays as that text, and a rule that only ever matches one character also
-  has `char()`.
+  value, and `span()` unless a variant stands for a terminal string. A type
+  with `text()` displays as that text, and a rule that only ever matches one
+  character also has `char()`.
 * A comment right before a rule, with no empty line between, begins the docs
   of its type, unless it is an [annotation](#annotations). The docs then
   quote the rule.

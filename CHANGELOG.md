@@ -39,6 +39,8 @@ adhere to [Semantic Versioning][semver].
 - `Spanned<T>`, which `(* as caiaphas::Spanned<T> *)` gives: a value with where
   it was read, that otherwise reads as the `T` it holds. An enum has `span()`
   when each of its variants has one.
+- Enums of terminal strings, such as `operator = '+' | '<=';`, with variants
+  named after their words and punctuation, as `Plus` and `LessEquals`.
 - Fields of `[T; N]` for a rule held the same number of times on every way, and
   `char()` on the type of a rule that only ever matches one character.
 - Docs on each type that quote its rule, and begin with the comments right
