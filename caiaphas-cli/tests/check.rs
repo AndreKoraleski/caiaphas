@@ -271,6 +271,31 @@ fn tells_whether_each_of_several_inputs_matches() {
 }
 
 #[test]
+fn fails_where_an_input_that_should_fail_matches() {
+    let path = grammar("expect-fail", PAIRS);
+    let good = input("expect-fail-good", "ab=12");
+    let bad = input("expect-fail-bad", "ab=");
+    let parse = |inputs: &[&PathBuf]| {
+        let mut arguments = vec!["parse", path.to_str().unwrap()];
+        arguments.extend(inputs.iter().map(|input| input.to_str().unwrap()));
+        arguments.push("--expect-fail");
+        caiaphas(&arguments)
+    };
+    let both = parse(&[&good, &bad]);
+    assert_eq!(both.status.code(), Some(1));
+    assert_eq!(printed(&both), "1 of 2 inputs fail\n");
+    let errors = String::from_utf8(both.stderr).unwrap();
+    assert!(
+        errors.contains(&format!(
+            "error: {} matches, though it should fail\n",
+            good.display()
+        )),
+        "{errors}"
+    );
+    assert_eq!(parse(&[&bad]).status.code(), Some(0));
+}
+
+#[test]
 fn parses_standard_input_from_another_rule() {
     let path = grammar("rule", PAIRS);
     let mut child = Command::new(env!("CARGO_BIN_EXE_caiaphas"))

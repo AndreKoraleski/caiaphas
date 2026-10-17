@@ -57,8 +57,9 @@ adhere to [Semantic Versioning][semver].
 - The `caiaphas` command of the `caiaphas-cli` crate. `caiaphas check` checks
   grammar files without building anything, `caiaphas types` prints the types
   a grammar gives, `caiaphas parse` runs a grammar on inputs as its parser
-  would and prints the tree or every error, and `caiaphas explain` tells what
-  a finding means, or lists every code.
+  would and prints the tree or every error, or with `--expect-fail` checks
+  that none matches, and `caiaphas explain` tells what a finding means, or
+  lists every code.
 - A tutorial in the docs, a page that explains every finding, and examples that
   read arithmetic, JSON, INI and CSV files, and logs.
 

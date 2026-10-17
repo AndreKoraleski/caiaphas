@@ -344,8 +344,9 @@ the parser would give. With rules written with `(* recover *)`, it prints
 every error, after the tree of what still matches, as `parse_recovering`
 gives them. Given several inputs, such as every sample of a language, it
 tells whether each matches, with the errors of those that do not, so a change
-to the grammar can be checked against all of them at once. `--rule` starts
-from another rule with a type.
+to the grammar can be checked against all of them at once. `--expect-fail`
+checks the other way, that none of them matches, for samples the language
+must reject. `--rule` starts from another rule with a type.
 
 ```console
 $ printf '[1, true]' | caiaphas parse grammars/json.ebnf --rule array

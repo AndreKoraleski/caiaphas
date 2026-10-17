@@ -1,6 +1,7 @@
 //! `caiaphas parse` runs a grammar on inputs as its generated parser would. It
 //! prints the tree of what matches and every error found, or for several
-//! inputs, whether each matches.
+//! inputs, whether each matches. It can also check that none matches, for
+//! samples a language must reject.
 
 use std::{
     ffi::OsString,
@@ -22,6 +23,8 @@ pub(crate) struct Parse {
     inputs: Vec<Option<PathBuf>>,
     /// The name of the rule to parse with, if not the first start rule.
     rule: Option<String>,
+    /// Whether every input should fail to match.
+    expect_fail: bool,
 }
 
 impl Parse {
@@ -31,9 +34,12 @@ impl Parse {
     ) -> Option<Self> {
         let mut paths = Vec::new();
         let mut rule = None;
+        let mut expect_fail = false;
         while let Some(argument) = arguments.next() {
             if argument == "--rule" {
                 rule = Some(arguments.next()?.to_string_lossy().into_owned());
+            } else if argument == "--expect-fail" {
+                expect_fail = true;
             } else {
                 paths.push(PathBuf::from(argument));
             }
@@ -54,6 +60,7 @@ impl Parse {
             grammar,
             inputs,
             rule,
+            expect_fail,
         })
     }
 
@@ -118,9 +125,10 @@ impl Parse {
         // An interpreted rule takes more stack than a generated one, so the
         // parses run where there is plenty.
         let inputs = files(self.inputs);
+        let expect_fail = self.expect_fail;
         thread::Builder::new()
             .stack_size(STACK)
-            .spawn(move || report(program, &inputs))
+            .spawn(move || report(program, &inputs, expect_fail))
             .expect("a thread can start")
             .join()
             .expect("a parse does not panic")
@@ -152,11 +160,16 @@ fn files(inputs: Vec<Option<PathBuf>>) -> Vec<Option<PathBuf>> {
 
 /// Parses each of `inputs` with `program` and prints what it finds: the tree
 /// of what matches for one input, and whether each matches for several, with
-/// every error. The inputs are read here, so a grammar's problems show without
+/// every error. When it should `expect_fail`, each input that matches is an
+/// error. The inputs are read here, so a grammar's problems show without
 /// waiting for standard input.
-fn report(program: &'static Program, inputs: &[Option<PathBuf>]) -> ExitCode {
+fn report(
+    program: &'static Program,
+    inputs: &[Option<PathBuf>],
+    expect_fail: bool,
+) -> ExitCode {
     let several = inputs.len() > 1;
-    let mut matching = 0;
+    let (mut matching, mut failing) = (0, 0);
     for path in inputs {
         let input = match path.as_deref().map_or_else(standard_input, read) {
             Ok(input) => input,
@@ -174,25 +187,37 @@ fn report(program: &'static Program, inputs: &[Option<PathBuf>]) -> ExitCode {
         for error in &errors {
             point(error, path.as_deref(), &input);
         }
-        if errors.is_empty() {
-            matching += 1;
-            if several {
-                let name = path.as_deref().map(Path::display);
-                match name {
-                    Some(name) => println!("ok {name}"),
-                    None => println!("ok standard input"),
-                }
-            }
+        if !errors.is_empty() {
+            failing += 1;
+            continue;
+        }
+        matching += 1;
+        let name = path
+            .as_deref()
+            .map_or_else(|| "standard input".to_owned(), named);
+        if expect_fail {
+            eprintln!("error: {name} matches, though it should fail");
+        } else if several {
+            println!("ok {name}");
         }
     }
-    if several {
-        println!("{matching} of {} inputs match", inputs.len());
+    let total = inputs.len();
+    if several && expect_fail {
+        println!("{failing} of {total} inputs fail");
+    } else if several {
+        println!("{matching} of {total} inputs match");
     }
-    if matching == inputs.len() {
+    let expected = if expect_fail { failing } else { matching };
+    if expected == total {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
     }
+}
+
+/// Returns how a message names the file at `path`.
+fn named(path: &Path) -> String {
+    path.display().to_string()
 }
 
 /// Prints `error` of `input`, with where it is in the file at `path`, if the
