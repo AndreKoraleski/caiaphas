@@ -7,11 +7,11 @@
 //! It ignores exceptions and greedy rules, so a sample is only a candidate,
 //! and the matcher tells whether it matches.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::ir::{Expression, ExpressionKind, Grammar, RuleId};
 
-/// How long a sample can be.
+/// How many bytes a sample can hold.
 const LENGTH: usize = 8;
 
 /// How many samples an expression keeps, the shortest first.
@@ -119,14 +119,22 @@ impl<'a> Sampler<'a> {
             ExpressionKind::RepeatedSequence(expression) => {
                 let once = self.within(expression, depth);
                 let mut samples = vec![String::new()];
+                // Only the samples the last round found can make new ones.
+                let mut newest = samples.clone();
                 loop {
-                    let mut next = concatenated(&samples, &once);
-                    next.extend(samples.iter().cloned());
-                    let next = bounded(next);
-                    if next == samples {
+                    let found: Vec<String> = concatenated(&newest, &once)
+                        .into_iter()
+                        .filter(|sample| !samples.contains(sample))
+                        .collect();
+                    if found.is_empty() {
                         return samples;
                     }
-                    samples = next;
+                    samples.extend(found.iter().cloned());
+                    samples = bounded(samples);
+                    newest = found
+                        .into_iter()
+                        .filter(|sample| samples.contains(sample))
+                        .collect();
                 }
             }
             ExpressionKind::SyntacticFactor {
@@ -158,28 +166,35 @@ fn after(c: char) -> Option<char> {
     }
 }
 
-/// Returns each of `firsts` followed by each of `seconds`, within bounds.
+/// Returns the shortest of `firsts` followed by `seconds`, within bounds. Both
+/// are sorted the shortest first, as samples are, so the samples come in order
+/// of length and the search stops once it has enough.
 fn concatenated(firsts: &[String], seconds: &[String]) -> Vec<String> {
-    let mut samples = Vec::new();
-    for first in firsts {
-        for second in seconds {
-            if first.chars().count() + second.chars().count() <= LENGTH {
-                samples.push(first.clone() + second);
+    let mut samples = HashSet::new();
+    for length in 0..=LENGTH {
+        for first in firsts.iter().take_while(|first| first.len() <= length) {
+            let wanted = length - first.len();
+            let start =
+                seconds.partition_point(|second| second.len() < wanted);
+            let seconds = seconds[start..]
+                .iter()
+                .take_while(|second| second.len() == wanted);
+            for second in seconds {
+                samples.insert(first.clone() + second);
+                if samples.len() == COUNT {
+                    return bounded(samples.into_iter().collect());
+                }
             }
         }
     }
-    bounded(samples)
+    bounded(samples.into_iter().collect())
 }
 
 /// Returns the shortest of `samples` that are not too long, each once.
 fn bounded(mut samples: Vec<String>) -> Vec<String> {
-    samples.retain(|sample| sample.chars().count() <= LENGTH);
-    samples.sort_unstable_by(|a, b| {
-        a.chars()
-            .count()
-            .cmp(&b.chars().count())
-            .then_with(|| a.cmp(b))
-    });
+    samples.retain(|sample| sample.len() <= LENGTH);
+    samples
+        .sort_unstable_by(|a, b| a.len().cmp(&b.len()).then_with(|| a.cmp(b)));
     samples.dedup();
     samples.truncate(COUNT);
     samples
