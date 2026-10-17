@@ -77,7 +77,8 @@ pub(crate) fn module(
         .zip(shapes)
         .map(|(rule, shape)| !rule.hidden && (shape.is_some() || rule.inline))
         .collect();
-    let functions = matching::functions(&facts, &general, &builds);
+    let spliced = shape::spliced(grammar);
+    let functions = matching::functions(&facts, &general, &builds, &spliced);
     let written = Facts::new(grammar);
     let types = shapes.iter().enumerate().filter_map(|(position, shape)| {
         let shape = shape.as_ref()?;

@@ -173,39 +173,120 @@ impl<'t, W: Width> Node<'t, W> {
     /// makes sure it is there.
     #[must_use]
     pub fn one<T: FromNode>(&self, rule: usize) -> T {
-        self.optional(rule)
-            .expect("the grammar always matches this rule here")
+        one(self.children(), rule)
     }
 
     /// Returns the rule numbered `rule` matched inside this one, if any.
+    #[must_use]
     pub fn optional<T: FromNode>(&self, rule: usize) -> Option<T> {
-        self.children()
-            .find(|child| child.rule() == rule)
-            .map(T::from_node)
+        optional(self.children(), rule)
     }
 
     /// Returns the `N` times the rule numbered `rule` matched inside this one,
     /// in order. The grammar makes sure there are that many.
     #[must_use]
     pub fn array<T: FromNode, const N: usize>(&self, rule: usize) -> [T; N] {
-        let mut found = self
-            .children()
-            .filter(|child| child.rule() == rule)
-            .map(T::from_node);
-        std::array::from_fn(|_| {
-            found.next().unwrap_or_else(|| {
-                panic!("the grammar always matches this rule {N} times here")
-            })
-        })
+        array(self.children(), rule)
     }
 
     /// Returns every rule numbered `rule` matched inside this one, in order.
+    #[must_use]
     pub fn many<T: FromNode>(&self, rule: usize) -> Vec<T> {
-        self.children()
-            .filter(|child| child.rule() == rule)
-            .map(T::from_node)
-            .collect()
+        many(self.children(), rule)
     }
+
+    /// Returns what the matches of the inline rule numbered `label` inside
+    /// this one hold, to read the field that rule names.
+    #[must_use]
+    pub fn inside(&self, label: usize) -> Inside<'t, W> {
+        Inside { node: *self, label }
+    }
+}
+
+/// What the matches of an inline rule that names a field hold, inside the node
+/// of the rule that has the field.
+#[derive(Debug, Clone, Copy)]
+pub struct Inside<'t, W> {
+    node: Node<'t, W>,
+    label: usize,
+}
+
+impl<'t, W: Width> Inside<'t, W> {
+    /// Returns the nodes of the rules matched inside each match of the label,
+    /// in order.
+    fn children(&self) -> impl Iterator<Item = Node<'t, W>> + use<'t, W> {
+        let label = self.label;
+        self.node
+            .children()
+            .filter(move |child| child.rule() == label)
+            .flat_map(|child| child.children())
+    }
+
+    /// Returns what [`Node::one`] does, inside the matches of the label.
+    #[must_use]
+    pub fn one<T: FromNode>(&self, rule: usize) -> T {
+        one(self.children(), rule)
+    }
+
+    /// Returns what [`Node::optional`] does, inside the matches of the label.
+    #[must_use]
+    pub fn optional<T: FromNode>(&self, rule: usize) -> Option<T> {
+        optional(self.children(), rule)
+    }
+
+    /// Returns what [`Node::array`] does, inside the matches of the label.
+    #[must_use]
+    pub fn array<T: FromNode, const N: usize>(&self, rule: usize) -> [T; N] {
+        array(self.children(), rule)
+    }
+
+    /// Returns what [`Node::many`] does, inside the matches of the label.
+    #[must_use]
+    pub fn many<T: FromNode>(&self, rule: usize) -> Vec<T> {
+        many(self.children(), rule)
+    }
+}
+
+/// Returns the first of `nodes` of the rule numbered `rule`, which the grammar
+/// makes sure is there.
+fn one<'t, T: FromNode, W: Width>(
+    nodes: impl Iterator<Item = Node<'t, W>>,
+    rule: usize,
+) -> T {
+    optional(nodes, rule).expect("the grammar always matches this rule here")
+}
+
+/// Returns the first of `nodes` of the rule numbered `rule`, if any.
+fn optional<'t, T: FromNode, W: Width>(
+    mut nodes: impl Iterator<Item = Node<'t, W>>,
+    rule: usize,
+) -> Option<T> {
+    nodes.find(|node| node.rule() == rule).map(T::from_node)
+}
+
+/// Returns the first `N` of `nodes` of the rule numbered `rule`, which the
+/// grammar makes sure are there.
+fn array<'t, T: FromNode, W: Width, const N: usize>(
+    nodes: impl Iterator<Item = Node<'t, W>>,
+    rule: usize,
+) -> [T; N] {
+    let mut found = nodes.filter(|node| node.rule() == rule).map(T::from_node);
+    std::array::from_fn(|_| {
+        found.next().unwrap_or_else(|| {
+            panic!("the grammar always matches this rule {N} times here")
+        })
+    })
+}
+
+/// Returns every one of `nodes` of the rule numbered `rule`, in order.
+fn many<'t, T: FromNode, W: Width>(
+    nodes: impl Iterator<Item = Node<'t, W>>,
+    rule: usize,
+) -> Vec<T> {
+    nodes
+        .filter(|node| node.rule() == rule)
+        .map(T::from_node)
+        .collect()
 }
 
 /// Builds the type of a rule from the node of its match. Its docs are hidden,

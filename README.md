@@ -191,6 +191,7 @@ annotation, such as `(* hidde *)`, gets a warning.
 |-----------------------------|------------------------------------------------|
 | `(* hide *)`                | no type and no field, as for whitespace        |
 | `(* inline *)`              | no type: rules that hold it hold what it holds |
+|                             | under its name, when that is one rule          |
 | `(* as u16 *)`              | the type is `u16`, read from the rule's text   |
 | `(* greedy *)`              | how the rule chooses, see [Matching](#matching)|
 | `(* recover *)`             | a parse goes on past it, see [Errors](#errors) |

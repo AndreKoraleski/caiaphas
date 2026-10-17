@@ -6,8 +6,10 @@
 //! struct with a field for each rule it holds, typed by how many times it can
 //! hold it, and a rule it always holds the same number of times becomes an
 //! array. A rule that holds an inline rule holds what the inline rule holds
-//! instead, as if its definition were written there. Hidden and inline rules
-//! get no type and no field, and neither do rules that no start rule holds. A
+//! instead, as if its definition were written there, and when that is one
+//! rule, the inline rule labels it: the field takes the inline rule's name, so
+//! two places that hold the same rule can have fields of their own. Hidden and
+//! inline rules get no type, and neither do rules that no start rule holds. A
 //! type that could contain itself holds itself in a box.
 
 use std::collections::HashSet;
@@ -30,6 +32,8 @@ pub(crate) enum Shape {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Field {
     pub(crate) rule: RuleId,
+    /// The inline rule that holds the rule here and names the field, if any.
+    pub(crate) label: Option<RuleId>,
     pub(crate) count: Count,
     /// Whether the field holds its type in a box.
     pub(crate) boxed: bool,
@@ -65,12 +69,13 @@ pub(crate) enum Variant {
 
 /// Returns the shape of each rule's type, or `None` for a rule without one.
 pub(crate) fn shapes(grammar: &Grammar) -> Vec<Option<Shape>> {
+    let labels = labels(grammar);
     let mut shapes: Vec<Shape> = grammar
         .syntax_rules
         .iter()
         .map(|rule| match &rule.converts_to {
             Some(ty) => Shape::Converted(ty.clone()),
-            None => shape(grammar, &rule.expression),
+            None => shape(grammar, &labels, &rule.expression),
         })
         .collect();
     box_cycles(&mut shapes);
@@ -85,11 +90,66 @@ pub(crate) fn shapes(grammar: &Grammar) -> Vec<Option<Shape>> {
         .collect()
 }
 
-fn shape(grammar: &Grammar, expression: &Expression) -> Shape {
-    variants(grammar, expression)
-        .or_else(|| grouped_variants(grammar, expression))
+/// Returns the rule each inline rule labels: the one rule it holds, when that
+/// is a rule with a type. An inline rule that only holds a label passes the
+/// label on instead, so no label holds another.
+pub(crate) fn labels(grammar: &Grammar) -> Vec<Option<RuleId>> {
+    let count = grammar.syntax_rules.len();
+    let (mut labels, mut known) = (vec![None; count], vec![false; count]);
+    for position in 0..count {
+        label(grammar, &mut labels, &mut known, position);
+    }
+    labels
+}
+
+/// Returns whether the node of each rule stands for its children, as an inline
+/// rule's does unless it labels a rule.
+pub(crate) fn spliced(grammar: &Grammar) -> Vec<bool> {
+    labels(grammar)
+        .iter()
+        .zip(&grammar.syntax_rules)
+        .map(|(label, rule)| rule.inline && label.is_none())
+        .collect()
+}
+
+/// Returns the rule the rule at `position` labels, working out the labels of
+/// the inline rules it holds first. The dictionary makes sure no inline rule
+/// holds itself through inline rules alone.
+fn label(
+    grammar: &Grammar,
+    labels: &mut [Option<RuleId>],
+    known: &mut [bool],
+    position: usize,
+) -> Option<RuleId> {
+    if known[position] {
+        return labels[position];
+    }
+    known[position] = true;
+    let rule = &grammar.syntax_rules[position];
+    if !rule.inline {
+        return None;
+    }
+    rule.expression
+        .visit_meta_identifiers(&mut |RuleId(read), _| {
+            label(grammar, labels, known, read);
+        });
+    labels[position] = match occurrences(grammar, labels, &rule.expression)[..]
+    {
+        [(RuleId(held), _)] if labels[held].is_none() => Some(RuleId(held)),
+        _ => None,
+    };
+    labels[position]
+}
+
+fn shape(
+    grammar: &Grammar,
+    labels: &[Option<RuleId>],
+    expression: &Expression,
+) -> Shape {
+    variants(grammar, labels, expression)
+        .or_else(|| grouped_variants(grammar, labels, expression))
         .map_or_else(
-            || Shape::Struct(fields(grammar, expression)),
+            || Shape::Struct(fields(grammar, labels, expression)),
             Shape::Enum,
         )
 }
@@ -100,6 +160,7 @@ fn shape(grammar: &Grammar, expression: &Expression) -> Shape {
 /// and the other parts add to that text, so a word leaves the rule a struct.
 fn grouped_variants(
     grammar: &Grammar,
+    labels: &[Option<RuleId>],
     expression: &Expression,
 ) -> Option<Vec<Variant>> {
     let ExpressionKind::SingleDefinition(parts) = &expression.kind else {
@@ -107,14 +168,14 @@ fn grouped_variants(
     };
     let mut holding = parts
         .iter()
-        .filter(|part| !occurrences(grammar, part).is_empty());
+        .filter(|part| !occurrences(grammar, labels, part).is_empty());
     let group = holding.next()?;
     if holding.next().is_some()
         || !matches!(group.kind, ExpressionKind::DefinitionsList(_))
     {
         return None;
     }
-    let variants = variants(grammar, group)?;
+    let variants = variants(grammar, labels, group)?;
     variants
         .iter()
         .all(|variant| matches!(variant, Variant::Rule { .. }))
@@ -122,10 +183,11 @@ fn grouped_variants(
 }
 
 /// Returns a variant for each alternative of `expression`, when each is a rule
-/// with a type, an inline rule that holds one such rule once, or a word, and
-/// no two variants would share a name or the rule they hold.
+/// with a type, an inline rule that labels one such rule held once, or a word,
+/// and no two variants would share a name or the rule they hold.
 fn variants(
     grammar: &Grammar,
+    labels: &[Option<RuleId>],
     expression: &Expression,
 ) -> Option<Vec<Variant>> {
     let ExpressionKind::DefinitionsList(alternatives) = &expression.kind
@@ -145,10 +207,13 @@ fn variants(
                         return None;
                     }
                     let holds = if rule.inline {
-                        // The node of an inline rule stands for its children,
-                        // so a variant can only take the one rule it holds.
-                        match occurrences(grammar, &rule.expression)[..] {
-                            [(inner, Occurrences { least: 1, most: 1 })] => {
+                        // A variant takes the one rule a label holds.
+                        let held =
+                            occurrences(grammar, labels, &rule.expression);
+                        match held[..] {
+                            [(inner, ONCE)]
+                                if labels[position] == Some(inner) =>
+                            {
                                 inner
                             }
                             _ => return None,
@@ -180,22 +245,50 @@ fn variants(
 }
 
 /// Returns a field for each rule `expression` holds, in the order they first
-/// appear.
-fn fields(grammar: &Grammar, expression: &Expression) -> Vec<Field> {
-    occurrences(grammar, expression)
+/// appear. A label holds its rule as many times as it is held, times as many
+/// times as it holds the rule.
+fn fields(
+    grammar: &Grammar,
+    labels: &[Option<RuleId>],
+    expression: &Expression,
+) -> Vec<Field> {
+    occurrences(grammar, labels, expression)
         .into_iter()
-        .map(|(rule, Occurrences { least, most })| Field {
-            rule,
-            count: if least == most && (2..MANY).contains(&most) {
-                Count::Fixed(most)
-            } else if most > 1 {
-                Count::Many
-            } else if least == 1 {
-                Count::One
-            } else {
-                Count::Optional
-            },
-            boxed: false,
+        .map(|(held, times)| {
+            let RuleId(position) = held;
+            let (rule, label, Occurrences { least, most }) = match labels
+                [position]
+            {
+                Some(rule) => {
+                    let inside = &grammar.syntax_rules[position].expression;
+                    let each = occurrences(grammar, labels, inside)
+                        .first()
+                        .map_or(ONCE, |&(_, each)| each);
+                    let product = |first: u8, second: u8| {
+                        first.saturating_mul(second).min(MANY)
+                    };
+                    let times = Occurrences {
+                        least: product(times.least, each.least),
+                        most: product(times.most, each.most),
+                    };
+                    (rule, Some(held), times)
+                }
+                None => (held, None, times),
+            };
+            Field {
+                rule,
+                label,
+                count: if least == most && (2..MANY).contains(&most) {
+                    Count::Fixed(most)
+                } else if most > 1 {
+                    Count::Many
+                } else if least == 1 {
+                    Count::One
+                } else {
+                    Count::Optional
+                },
+                boxed: false,
+            }
         })
         .collect()
 }
@@ -208,13 +301,17 @@ struct Occurrences {
     most: u8,
 }
 
-/// Returns how many times `expression` holds each rule with a type, in the
-/// order the rules first appear.
+/// Exactly once.
+const ONCE: Occurrences = Occurrences { least: 1, most: 1 };
+
+/// Returns how many times `expression` holds each rule with a type or each
+/// label, as `labels` tells them, in the order the rules first appear.
 fn occurrences(
     grammar: &Grammar,
+    labels: &[Option<RuleId>],
     expression: &Expression,
 ) -> Vec<(RuleId, Occurrences)> {
-    let of = |expression| occurrences(grammar, expression);
+    let of = |expression| occurrences(grammar, labels, expression);
     match &expression.kind {
         ExpressionKind::MetaIdentifier(rule_id) => {
             let RuleId(position) = *rule_id;
@@ -224,10 +321,10 @@ fn occurrences(
             }
             // The dictionary makes sure no inline rule holds itself through
             // inline rules alone.
-            if rule.inline {
+            if rule.inline && labels[position].is_none() {
                 return of(&rule.expression);
             }
-            vec![(*rule_id, Occurrences { least: 1, most: 1 })]
+            vec![(*rule_id, ONCE)]
         }
         ExpressionKind::SingleDefinition(expressions) => {
             expressions.iter().fold(Vec::new(), |held, expression| {
@@ -410,11 +507,15 @@ mod tests {
                             .map(|field| {
                                 let boxed =
                                     if field.boxed { " boxed" } else { "" };
-                                format!(
-                                    "{} {:?}{boxed}",
-                                    name(field.rule),
-                                    field.count
-                                )
+                                let held = match field.label {
+                                    Some(label) => format!(
+                                        "{}({})",
+                                        name(label),
+                                        name(field.rule)
+                                    ),
+                                    None => name(field.rule),
+                                };
+                                format!("{held} {:?}{boxed}", field.count)
                             })
                             .collect();
                         format!("struct {{{}}}", fields.join(", "))
@@ -525,7 +626,7 @@ mod tests {
                  f = 'y';"
             ),
             [
-                shape("s", "struct {e Fixed(2)}"),
+                shape("s", "struct {g(e) Fixed(2)}"),
                 ("g".to_owned(), None),
                 shape("e", "enum {\"x\", f}"),
                 shape("f", "struct {}"),
@@ -534,7 +635,37 @@ mod tests {
         assert_eq!(
             shapes_of("s = g | h; (* inline *) g = e, e; e = 'x'; h = 'y';")
                 [0],
-            shape("s", "struct {e Many, h Optional}")
+            shape("s", "struct {g(e) Many, h Optional}")
+        );
+        // Several rules have no one label, so their fields are held as is.
+        assert_eq!(
+            shapes_of("s = g, e; (* inline *) g = e, f; e = 'x'; f = 'y';")[0],
+            shape("s", "struct {e Fixed(2), f One}")
+        );
+    }
+
+    #[test]
+    fn names_a_field_after_the_inline_rule_that_labels_it() {
+        assert_eq!(
+            shapes_of(
+                "function = name, '(', [parameter, {',', parameter}], ')'; \
+                 (* inline *) name = identifier; \
+                 (* inline *) parameter = identifier; \
+                 identifier = ? /[a-z]+/ ?;"
+            )[0],
+            shape(
+                "function",
+                "struct {name(identifier) One, \
+                 parameter(identifier) Many}"
+            )
+        );
+        // A label that holds another passes it on.
+        assert_eq!(
+            shapes_of(
+                "s = outer, outer; (* inline *) outer = inner; \
+                 (* inline *) inner = e; e = 'x';"
+            )[0],
+            shape("s", "struct {inner(e) Fixed(2)}")
         );
     }
 

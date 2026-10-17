@@ -31,7 +31,8 @@ adhere to [Semantic Versioning][semver].
   other comment is text, and a lone word written almost like one is warned of:
   - `(* hide *)` leaves a rule out of the generated types.
   - `(* inline *)` gives the rules that hold a rule what it holds instead of
-    its type.
+    its type, under its name when that is one rule, so that rule's field
+    takes the inline rule's name.
   - `(* as T *)` makes the type of a rule a Rust type read from its text.
   - `(* greedy *)` makes a rule take each way as it comes and never go back, so
     its parser stays fast.

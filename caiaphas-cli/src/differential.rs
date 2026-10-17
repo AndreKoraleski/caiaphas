@@ -495,6 +495,13 @@ written! {
         "(* expect ambiguous-split: each round takes what it can *)
          s = {a}, ';'; a = ['x'], ['y'];"
     } [";", "x;", "xy;", "yx;", "xyxy;", "y"], "s" => S;
+    labels {
+        "function = name, '(', [parameter, {',', parameter}], ')';
+         (* inline *) name = identifier;
+         (* inline *) parameter = outer;
+         (* inline *) outer = identifier;
+         identifier = ? /[a-c]+/ ?;"
+    } ["a(b,c)", "a()", "ab(c)", "a(b,", "(b)"], "function" => Function;
     spanned_values {
         "s = {number, ' '};
          (* as caiaphas::Spanned<u8> *) number = ? /[0-9]+/ ?;"

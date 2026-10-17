@@ -41,33 +41,40 @@ fn derives(textual: bool) -> TokenStream {
     }
 }
 
-/// Returns the code that reads the field of `rule`, held `count` times, from
-/// `node`. A converted rule is read from its text.
-fn read(names: &Names, rule: RuleId, count: Count) -> TokenStream {
-    let RuleId(held) = rule;
+/// Returns the code that reads `field` from `node`, inside the matches of its
+/// label if it has one. A converted rule is read from its text.
+fn read(names: &Names, field: &Field) -> TokenStream {
+    let RuleId(held) = field.rule;
     let index = Literal::usize_unsuffixed(held);
+    let node = field.label.map_or_else(
+        || quote! { node },
+        |RuleId(label)| {
+            let label = Literal::usize_unsuffixed(label);
+            quote! { node.inside(#label) }
+        },
+    );
     let Some(value) = &names.values[held] else {
-        return match count {
-            Count::One => quote! { node.one(#index) },
-            Count::Optional => quote! { node.optional(#index) },
-            Count::Fixed(_) => quote! { node.array(#index) },
-            Count::Many => quote! { node.many(#index) },
+        return match field.count {
+            Count::One => quote! { #node.one(#index) },
+            Count::Optional => quote! { #node.optional(#index) },
+            Count::Fixed(_) => quote! { #node.array(#index) },
+            Count::Many => quote! { #node.many(#index) },
         };
     };
     let converted = quote! { __caiaphas::Converted<#value> };
-    match count {
-        Count::One => quote! { node.one::<#converted>(#index).0 },
-        Count::Optional => {
-            quote! { node.optional::<#converted>(#index).map(|value| value.0) }
-        }
+    match field.count {
+        Count::One => quote! { #node.one::<#converted>(#index).0 },
+        Count::Optional => quote! {
+            #node.optional::<#converted>(#index).map(|value| value.0)
+        },
         Count::Fixed(times) => {
             let length = Literal::usize_unsuffixed(usize::from(times));
             quote! {
-                node.array::<#converted, #length>(#index).map(|value| value.0)
+                #node.array::<#converted, #length>(#index).map(|value| value.0)
             }
         }
         Count::Many => quote! {
-            node.many::<#converted>(#index)
+            #node.many::<#converted>(#index)
                 .into_iter()
                 .map(|value| value.0)
                 .collect()
@@ -89,20 +96,20 @@ pub(super) fn structure(
     let traits = text_traits(name);
     let field_names: Vec<&Ident> = fields
         .iter()
-        .map(|field| &names.fields[field.rule.0])
+        .map(|field| &names.fields[field.label.unwrap_or(field.rule).0])
         .collect();
     let mut types = Vec::new();
     let mut documentations = Vec::new();
     let mut builds = Vec::new();
     for field in fields {
-        let RuleId(held) = field.rule;
-        let held_name = name::spaced(&grammar.syntax_rules[held]);
+        let RuleId(naming) = field.label.unwrap_or(field.rule);
+        let held_name = name::spaced(&grammar.syntax_rules[naming]);
         let inner = held_type(names, field.rule, field.boxed);
         let (ty, documentation, build) = match field.count {
             Count::One => (
                 inner,
                 format!(" The `{held_name}` this `{this}` matched."),
-                read(names, field.rule, field.count),
+                read(names, field),
             ),
             Count::Optional => (
                 quote! { ::core::option::Option<#inner> },
@@ -110,7 +117,7 @@ pub(super) fn structure(
                     " The `{held_name}` this `{this}` matched, if it matched \
                      one."
                 ),
-                read(names, field.rule, field.count),
+                read(names, field),
             ),
             Count::Fixed(times) => {
                 let length = Literal::usize_unsuffixed(usize::from(times));
@@ -120,7 +127,7 @@ pub(super) fn structure(
                         " The {times} `{held_name}` matches of this \
                          `{this}`, in order."
                     ),
-                    read(names, field.rule, field.count),
+                    read(names, field),
                 )
             }
             Count::Many => (
@@ -128,7 +135,7 @@ pub(super) fn structure(
                 format!(
                     " Every `{held_name}` this `{this}` matched, in order."
                 ),
-                read(names, field.rule, field.count),
+                read(names, field),
             ),
         };
         types.push(ty);
@@ -225,20 +232,27 @@ pub(super) fn enumeration(
                         quote! { Self::#variant(inner) => inner.span() },
                     );
                 }
-                if let Some(value) = &names.values[held] {
-                    by_rule.push(quote! {
-                        #index => Self::#variant(
-                            <__caiaphas::Converted<#value> as
-                                __caiaphas::FromNode>::from_node(child).0,
-                        )
-                    });
-                } else {
-                    by_rule.push(quote! {
-                        #index => Self::#variant(
-                            __caiaphas::FromNode::from_node(child),
-                        )
-                    });
-                }
+                // The node of a label holds the one rule it names.
+                let label = (*named != *rule)
+                    .then(|| Literal::usize_unsuffixed(name_giver));
+                let converted = names.values[held]
+                    .as_ref()
+                    .map(|value| quote! { __caiaphas::Converted<#value> });
+                let read = match (&converted, &label) {
+                    (Some(converted), None) => quote! {
+                        <#converted as __caiaphas::FromNode>
+                            ::from_node(child).0
+                    },
+                    (None, None) => {
+                        quote! { __caiaphas::FromNode::from_node(child) }
+                    }
+                    (Some(converted), Some(_)) => {
+                        quote! { child.one::<#converted>(#index).0 }
+                    }
+                    (None, Some(_)) => quote! { child.one(#index) },
+                };
+                let index = label.unwrap_or(index);
+                by_rule.push(quote! { #index => Self::#variant(#read) });
             }
             Variant::Word(word) => {
                 let variant = name::word_variant(word)

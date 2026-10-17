@@ -285,10 +285,31 @@ caiaphas::grammar!(mod remembered {
 fn gives_a_rule_that_holds_an_inline_rule_what_it_holds() {
     let sum = grouped::Sum::parse("(1)+23").unwrap();
     let numbers: Vec<&str> =
-        sum.number.iter().map(grouped::Number::text).collect();
+        sum.group.iter().map(grouped::Number::text).collect();
     assert_eq!(numbers, ["1", "23"]);
     let pair = remembered::Pair::parse("aby").unwrap();
     assert_eq!((pair.a.text(), pair.b.text()), ("a", "b"));
+}
+
+caiaphas::grammar!(mod labeled {
+    "function = name, '(', [parameter, {',', parameter}], ')';
+     (* inline *) name = identifier;
+     (* inline *) parameter = identifier;
+     (* as caiaphas::Spanned<String> *) identifier = ? /[a-z]+/ ?;"
+});
+
+#[test]
+fn names_a_field_after_the_inline_rule_that_labels_it() {
+    let function = labeled::Function::parse("f(a,b)").unwrap();
+    assert_eq!(*function.name, "f");
+    let parameters: Vec<&str> = function
+        .parameter
+        .iter()
+        .map(|name| name.as_str())
+        .collect();
+    assert_eq!(parameters, ["a", "b"]);
+    let empty = labeled::Function::parse("f()").unwrap().parameter;
+    assert_eq!(empty.len(), 0);
 }
 
 caiaphas::grammar!(mod parenthesized {

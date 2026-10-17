@@ -42,7 +42,7 @@ pub(crate) fn outline(
             Some(Shape::Struct(fields)) => {
                 let _ = writeln!(outline, "pub struct {name} {{");
                 for field in fields {
-                    let RuleId(held) = field.rule;
+                    let RuleId(held) = field.label.unwrap_or(field.rule);
                     let _ = writeln!(
                         outline,
                         "    pub {}: {},",

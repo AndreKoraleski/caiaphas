@@ -36,6 +36,7 @@ pub(crate) fn functions(
     facts: &Facts<'_>,
     general: &[bool],
     builds: &[bool],
+    spliced: &[bool],
 ) -> TokenStream {
     let grammar: &Grammar = facts.grammar();
     let Decisions {
@@ -52,7 +53,11 @@ pub(crate) fn functions(
             .enumerate()
             .map(|(position, rule)| {
                 let rule_id = RuleId(position);
-                let writer = FunctionWriter { facts, builds };
+                let writer = FunctionWriter {
+                    facts,
+                    builds,
+                    spliced,
+                };
                 if !general[position] {
                     return writer.function(
                         rule_id,
@@ -178,6 +183,8 @@ pub(super) struct FunctionWriter<'a> {
     pub(super) facts: &'a Facts<'a>,
     /// Which rules build a node, since a type reads it.
     pub(super) builds: &'a [bool],
+    /// Which rules' nodes stand for their children, as `shape::spliced` tells.
+    pub(super) spliced: &'a [bool],
 }
 
 impl FunctionWriter<'_> {
@@ -192,7 +199,7 @@ impl FunctionWriter<'_> {
         let RuleId(position) = rule_id;
         let number = Literal::usize_unsuffixed(position);
         let name = name::spaced(rule);
-        let (hidden, inline) = (rule.hidden, rule.inline);
+        let (hidden, inline) = (rule.hidden, self.spliced[position]);
         let builds = self.builds[position];
         let quiet = quiet(self.facts, rule);
         let start = self.facts.grammar().start_syntax_rules.contains(&rule_id);

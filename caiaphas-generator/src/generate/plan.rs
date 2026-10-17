@@ -171,11 +171,17 @@ pub fn of(source: &str, path: &str) -> Result<Plan, Vec<String>> {
     }
     // The parser matches the grammar rearranged, with the types it has as
     // written.
-    Ok(plan(&rearrange::rearranged(&grammar), &shapes))
+    let spliced = shape::spliced(&grammar);
+    Ok(plan(&rearrange::rearranged(&grammar), &shapes, &spliced))
 }
 
-/// Returns the plan of `grammar`, whose types `shapes` tells.
-fn plan(grammar: &Grammar, shapes: &[Option<Shape>]) -> Plan {
+/// Returns the plan of `grammar`, whose types `shapes` tells, and whose rules
+/// `spliced` marks have nodes that stand for their children.
+fn plan(
+    grammar: &Grammar,
+    shapes: &[Option<Shape>],
+    spliced: &[bool],
+) -> Plan {
     let facts = Facts::new(grammar);
     let general = general_rules(&facts);
     let builds: Vec<bool> = grammar
@@ -194,6 +200,7 @@ fn plan(grammar: &Grammar, shapes: &[Option<Shape>]) -> Plan {
                 writer: FunctionWriter {
                     facts: &facts,
                     builds: &builds,
+                    spliced,
                 },
                 general: &general,
                 settled: &decisions.settled,
@@ -205,7 +212,7 @@ fn plan(grammar: &Grammar, shapes: &[Option<Shape>]) -> Plan {
                 hidden: rule.hidden,
                 builds: builds[position],
                 quiet: quiet(&facts, rule),
-                inline: rule.inline,
+                inline: spliced[position],
                 start: grammar.start_syntax_rules.contains(&rule_id),
                 typed: matches!(
                     shapes[position],

@@ -145,6 +145,10 @@
 //!   docs of its type, unless it is an annotation.
 //! - `(* hide *)` gives a rule no type and no field, and `(* inline *)` gives
 //!   it no type, with each rule that holds it holding what it holds instead.
+//!   When that is one rule, the field takes the inline rule's name, so
+//!   `function = name, {parameter}` with `(* inline *) name = identifier;` and
+//!   `(* inline *) parameter = identifier;` has the fields `name` and
+//!   `parameter`, where both would be in one `identifier` field.
 //! - `(* as T *)` makes a rule's type the Rust type `T`, read from its text
 //!   with `FromStr`. `T` is named as where `grammar!` is called, so it can be
 //!   a type of your own, generic or not. Text `T` does not read fails to
