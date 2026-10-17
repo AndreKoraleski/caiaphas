@@ -220,8 +220,7 @@ Each finding has a code in its title, as in `warning[tied-branches]`, and
 `caiaphas explain <code>` tells what it means, with an example and the usual
 fix.
 
-* An error stops the build, as `unproductive-rule` and
-  `nullable-repeated-sequence` do.
+* An error stops the build, as `left-recursion` and `unproductive-rule` do.
 * A warning stops it too, as `tied-branches` and `unreachable-alternative` do,
   unless a comment right before its rule expects it with a reason:
 
