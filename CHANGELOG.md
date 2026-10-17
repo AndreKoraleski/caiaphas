@@ -25,7 +25,8 @@ adhere to [Semantic Versioning][semver].
   expression between two `/`, such as `? /[a-z_]+/ ?`.
 - Alternatives that start alike, as in `a, x | a, y`, read that start once,
   as `a, (x | y)` does, without changing the types.
-- Annotations:
+- Annotations, each a comment right before a rule that holds exactly it; any
+  other comment is text, and a lone word written almost like one is warned of:
   - `(* hide *)` leaves a rule out of the generated types.
   - `(* inline *)` gives the rules that hold a rule what it holds instead of
     its type.

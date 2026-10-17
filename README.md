@@ -164,7 +164,10 @@ pub struct Square { pub size: [u32; 2] }
 
 ## Annotations
 
-A comment right before a rule can tell caiaphas more about it.
+A comment right before a rule can tell caiaphas more about it, when the
+comment holds exactly one of these annotations. Any other comment is text for
+people, as the standard has it, though a lone word written almost like an
+annotation, such as `(* hidde *)`, gets a warning.
 
 | Annotation                  | Effect                                         |
 |-----------------------------|------------------------------------------------|
