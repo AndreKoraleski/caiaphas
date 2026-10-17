@@ -320,7 +320,10 @@ as its parser would, so a grammar can be tried while it is written, without a
 build. It prints the tree of the match, a node on each line, or the error
 the parser would give. With rules written with `(* recover *)`, it prints
 every error, after the tree of what still matches, as `parse_recovering`
-gives them. `--rule` starts from another rule with a type.
+gives them. Given several inputs, such as every sample of a language, it
+tells whether each matches, with the errors of those that do not, so a change
+to the grammar can be checked against all of them at once. `--rule` starts
+from another rule with a type.
 
 ```console
 $ printf '[1, true]' | caiaphas parse grammars/json.ebnf --rule array

@@ -8,13 +8,15 @@ the usual fix. `caiaphas explain` without a code lists every code.
 rule. `caiaphas parse` runs a grammar on an input, from a file or standard
 input, as its parser would, and prints the tree of the match or the error the
 parser would give, or every error a rule written with `(* recover *)` skips.
-`--rule` starts from another rule with a type.
+Given several inputs, it tells whether each matches. `--rule` starts from
+another rule with a type.
 
 ```sh
 cargo install caiaphas-cli
 caiaphas check grammars/json.ebnf
 caiaphas types grammars/json.ebnf
 caiaphas parse grammars/json.ebnf data.json
+caiaphas parse grammars/json.ebnf samples/*.json
 caiaphas explain tied-branches
 ```
 
