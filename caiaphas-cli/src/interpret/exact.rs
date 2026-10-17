@@ -6,8 +6,8 @@ use caiaphas::__private::{Ends, Parser, Width};
 use caiaphas_generator::plan::{Kind, Part};
 
 use super::{
-    Program, contains, expected, set_except, set_parts, sets_apart, single,
-    skips,
+    Program, again_ends, contains, expected, recovering, set_except,
+    set_parts, sets_apart, single, skips,
 };
 
 /// A step of a sequence, as the parser splits a match among the steps.
@@ -51,7 +51,13 @@ impl Program {
         if self.plan_of(id).converts_to.is_some() {
             ends.retain(|end| self.converts(parser, id, position, end));
         }
-        parser.finish_ends(rule, start, ends)
+        let ends = parser.finish_ends(rule, start, ends);
+        // A rule that recovers goes on from where a parse that recovers tells
+        // it to, when it fails.
+        if ends.first().is_some() || !self.plan_of(id).recovers {
+            return ends;
+        }
+        recovering(id, || parser.recover_ends(rule, start, again_ends::<R, W>))
     }
 
     /// Returns where `part` of the rule numbered `rule` can end at `position`,
@@ -258,6 +264,12 @@ impl Program {
         position: usize,
         end: usize,
     ) -> Option<usize> {
+        // A rule that recovered builds its node from where it went on.
+        let position = if self.plan_of(id).recovers {
+            parser.recovered(&self.rules[id], position)
+        } else {
+            position
+        };
         let start = parser.start_rule(position);
         self.build(parser, id, &self.plan_of(id).expression, position, end);
         parser.built(&self.rules[id], start, end)

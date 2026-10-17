@@ -32,7 +32,9 @@ ISO/IEC 14977 EBNF grammar, suggestions included. caiaphas types prints the
 Rust types the macro would generate for a grammar, each after its rule.
 caiaphas parse runs a grammar on an input, from a file or standard input, as
 its generated parser would, and prints the tree of the match or where it
-stops matching. --rule parses with another rule than the first start rule.
+stops matching. It goes on past each error that a rule written with
+(* recover *) skips, and prints every error with the tree of what matches.
+--rule parses with another rule than the first start rule.
 caiaphas explain tells what a finding means, given its code, such as
 tied-branches, and lists every code without one.
 
@@ -209,8 +211,8 @@ impl Parse {
         })
     }
 
-    /// Runs the grammar on the input, and prints the tree of the match or why
-    /// it does not match.
+    /// Runs the grammar on the input, and prints the tree of what matches and
+    /// every error found.
     fn run(self) -> ExitCode {
         let source = match read(&self.grammar) {
             Ok(source) => source,
@@ -270,24 +272,28 @@ impl Parse {
         }
         // An interpreted rule takes more stack than a generated one, so the
         // parse runs where there is plenty.
-        let parsed = thread::Builder::new()
+        let (tree, errors, input) = thread::Builder::new()
             .stack_size(STACK)
             .spawn(move || {
-                program.parse(&input, DEPTH).map_err(|error| (error, input))
+                let (tree, errors) = program.parse_recovering(&input, DEPTH);
+                (tree, errors, input)
             })
             .expect("a thread can start")
             .join()
             .expect("a parse does not panic");
-        match parsed {
-            Ok(tree) => {
-                print!("{tree}");
-                ExitCode::SUCCESS
-            }
-            Err((error, input)) => {
-                eprintln!("error: {error}");
-                eprintln!("{}", error.excerpt(&input));
-                ExitCode::FAILURE
-            }
+        // A grammar whose rules recover gives the tree of what still matches
+        // with the errors it skipped.
+        if let Some(tree) = tree {
+            print!("{tree}");
+        }
+        for error in &errors {
+            eprintln!("error: {error}");
+            eprintln!("{}", error.excerpt(&input));
+        }
+        if errors.is_empty() {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
         }
     }
 }

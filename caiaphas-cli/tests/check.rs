@@ -263,3 +263,33 @@ fn prints_the_problems_of_a_grammar_before_parsing() {
         printed(&output)
     );
 }
+
+#[test]
+fn prints_every_error_a_rule_that_recovers_skips() {
+    let path = grammar(
+        "recover",
+        r"settings = [line], {newline, [line]};
+          (* recover *)
+          line = name, ' = ', value;
+          (* hide *) name = ? /[a-z]+/ ?;
+          (* hide *) value = ? /[^\n]+/ ?;
+          (* hide *) newline = ? U+000A ?;",
+    );
+    let input = input("recover", "a = 1\nbroken\nb = 2\nworse\nc = 3");
+    let output =
+        caiaphas(&["parse", path.to_str().unwrap(), input.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(
+        printed(&output),
+        "settings 1:1 \"a = 1\\nbroken\\nb = 2\\nworse\\nc = 3\"\n  \
+         line 1:1 \"a = 1\"\n  line 3:1 \"b = 2\"\n  line 5:1 \"c = 3\"\n"
+    );
+    let errors = String::from_utf8(output.stderr).unwrap();
+    assert_eq!(
+        errors,
+        "error: expected ` = ` or a lowercase letter, found `\\n` at line 2, \
+         column 7\n2 | broken\n  |       ^\n\
+         error: expected ` = ` or a lowercase letter, found `\\n` at line 4, \
+         column 6\n4 | worse\n  |      ^\n"
+    );
+}

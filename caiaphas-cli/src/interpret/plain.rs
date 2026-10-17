@@ -5,8 +5,8 @@ use caiaphas::__private::{Expected, Match, Parser, Width};
 use caiaphas_generator::plan::{Kind, Part};
 
 use super::{
-    Branch, Program, accepts, branches, contains, expected, set_except,
-    set_parts, sets_apart, single, skips, within,
+    Branch, Program, accepts, again, branches, contains, expected, recovering,
+    set_except, set_parts, sets_apart, single, skips, within,
 };
 
 impl Program {
@@ -24,14 +24,20 @@ impl Program {
             }
         }
         // A parse that only matches needs no account of where a leaf starts.
-        let leaf = plan.leaf && !plan.remembers;
+        let leaf = plan.leaf && !plan.remembers && !plan.recovers;
         let start = (R || !leaf).then(|| parser.start_rule(position));
         let end = self.plain(parser, id, &plan.expression, position);
         let end = end.filter(|&end| self.converts(parser, id, position, end));
-        match start {
-            Some(start) => parser.finish_rule(rule, start, end),
-            None => end.map(|end| (end, None)),
+        let Some(start) = start else {
+            return end.map(|end| (end, None));
+        };
+        let found = parser.finish_rule(rule, start, end);
+        // A rule that recovers goes on from where a parse that recovers tells
+        // it to, when it fails.
+        if found.is_some() || !plan.recovers {
+            return found;
         }
+        recovering(id, || parser.recover(rule, start, again::<R, W>))
     }
 
     /// Returns whether the type the rule numbered `id` converts to, if any,

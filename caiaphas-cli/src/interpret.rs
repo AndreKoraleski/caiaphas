@@ -10,11 +10,11 @@
 mod exact;
 mod plain;
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 use caiaphas::{
     __private::{
-        self as runtime, Expected, Match, Parser, Rule, Start, Width,
+        self as runtime, Ends, Expected, Match, Parser, Rule, Start, Width,
     },
     Error,
 };
@@ -33,6 +33,12 @@ thread_local! {
     /// The program a parse on this thread runs, since the runtime names the
     /// start of a parse by a type.
     static RUNNING: Cell<Option<&'static Program>> = const { Cell::new(None) };
+
+    /// The numbers of the rules a parse that recovers goes on with, the
+    /// innermost last, since the runtime takes the function that matches one
+    /// again as a pointer.
+    static RECOVERING: RefCell<Vec<usize>> =
+        const { RefCell::new(Vec::new()) };
 }
 
 impl Program {
@@ -61,21 +67,45 @@ impl Program {
 
     /// Returns the tree of `input` as text, as a node on each line, or why it
     /// does not match. Matches nest at most `depth` deep.
+    #[cfg(test)]
     pub(crate) fn parse(
         &'static self,
         input: &str,
         depth: usize,
     ) -> Result<String, Error> {
+        let parsed = self.run(|| runtime::parse::<Running>(input, depth));
+        parsed.map(|tree| tree.dump(&self.names()))
+    }
+
+    /// Returns what [`parse`](Self::parse) does, but goes on past each error
+    /// that a rule that recovers lets the parse skip, and gives every error
+    /// found. The tree comes when the input matches once those errors are
+    /// skipped.
+    pub(crate) fn parse_recovering(
+        &'static self,
+        input: &str,
+        depth: usize,
+    ) -> (Option<String>, Vec<Error>) {
+        let (tree, errors) =
+            self.run(|| runtime::parse_recovering::<Running>(input, depth));
+        (tree.map(|tree| tree.dump(&self.names())), errors)
+    }
+
+    /// Returns what `parse` gives, with the program running on this thread.
+    fn run<T>(&'static self, parse: impl FnOnce() -> T) -> T {
         RUNNING.with(|running| running.set(Some(self)));
-        let names: Vec<&str> = self
-            .plan
+        let parsed = parse();
+        RUNNING.with(|running| running.set(None));
+        parsed
+    }
+
+    /// Returns the name of each rule, by its number.
+    fn names(&self) -> Vec<&str> {
+        self.plan
             .rules
             .iter()
             .map(|rule| rule.name.as_str())
-            .collect();
-        let parsed = runtime::parse::<Running>(input, depth);
-        RUNNING.with(|running| running.set(None));
-        parsed.map(|tree| tree.dump(&names))
+            .collect()
     }
 
     /// Returns the type of each conversion the interpreter cannot check.
@@ -161,6 +191,39 @@ impl Start for Running {
 /// Returns the program running on this thread.
 fn running() -> &'static Program {
     RUNNING.with(Cell::get).expect("a parse runs a program")
+}
+
+/// Returns what `recover` gives, with the rule numbered `id` as the one a
+/// recovery matches again.
+fn recovering<T>(id: usize, recover: impl FnOnce() -> T) -> T {
+    RECOVERING.with(|rules| rules.borrow_mut().push(id));
+    let recovered = recover();
+    RECOVERING.with(|rules| rules.borrow_mut().pop());
+    recovered
+}
+
+/// Returns the number of the rule a recovery matches again.
+fn recovered_rule() -> usize {
+    RECOVERING
+        .with(|rules| rules.borrow().last().copied())
+        .expect("a recovery goes on with a rule")
+}
+
+/// Matches the rule a recovery goes on with, as its function does.
+fn again<const R: bool, W: Width>(
+    parser: &mut Parser<'_, R, W>,
+    position: usize,
+) -> Match {
+    running().rule(parser, recovered_rule(), position)
+}
+
+/// Returns where the matches of the rule a recovery goes on with can end, as
+/// its function that tells them does.
+fn again_ends<const R: bool, W: Width>(
+    parser: &mut Parser<'_, R, W>,
+    position: usize,
+) -> Ends {
+    running().ends_rule(parser, recovered_rule(), position)
 }
 
 /// A branch of a choice: an alternative, or a run of alternatives that each
