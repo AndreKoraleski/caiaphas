@@ -246,7 +246,11 @@ impl ExactWriter<'_> {
             !self.writer.first_match && self.keeps_order(expression);
         let ways = match &expression.kind {
             ExpressionKind::SingleDefinition(steps) => {
-                let steps = steps.iter().map(|step| self.step(step));
+                // The ends of a rule that keeps no order are sorted at the
+                // end, so a step can give its ends in any order.
+                let unordered = !self.writer.first_match && !keeps_order;
+                let steps =
+                    steps.iter().map(|step| self.step(step, unordered));
                 quote! {
                     {
                         let ends = #ends::one(position);
@@ -414,22 +418,29 @@ impl ExactWriter<'_> {
     }
 
     /// Returns the code that tells where `step` of a sequence can end after
-    /// each of `ends`. A run of characters from a set is read once for all of
-    /// them, since the ends of a run all reach its end.
-    fn step(&self, step: &Expression) -> TokenStream {
-        let set = match &step.kind {
-            ExpressionKind::RepeatedSequence(sequence) => {
-                self.writer.set_parts(sequence)
-            }
-            _ => None,
+    /// each of `ends`, in any order when the sequence is `unordered`. A run of
+    /// characters from a set is read once for all of them, since the ends of a
+    /// run all reach its end.
+    fn step(&self, step: &Expression, unordered: bool) -> TokenStream {
+        let ExpressionKind::RepeatedSequence(sequence) = &step.kind else {
+            let part = self.part(step);
+            return quote! { parser.then(&ends, #part) };
         };
-        if let Some((pattern, expected)) = set {
+        if let Some((pattern, expected)) = self.writer.set_parts(sequence) {
             return quote! {
                 parser.then_span(
                     &ends,
                     |c| ::core::matches!(c, #pattern),
                     &[#(#expected),*],
                 )
+            };
+        }
+        // Where the order of the ends does not count, the rounds from every
+        // end are followed together, so each place is read once.
+        if unordered {
+            let round = self.branch(sequence);
+            return quote! {
+                parser.then_rounds(&ends, |parser, position| #round)
             };
         }
         let part = self.part(step);

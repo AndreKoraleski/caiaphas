@@ -655,3 +655,20 @@ fn stops_at_an_input_that_nests_too_deeply_for_the_stack() {
     let error = brackets::Brackets::parse("(()").unwrap_err();
     assert!(!error.is_too_deep());
 }
+
+caiaphas::grammar!(mod spaced_words {
+    "(* expect ambiguous-split: the first word takes what it can *)
+     words = word, {' ', word, ';'}, [' '];
+     word = letter, {letter | ' '};
+     (* hide *) letter = ? U+0061..U+007A ?;"
+});
+
+#[test]
+fn follows_a_repetition_from_every_end_before_it() {
+    let parsed = spaced_words::Words::parse("ab cd e; f g;").unwrap();
+    let words: Vec<&str> =
+        parsed.word.iter().map(spaced_words::Word::text).collect();
+    assert_eq!(words, ["ab cd", "e", "f g"]);
+    let long = format!("{}x;", "ab ".repeat(500));
+    assert_eq!(spaced_words::Words::parse(&long).unwrap().word.len(), 2);
+}
