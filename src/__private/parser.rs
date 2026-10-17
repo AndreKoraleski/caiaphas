@@ -257,6 +257,34 @@ impl<'i, const REPORTS: bool, W: Width> Parser<'i, REPORTS, W> {
         end
     }
 
+    /// Returns `position` when the input ends there. Otherwise notes the end
+    /// as expected.
+    pub fn end(&mut self, position: usize) -> Option<usize> {
+        if position == self.input.len() {
+            return Some(position);
+        }
+        self.note(position, Expected::End);
+        None
+    }
+
+    /// Returns `position` unless what a `not` looks for was `found` there.
+    /// Otherwise it fails there, noting nothing, since what must not come next
+    /// tells nothing about what could.
+    pub fn not(&mut self, position: usize, found: bool) -> Option<usize> {
+        if !found {
+            return Some(position);
+        }
+        self.fail(position, &[]);
+        None
+    }
+
+    /// Returns a parser of the same input that notes nothing, to look for what
+    /// a `not` must not find.
+    #[must_use]
+    pub fn ahead(&self) -> Parser<'i, false, W> {
+        Parser::new(self.input, self.limit)
+    }
+
     /// Notes each of `expected` as what could have been read where something
     /// failed at `position`. With nothing to note, the failure still counts as
     /// the furthest, as a hidden rule's does.
