@@ -5,17 +5,21 @@ macro of [caiaphas] does, without building anything. It prints every finding,
 suggestions included, and explains each one by its code, with an example and
 the usual fix. `caiaphas explain` without a code lists every code.
 `caiaphas types` prints the types the macro would generate, each after its
-rule.
+rule. `caiaphas parse` runs a grammar on an input, from a file or standard
+input, as its parser would, and prints the tree of the match or the error the
+parser would give. `--rule` starts from another rule with a type.
 
 ```sh
 cargo install caiaphas-cli
 caiaphas check grammars/json.ebnf
 caiaphas types grammars/json.ebnf
+caiaphas parse grammars/json.ebnf data.json
 caiaphas explain tied-branches
 ```
 
 It exits with 1 when a grammar cannot be read, has a problem that would stop
-the build, or a code names no finding, so `caiaphas check` suits a CI step.
+the build, an input does not match, or a code names no finding, so
+`caiaphas check` suits a CI step.
 
 ## License
 

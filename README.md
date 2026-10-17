@@ -315,6 +315,23 @@ caiaphas types grammars/json.ebnf
 caiaphas explain tied-branches
 ```
 
+`caiaphas parse` runs a grammar on an input, from a file or standard input,
+as its parser would, so a grammar can be tried while it is written, without a
+build. It prints the tree of the match, a node on each line, or the error
+the parser would give. `--rule` starts from another rule with a type.
+
+```console
+$ printf '[1, true]' | caiaphas parse grammars/json.ebnf --rule array
+array 1:1 "[1, true]"
+  value 1:2 "1"
+    number 1:2 "1"
+  value 1:5 "true"
+$ printf '[1, tru]' | caiaphas parse grammars/json.ebnf --rule array
+error: expected a value, found `t` at line 1, column 5
+   1 | [1, tru]
+     |     ^
+```
+
 ## Examples
 
 | Example                              | Shows                                       |
