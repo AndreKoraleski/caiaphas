@@ -137,6 +137,14 @@ mod tests {
             "a = ['x'] | ['y'];",
             "a = ['x'] | ['y'];",
         ),
+        fixed(
+            "ambiguous-split",
+            "table = record, {newline, record}, [newline];",
+            "table = record, {newline, record}, [newline]; \
+             record = {'x'}; newline = ? U+000A ?;",
+            "table = {record, newline};",
+        ),
+        example("ambiguous-split", "{'a' | 'aa'}", "a = {'a' | 'aa'};"),
         example(
             "unreachable-rule",
             "s = 'x'; a = b; b = 'y', [a];",

@@ -373,7 +373,8 @@ caiaphas::grammar!(mod price {
 });
 
 caiaphas::grammar!(mod bytes {
-    "pair = byte, byte; (* as u8 *) byte = digit, {digit};
+    "(* expect ambiguous-split: the first byte takes what it can *)
+     pair = byte, byte; (* as u8 *) byte = digit, {digit};
      (* hide *) digit = ? U+0030..U+0039 ?;"
 });
 

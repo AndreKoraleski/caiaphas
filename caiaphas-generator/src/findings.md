@@ -92,6 +92,17 @@ Warning. More than one branch of a choice can match nothing, as both do in
 `a = ['x'] | ['y'];`, so an empty match could come from either. Make all but
 one of them read something.
 
+## ambiguous-split
+
+Warning. A sequence can split a text between its parts in more than one way,
+as `table = record, {newline, record}, [newline];` can split a last line break
+when a record can be empty, or a repetition can cut a text into rounds in
+more than one way, as `{'a' | 'aa'}` can with `aa`. The parser gives each part
+the most text it can while the rest still matches, which may not be the split
+meant. Write the parts so they can only meet at one place, as
+`table = {record, newline};` does, or expect the finding if that split is the
+one meant.
+
 ## unreachable-rule
 
 Warning. No start rule reaches a rule, so no parser uses it. In

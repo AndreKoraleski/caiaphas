@@ -27,6 +27,18 @@ pub(crate) fn matches_all(
     text: &str,
     greedy: bool,
 ) -> Option<bool> {
+    Some(ends(grammar, expression, text, 0, greedy)?.contains(&text.len()))
+}
+
+/// Returns where the matches of `expression` in `text` from `position` can
+/// end, as [`matches_all`] reads it, or `None` if matching gave up first.
+pub(crate) fn ends(
+    grammar: &Grammar,
+    expression: &Expression,
+    text: &str,
+    position: usize,
+    greedy: bool,
+) -> Option<Vec<usize>> {
     let mut matcher = Matcher {
         grammar,
         text,
@@ -35,8 +47,7 @@ pub(crate) fn matches_all(
         first_match: false,
         greedy,
     };
-    let ends = matcher.ends(expression, 0)?;
-    Some(ends.contains(&text.len()))
+    matcher.ends(expression, position)
 }
 
 /// Returns every text `expression` can match, when it can only match a few

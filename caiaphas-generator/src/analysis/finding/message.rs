@@ -71,6 +71,24 @@ impl fmt::Display for FindingKind {
             Self::AmbiguousNullableBranches => {
                 f.write_str("more than one branch can match nothing")
             }
+            Self::AmbiguousSplit {
+                matched,
+                repeated: false,
+            } => write!(
+                f,
+                "this sequence can split {matched} between its parts in more \
+                 than one way, so the parser gives each part the most it can, \
+                 from the first"
+            ),
+            Self::AmbiguousSplit {
+                matched,
+                repeated: true,
+            } => write!(
+                f,
+                "this repetition can cut {matched} into rounds in more than \
+                 one way, so the parser makes each round the most it can, \
+                 from the first"
+            ),
             Self::UnreachableRule { meta_identifier } => write!(
                 f,
                 "`{}` cannot be reached from any start rule, so no parser \

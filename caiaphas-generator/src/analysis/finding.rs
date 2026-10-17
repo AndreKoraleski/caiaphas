@@ -63,6 +63,10 @@ pub(crate) enum FindingKind {
     DeadEndRepeatedSequence,
     /// More than one branch of a choice can match nothing.
     AmbiguousNullableBranches,
+    /// A sequence can split a text between its parts in more than one way, or
+    /// a repetition can cut it into rounds in more than one way, when
+    /// `repeated` holds.
+    AmbiguousSplit { matched: String, repeated: bool },
     /// No start rule can reach a rule, so no parser uses it.
     UnreachableRule { meta_identifier: MetaIdentifier },
     /// An alternative of a rule that takes the first match comes after one

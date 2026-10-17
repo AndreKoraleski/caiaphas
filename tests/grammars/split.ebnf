@@ -1,5 +1,6 @@
 (* A name other than `if`, an `f`, then another name, where the first name
    could take the `f`. *)
+(* expect ambiguous-split: the first name takes what it can *)
 split = name - 'if', 'f', name;
 name = letter, {letter};
 (* hide *)

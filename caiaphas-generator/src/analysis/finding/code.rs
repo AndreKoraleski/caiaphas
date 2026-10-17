@@ -48,6 +48,7 @@ finding_codes! {
     RequiredOptionalSequence => "required-optional-sequence",
     DeadEndRepeatedSequence => "dead-end-repeated-sequence",
     AmbiguousNullableBranches => "ambiguous-nullable-branches",
+    AmbiguousSplit => "ambiguous-split",
     UnreachableRule => "unreachable-rule",
     UnreachableAlternative => "unreachable-alternative",
     DuplicateAlternative => "duplicate-alternative",
@@ -86,6 +87,7 @@ impl FindingCode {
             | Self::RequiredOptionalSequence
             | Self::DeadEndRepeatedSequence
             | Self::AmbiguousNullableBranches
+            | Self::AmbiguousSplit
             | Self::UnreachableRule
             | Self::UnreachableAlternative
             | Self::DuplicateAlternative
@@ -146,6 +148,10 @@ impl FindingCode {
             Self::NondeterministicChoice => {
                 Some("the parser still tries every way")
             }
+            Self::AmbiguousSplit => Some(
+                "the parser gives each part the most text it can while the \
+                 rest still matches",
+            ),
             Self::RequiredOptionalSequence
             | Self::DeadEndRepeatedSequence
             | Self::UnreachableRule

@@ -1,6 +1,7 @@
 //! Grammar checks read the whole grammar at once, such as the checks about
 //! recursion.
 
+mod ambiguous_split;
 mod case_only_names;
 mod duplicate_alternative;
 mod empty_rule;
@@ -35,6 +36,7 @@ pub(super) const GRAMMAR_CHECKS: &[GrammarCheck] = &[
     indirect_left_recursion::check,
     duplicate_alternative::check,
     tied_branches::check,
+    ambiguous_split::check,
     longer_branch_conflict::check,
     ineffective_exception::check,
     empty_rule::check,

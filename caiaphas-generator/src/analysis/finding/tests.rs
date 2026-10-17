@@ -122,6 +122,16 @@ const CASES: &[Case] = &[
                by removing `[...]` around one of them",
     },
     Case {
+        source: "a = {'x'}, ['x'];",
+        code: FindingCode::AmbiguousSplit,
+        severity: Severity::Warning,
+        message: "this sequence can split `x` between its parts in more than \
+                  one way, so the parser gives each part the most it can, \
+                  from the first",
+        help: "write the sequence so its parts can only meet at one place, \
+               as `{'x'}` does where `{'x'}, ['x']` does not",
+    },
+    Case {
         source: "s = 'x'; a = 'y', [b]; b = 'z', a;",
         code: FindingCode::UnreachableRule,
         severity: Severity::Warning,

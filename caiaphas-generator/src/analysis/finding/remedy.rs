@@ -64,6 +64,18 @@ impl FindingKind {
                 "move what comes after the repetition before it, so `{'x'}, \
                  'x'` becomes `'x', {'x'}`",
             ),
+            Self::AmbiguousSplit {
+                repeated: false, ..
+            } => {
+                "write the sequence so its parts can only meet at one place, \
+                  as `{'x'}` does where `{'x'}, ['x']` does not"
+                    .to_owned()
+            }
+            Self::AmbiguousSplit { repeated: true, .. } => {
+                "make each round end at one place, as `{'a'}` does where \
+                 `{'a' | 'aa'}` does not"
+                    .to_owned()
+            }
             Self::AmbiguousNullableBranches => {
                 "make all but one of these branches read something, such as \
                  by removing `[...]` around one of them"
