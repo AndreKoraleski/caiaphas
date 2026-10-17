@@ -3,9 +3,9 @@
 //!
 //! It follows every way through a rule, as a parser that tries every way does.
 //! In a greedy rule it takes one way as it comes instead: the branch that
-//! matches the most, or the first that matches with a first match, and as much
-//! of an optional or repeated sequence as it can. Recursion can make matching
-//! run long or deep, so it gives up after a fixed number of steps or levels.
+//! matches the most, and as much of an optional or repeated sequence as it
+//! can. Recursion can make matching run long or deep, so it gives up after a
+//! fixed number of steps or levels.
 
 use crate::ir::{Expression, ExpressionKind, Grammar, RuleId};
 
@@ -44,7 +44,6 @@ pub(crate) fn ends(
         text,
         steps: STEPS,
         depth: DEPTH,
-        first_match: false,
         greedy,
     };
     matcher.ends(expression, position)
@@ -152,8 +151,6 @@ struct Matcher<'a> {
     steps: usize,
     /// How many more levels matching can nest.
     depth: usize,
-    /// Whether the choices being matched take their first branch that matches.
-    first_match: bool,
     /// Whether the rule being matched takes each way as it comes.
     greedy: bool,
 }
@@ -196,21 +193,16 @@ impl Matcher<'_> {
             ExpressionKind::EmptySequence => vec![position],
             ExpressionKind::MetaIdentifier(RuleId(rule)) => {
                 let rule = &self.grammar.syntax_rules[*rule];
-                let around = (self.first_match, self.greedy);
-                (self.first_match, self.greedy) =
-                    (rule.first_match, rule.greedy);
+                let around = self.greedy;
+                self.greedy = rule.greedy;
                 let ends = self.ends(&rule.expression, position);
-                (self.first_match, self.greedy) = around;
+                self.greedy = around;
                 let ends = ends?;
                 // A greedy rule takes the end the rule it reads prefers.
                 if !self.greedy || ends.len() < 2 {
                     return Some(ends);
                 }
-                if rule.first_match {
-                    vec![ends[0]]
-                } else {
-                    ends.into_iter().max().into_iter().collect()
-                }
+                ends.into_iter().max().into_iter().collect()
             }
             ExpressionKind::SingleDefinition(expressions) => {
                 return self.sequence(expressions.iter(), position);
@@ -242,11 +234,7 @@ impl Matcher<'_> {
             ExpressionKind::DefinitionsList(expressions) => {
                 let mut ends = Vec::new();
                 for expression in expressions {
-                    let found = self.ends(expression, position)?;
-                    if self.greedy && self.first_match && !found.is_empty() {
-                        return Some(found);
-                    }
-                    add_all(&mut ends, found);
+                    add_all(&mut ends, self.ends(expression, position)?);
                 }
                 if self.greedy {
                     ends.into_iter().max().into_iter().collect()
@@ -386,7 +374,7 @@ mod tests {
 
     #[test]
     fn follows_every_way_outside_a_greedy_rule() {
-        let source = "s = k; (* match first *) k = 'i' | 'if';";
+        let source = "s = k; k = 'i' | 'if';";
         assert_eq!(first_rule_matches(source, "if"), Some(true));
         assert_eq!(first_rule_matches("s = {'x'}, 'x';", "xx"), Some(true));
         assert_eq!(first_rule_matches("s = ['x'], 'x';", "x"), Some(true));
@@ -394,14 +382,6 @@ mod tests {
             first_rule_texts(source),
             Some(vec!["i".to_owned(), "if".to_owned()])
         );
-    }
-
-    #[test]
-    fn takes_the_first_branch_that_matches_in_a_greedy_rule() {
-        let source = "s = k; (* greedy *) (* match first *) k = 'i' | 'if';";
-        assert_eq!(first_rule_matches(source, "i"), Some(true));
-        assert_eq!(first_rule_matches(source, "if"), Some(false));
-        assert_eq!(first_rule_texts(source), None);
     }
 
     #[test]

@@ -202,13 +202,9 @@
 //!
 //! Most choices need no such care, since the next character tells which way
 //! goes on, and the parser takes those as it comes. caiaphas finds the few
-//! rules where that is not so, and only those try every way. Two annotations
-//! change how a rule chooses:
-//!
-//! - `(* match first *)` makes its choices take the first alternative after
-//!   which the rest still matches, in the order written.
-//! - `(* greedy *)` makes it take each way as it comes and never go back, as
-//!   the `else` of a nested `if` does. That keeps its parser fast.
+//! rules where that is not so, and only those try every way. `(* greedy *)`
+//! makes a rule take each way as it comes and never go back, as the `else` of
+//! a nested `if` does. That keeps its parser fast.
 //!
 //! Text that must not hold something, such as the text of a comment, reads
 //! well as an exception. Where what it must not hold is short, the parser

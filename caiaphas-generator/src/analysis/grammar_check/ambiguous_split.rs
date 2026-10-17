@@ -7,10 +7,9 @@
 //! Short texts each sequence may match are tried, so a split found is always
 //! real, but one that needs a longer text can go unreported. Splits inside a
 //! part are left to the checks of that part, and ties between branches to the
-//! tied branches check. Greedy rules are left to the checks about them. Rules
-//! that take the first match, and parts that hold one, choose where they end
-//! as written, and exceptions never use how they split what they match, so
-//! those are left alone too.
+//! tied branches check. Greedy rules are left to the checks about them, and
+//! exceptions never use how they split what they match, so those are left
+//! alone too.
 
 use crate::{
     analysis::{
@@ -20,7 +19,7 @@ use crate::{
         matcher,
         samples::Sampler,
     },
-    ir::{Expression, ExpressionKind, Grammar, RuleId},
+    ir::{Expression, ExpressionKind, Grammar},
 };
 
 /// Reports every sequence and repetition of a rule that is not greedy that can
@@ -31,10 +30,7 @@ pub(super) fn check(
     findings: &mut Vec<Finding>,
 ) {
     let mut sampler = Sampler::new(grammar);
-    let plain = grammar
-        .syntax_rules
-        .iter()
-        .filter(|rule| !rule.greedy && !rule.first_match);
+    let plain = grammar.syntax_rules.iter().filter(|rule| !rule.greedy);
     for rule in plain {
         visit(&rule.expression, &mut |expression| {
             let (parts, repeated) = match &expression.kind {
@@ -81,7 +77,7 @@ fn can_overlap(
     part: &Expression,
     rest: &[Expression],
 ) -> bool {
-    if facts.ends_once(part) || takes_first_match(facts.grammar(), part) {
+    if facts.ends_once(part) {
         return false;
     }
     let mut held = facts.inner(part);
@@ -96,15 +92,6 @@ fn can_overlap(
         }
     }
     !held.intersection(&starts).is_empty()
-}
-
-/// Returns whether `expression` holds a rule that takes the first match.
-fn takes_first_match(grammar: &Grammar, expression: &Expression) -> bool {
-    let mut found = false;
-    expression.visit_meta_identifiers(&mut |RuleId(position), _| {
-        found |= grammar.syntax_rules[position].first_match;
-    });
-    found
 }
 
 /// Visits `expression` and each expression in it, but for exceptions.

@@ -24,9 +24,6 @@ pub(crate) struct ChoicePoint {
 pub(crate) enum ChoicePointKind {
     /// The branches are the alternatives.
     DefinitionsList,
-    /// The branches are the alternatives of a rule that takes the first match,
-    /// so the first written of those that match wins.
-    FirstMatchDefinitionsList,
     /// The branches are taking the sequence and skipping it.
     OptionalSequence,
     /// The branches are repeating the sequence again and stopping.
@@ -122,11 +119,7 @@ fn visit_choice_points<'a>(
             };
             let (kind, branches) = match &expression.kind {
                 ExpressionKind::DefinitionsList(expressions) => (
-                    if rule.first_match {
-                        ChoicePointKind::FirstMatchDefinitionsList
-                    } else {
-                        ChoicePointKind::DefinitionsList
-                    },
+                    ChoicePointKind::DefinitionsList,
                     expressions.iter().map(branch).collect(),
                 ),
                 ExpressionKind::OptionalSequence(expression) => (
@@ -178,12 +171,6 @@ mod tests {
     }
 
     #[test]
-    fn finds_the_alternatives_of_a_rule_that_takes_the_first_match() {
-        let points = choice_points_of("(* match first *) a = 'x' | 'xy';");
-        assert_eq!(points[0].kind, ChoicePointKind::FirstMatchDefinitionsList);
-    }
-
-    #[test]
     fn finds_taking_or_skipping_an_optional_sequence() {
         let points = choice_points_of("a = ['x'], 'y';");
         assert_eq!(points[0].kind, ChoicePointKind::OptionalSequence);
@@ -218,14 +205,6 @@ mod tests {
         assert_eq!(revisited("s = [a, 'x'], a, 'y'; a = 'z';"), [false, true]);
         assert_eq!(revisited("s = [a, 'x'], 'y'; a = 'z';"), [false, false]);
         assert_eq!(revisited("s = {a, 'x'}, a, 'y'; a = 'z';"), [false, true]);
-    }
-
-    #[test]
-    fn finds_rules_two_alternatives_of_a_first_match_reach() {
-        assert_eq!(
-            revisited("(* match first *) s = a, 'x' | a, 'y'; a = 'z';"),
-            [false, true]
-        );
     }
 
     #[test]

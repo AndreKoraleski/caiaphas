@@ -60,8 +60,6 @@ pub struct RulePlan {
     pub recursive: bool,
     /// Whether the rule tries every way through it.
     pub general: bool,
-    /// Whether the rule's choices take their first alternative that matches.
-    pub first_match: bool,
     /// Whether a parse that recovers skips the rule ahead to its next match
     /// where it fails partway.
     pub recovers: bool,
@@ -87,9 +85,6 @@ pub struct Part {
     pub nullable: bool,
     /// For a choice, whether at most one alternative can match at any place.
     pub start_apart: bool,
-    /// Whether the part reads a rule that keeps the order a first match gives
-    /// its ends.
-    pub keeps_order: bool,
     /// For an exception, whether what follows the text it reads cannot change
     /// where it ends.
     pub settled: bool,
@@ -197,10 +192,8 @@ fn plan(grammar: &Grammar, shapes: &[Option<Shape>]) -> Plan {
                 writer: FunctionWriter {
                     facts: &facts,
                     builds: &builds,
-                    first_match: rule.first_match,
                 },
                 general: &general,
-                ordered: &decisions.ordered,
                 settled: &decisions.settled,
                 recursive: &decisions.recursive,
             };
@@ -221,7 +214,6 @@ fn plan(grammar: &Grammar, shapes: &[Option<Shape>]) -> Plan {
                 leaf: decisions.leaves[position],
                 recursive: decisions.recursive[position],
                 general: general[position],
-                first_match: rule.first_match,
                 recovers: rule.recovers,
                 converts_to: rule.converts_to.clone(),
                 expression: part(&writer, &rule.expression),
@@ -324,7 +316,6 @@ fn part(writer: &ExactWriter<'_>, expression: &Expression) -> Part {
         first: ranges(&facts.first(expression)),
         nullable: facts.is_nullable(expression),
         start_apart,
-        keeps_order: writer.keeps_order(expression),
         settled,
         builds_nodes: writer.builds_nodes(expression),
         has_one_end: writer.has_one_end(expression),

@@ -8,9 +8,7 @@
 //! texts each may match are tried on both, so a tie found is always real, but
 //! one that needs a longer text can go unreported. Alternatives written the
 //! same way are left to the duplicate alternative check, and those that can
-//! both match nothing to the nullable branches check. Rules that take the
-//! first match are left alone, since there the first written alternative is
-//! meant to win.
+//! both match nothing to the nullable branches check.
 
 use crate::{
     analysis::{
@@ -33,9 +31,7 @@ pub(super) fn check(
     findings: &mut Vec<Finding>,
 ) {
     let mut sampler = Sampler::new(grammar);
-    let longest_match =
-        grammar.syntax_rules.iter().filter(|rule| !rule.first_match);
-    for rule in longest_match {
+    for rule in &grammar.syntax_rules {
         rule.expression.visit(&mut |expression| {
             let ExpressionKind::DefinitionsList(alternatives) =
                 &expression.kind
@@ -249,12 +245,5 @@ mod tests {
     fn leaves_alternatives_it_cannot_tell_about() {
         assert_eq!(ties("a = {'x'} , 'y' | {'x'}, 'z';"), []);
         assert_eq!(ties("s = a; a = a, 'x' | 'y';"), []);
-    }
-
-    #[test]
-    fn matches_a_rule_that_takes_the_first_match_as_its_parser_does() {
-        let rules = "(* match first *) k = 'i' | 'if'; o = 'if' | 'of';";
-        assert_eq!(ties(&format!("s = k | o; {rules}")).len(), 1);
-        assert_eq!(ties(&format!("s = k | o; (* greedy *) {rules}")), []);
     }
 }

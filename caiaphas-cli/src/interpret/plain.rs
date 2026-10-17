@@ -177,16 +177,6 @@ impl Program {
         if let [branch] = branches.as_slice() {
             return take(parser, branch);
         }
-        if self.plan_of(rule).first_match {
-            let mark = parser.mark();
-            for branch in &branches {
-                if let Some(end) = take(parser, branch) {
-                    return Some(end);
-                }
-                parser.truncate(mark);
-            }
-            return None;
-        }
         if part.start_apart {
             let mut found = None;
             for branch in &branches {

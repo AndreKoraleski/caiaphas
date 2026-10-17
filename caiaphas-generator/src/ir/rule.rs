@@ -37,9 +37,6 @@ pub(crate) struct Rule {
     pub(crate) expectations: Vec<Expectation>,
     /// Whether a `(* hide *)` leaves the rule out of the generated types.
     pub(crate) hidden: bool,
-    /// Whether a `(* match first *)` right before the rule makes it take the
-    /// first match.
-    pub(crate) first_match: bool,
     /// Whether a `(* greedy *)` right before the rule makes it take each way
     /// through it as it comes to it.
     pub(crate) greedy: bool,

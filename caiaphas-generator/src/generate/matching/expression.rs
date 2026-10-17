@@ -27,20 +27,6 @@ impl FunctionWriter<'_> {
                 if let [branch] = branches.as_slice() {
                     return branch.clone();
                 }
-                if self.first_match {
-                    return quote! {
-                        (|| {
-                            let mark = parser.mark();
-                            #(
-                                if let #some(end) = #branches {
-                                    return #some(end);
-                                }
-                                parser.truncate(mark);
-                            )*
-                            #none
-                        })()
-                    };
-                }
                 // The one alternative that can match is then the longest.
                 if self.facts.start_apart(expressions) {
                     // A parse that only matches stops at the one branch that

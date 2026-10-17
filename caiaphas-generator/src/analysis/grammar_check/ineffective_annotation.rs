@@ -1,21 +1,17 @@
 //! An ineffective annotation changes nothing in its rule. A `(* greedy *)`
 //! does not when a parser can already tell each way through the rule from the
-//! next character, and the rule reaches no rule that tries every way. A
-//! `(* match first *)` does not when no two alternatives of a choice in the
-//! rule can match at the same place, since then the first that matches is also
-//! the one that matches the most.
+//! next character, and the rule reaches no rule that tries every way.
 
 use crate::{
     analysis::{
         exactness::{general_rules, visit_rule_conflicts},
         facts::Facts,
-        finding::{Choosing, Finding, FindingKind},
+        finding::{Finding, FindingKind},
     },
-    ir::{ExpressionKind, Grammar, Rule, RuleId},
+    ir::{Grammar, RuleId},
 };
 
-/// Reports every `(* greedy *)` and `(* match first *)` that changes nothing
-/// in its rule.
+/// Reports every `(* greedy *)` that changes nothing in its rule.
 pub(super) fn check(
     grammar: &Grammar,
     facts: &Facts<'_>,
@@ -23,48 +19,28 @@ pub(super) fn check(
 ) {
     let general = general_rules(facts);
     for (position, rule) in grammar.syntax_rules.iter().enumerate() {
-        let mut ineffective = Vec::new();
-        if rule.greedy {
-            let mut conflicts = false;
-            visit_rule_conflicts(facts, RuleId(position), &mut |_| {
-                conflicts = true;
+        if !rule.greedy {
+            continue;
+        }
+        let mut conflicts = false;
+        visit_rule_conflicts(facts, RuleId(position), &mut |_| {
+            conflicts = true;
+        });
+        let mut reaches_general = false;
+        rule.expression
+            .visit_meta_identifiers(&mut |RuleId(read), _| {
+                reaches_general |= general[read];
             });
-            let mut reaches_general = false;
-            rule.expression
-                .visit_meta_identifiers(&mut |RuleId(read), _| {
-                    reaches_general |= general[read];
-                });
-            if !conflicts && !reaches_general {
-                ineffective.push(Choosing::Greedy);
-            }
-        }
-        if rule.first_match && !has_alternatives_that_meet(facts, rule) {
-            ineffective.push(Choosing::FirstMatch);
-        }
-        for annotation in ineffective {
+        if !conflicts && !reaches_general {
             findings.push(Finding {
                 kind: FindingKind::IneffectiveAnnotation {
                     meta_identifier: rule.meta_identifier.clone(),
-                    annotation,
                 },
                 span: rule.span,
                 labels: Vec::new(),
             });
         }
     }
-}
-
-/// Returns whether two alternatives of a choice in `rule` can match at the
-/// same place, since one can match nothing or both can start alike.
-fn has_alternatives_that_meet(facts: &Facts<'_>, rule: &Rule) -> bool {
-    let mut meet = false;
-    rule.expression.visit(&mut |expression| {
-        if let ExpressionKind::DefinitionsList(alternatives) = &expression.kind
-        {
-            meet |= !facts.start_apart(alternatives);
-        }
-    });
-    meet
 }
 
 #[cfg(test)]
@@ -87,25 +63,6 @@ mod tests {
         );
         assert_eq!(
             ineffective("(* greedy *) s = a, ';'; a = {'x'}, 'x';"),
-            Vec::<String>::new()
-        );
-    }
-
-    #[test]
-    fn finds_a_first_match_whose_alternatives_never_meet() {
-        assert_eq!(
-            ineffective("(* match first *) s = 'x' | 'y';"),
-            [
-                "`(* match first *)` changes nothing in `s`, since no two of \
-                 its alternatives can match at the same place"
-            ]
-        );
-        assert_eq!(
-            ineffective("(* match first *) s = 'x' | 'xy';"),
-            Vec::<String>::new()
-        );
-        assert_eq!(
-            ineffective("(* match first *) s = 'x' | ;"),
             Vec::<String>::new()
         );
     }

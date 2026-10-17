@@ -80,7 +80,7 @@ fn leaves_out_a_rule_that_tried_to_read_nothing() {
 }
 
 #[test]
-fn takes_the_first_branch_after_which_the_rest_matches_where_the_rule_asks() {
+fn reads_items_whose_alternatives_tie() {
     fn texts(input: &str) -> Vec<String> {
         let parsed = items::Items::parse(input).unwrap();
         parsed
@@ -541,30 +541,6 @@ fn writes_a_type_as_the_text_its_rule_matched() {
     assert_eq!(parsed.to_string(), "12,(3,4)");
     let word = phrase::Phrase::parse("affy").unwrap().word;
     assert_eq!(word.to_string(), "af");
-}
-
-caiaphas::grammar!(mod first_everywhere {
-    "s = direct | optional | grouped | sequence;
-     direct = 'd', f, {'b'};
-     optional = 'o', [f], {'b'};
-     grouped = 'g', (f | 'c'), {'b'};
-     sequence = 's', (f, ['b']), {'b'};
-     (* match first *) f = 'a' | 'ab', ['b'];"
-});
-
-#[test]
-fn takes_the_first_match_of_a_rule_wherever_it_is() {
-    use first_everywhere::S;
-    let f = |input| match S::parse(input).unwrap() {
-        S::Direct(direct) => direct.f.text().to_owned(),
-        S::Optional(optional) => optional.f.unwrap().text().to_owned(),
-        S::Grouped(grouped) => grouped.f.unwrap().text().to_owned(),
-        S::Sequence(sequence) => sequence.f.text().to_owned(),
-    };
-    assert_eq!(f("dabb"), "a");
-    assert_eq!(f("oabb"), "a");
-    assert_eq!(f("gabb"), "a");
-    assert_eq!(f("sabb"), "a");
 }
 
 caiaphas::grammar!(mod patterns {

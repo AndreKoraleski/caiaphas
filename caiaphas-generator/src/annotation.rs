@@ -6,12 +6,12 @@
 //! word = keyword | name;
 //! ```
 //!
-//! An annotation is `hide`, `inline`, `match first`, `greedy`, `recover`, `as`
-//! and a Rust type, or `expect` with a finding's code, a colon and a reason. A
-//! type is a primitive or a path whose last part starts with a capital, so a
-//! comment such as `(* as such *)` stays a comment. Each comment holds one
-//! annotation, and a rule can have several. The standard reads quotes in a
-//! comment as terminal strings, so a reason cannot hold a lone `'` or `"`.
+//! An annotation is `hide`, `inline`, `greedy`, `recover`, `as` and a Rust
+//! type, or `expect` with a finding's code, a colon and a reason. A type is a
+//! primitive or a path whose last part starts with a capital, so a comment
+//! such as `(* as such *)` stays a comment. Each comment holds one annotation,
+//! and a rule can have several. The standard reads quotes in a comment as
+//! terminal strings, so a reason cannot hold a lone `'` or `"`.
 
 use std::fmt;
 
@@ -34,9 +34,6 @@ pub(crate) enum Annotation {
     Expectation(Expectation),
     /// Leaves the rule out of the types generated for the grammar.
     Hide,
-    /// Makes the choices written in the rule take their first alternative that
-    /// matches.
-    FirstMatch,
     /// Makes the rule take each way through it as it comes to it.
     Greedy,
     /// Lets a parse that recovers skip the rule ahead to its next match where
@@ -108,19 +105,6 @@ impl Comment {
                 ));
             }
         }
-        let words = |first, second| {
-            after_word(content, first).and_then(|rest| {
-                after_word(rest.trim_start_matches(is_gap), second)
-            })
-        };
-        // The words of `match first` the other way around are how it was
-        // written before.
-        if words("first", "match").is_some_and(str::is_empty) {
-            return Self::Malformed(Malformed::Misspelled {
-                meant: "match first",
-            });
-        }
-        let first_match = words("match", "first");
         let alone = [
             ("hide", after_word(content, "hide"), Annotation::Hide),
             ("inline", after_word(content, "inline"), Annotation::Inline),
@@ -130,7 +114,6 @@ impl Comment {
                 after_word(content, "recover"),
                 Annotation::Recover,
             ),
-            ("match first", first_match, Annotation::FirstMatch),
         ];
         for (name, rest, annotation) in alone {
             if let Some(rest) = rest {
@@ -159,9 +142,6 @@ impl fmt::Display for Malformed {
             Self::NotAlone("hide") => {
                 f.write_str("a rule is hidden with `(* hide *)` alone")
             }
-            Self::NotAlone("match first") => f.write_str(
-                "a rule takes the first match with `(* match first *)` alone",
-            ),
             Self::NotAlone(name) => {
                 write!(f, "a rule is made {name} with `(* {name} *)` alone")
             }
@@ -454,43 +434,6 @@ mod tests {
             assert_eq!(
                 read(text),
                 Comment::Malformed(Malformed::NotAlone("hide")),
-                "{text:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn reads_a_first_match() {
-        for text in [
-            "(* match first *)",
-            "(*match  first*)",
-            "(*\nmatch\nfirst\n*)",
-        ] {
-            assert_eq!(
-                read(text),
-                Comment::Annotation(Annotation::FirstMatch),
-                "{text:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn tells_how_a_first_match_is_written_now() {
-        assert_eq!(
-            read("(* first match *)"),
-            Comment::Malformed(Malformed::Misspelled {
-                meant: "match first"
-            })
-        );
-        assert_eq!(read("(* first match wins *)"), Comment::Ordinary);
-    }
-
-    #[test]
-    fn rejects_a_first_match_with_more_after_it() {
-        for text in ["(* match first wins *)", "(* match first: always *)"] {
-            assert_eq!(
-                read(text),
-                Comment::Malformed(Malformed::NotAlone("match first")),
                 "{text:?}"
             );
         }

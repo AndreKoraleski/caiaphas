@@ -405,14 +405,6 @@ written! {
          (* as String *) body = {character} - ({character}, '*/', {character});
          (* hide *) character = ? U+0020..U+007E ?;"
     }, "comment" => Comment;
-    first_everywhere {
-        "s = direct | optional | grouped | sequence;
-         direct = 'd', f, {'b'};
-         optional = 'o', [f], {'b'};
-         grouped = 'g', (f | 'c'), {'b'};
-         sequence = 's', (f, ['b']), {'b'};
-         (* match first *) f = 'a' | 'ab', ['b'];"
-    }, "s" => S;
     address {
         "address = byte, '.', byte, '.', byte, '.', byte;
          (* hide *) (* as u8 *) byte = ? /\\d+/ ?;"
@@ -496,12 +488,4 @@ written! {
         "list = item, {';', item};
          (* recover *) (* hide *) item = 'a', 'b';"
     }, "list" => List;
-}
-
-written! {
-    greedy_first_match {
-        "s = k, ['f'], ';';
-         (* expect unreachable-alternative: the test reads both ways *)
-         (* greedy *) (* match first *) k = 'i' | 'if';"
-    }, "s" => S;
 }

@@ -267,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    fn takes_the_longest_match_unless_a_rule_asks_for_the_first() {
+    fn takes_the_longest_match() {
         let items = |source: String| {
             generate(&source, "g.ebnf", Options::default())
                 .unwrap()
@@ -277,8 +277,6 @@ mod tests {
         let rules = "a = 'x'; b = 'x', 'y';";
         let longest = items(format!("s = a | b; {rules}"));
         assert!(longest.contains("longest"), "{longest}");
-        let first = items(format!("(* match first *) s = b | a; {rules}"));
-        assert!(!first.contains("longest"), "{first}");
     }
 
     #[test]

@@ -1,5 +1,4 @@
-(* Items split by `;`, where an item is `ab` before it is an `a` with any
-   `b`s after it. *)
+(* Items split by `;`, where an item is an `a` with any `b`s after it. *)
 items = item, {';', item};
-(* match first *)
+(* expect tied-branches: `ab` reads the same either way *)
 item = 'ab' | 'a', {'b'};

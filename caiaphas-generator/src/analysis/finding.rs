@@ -69,8 +69,8 @@ pub(crate) enum FindingKind {
     AmbiguousSplit { matched: String, repeated: bool },
     /// No start rule can reach a rule, so no parser uses it.
     UnreachableRule { meta_identifier: MetaIdentifier },
-    /// An alternative of a rule that takes the first match comes after one
-    /// that matches wherever it would, so a parser never takes it.
+    /// An alternative comes after one that matches wherever it would, so a
+    /// parser never takes it.
     UnreachableAlternative,
     /// An alternative is written the same way as an earlier alternative of the
     /// same choice.
@@ -99,11 +99,8 @@ pub(crate) enum FindingKind {
         last: char,
         between: CharacterSet,
     },
-    /// A `(* greedy *)` or `(* match first *)` changes nothing in its rule.
-    IneffectiveAnnotation {
-        meta_identifier: MetaIdentifier,
-        annotation: Choosing,
-    },
+    /// A `(* greedy *)` changes nothing in its rule.
+    IneffectiveAnnotation { meta_identifier: MetaIdentifier },
     /// A visible rule only ever matches one character and a repetition reads
     /// it, so every character it matches builds a value of its own.
     SingleCharacterRule { meta_identifier: MetaIdentifier },
@@ -127,23 +124,6 @@ pub(crate) enum FindingKind {
     UnexpectableFinding { code: FindingCode },
     /// An expectation finds no finding of its kind in its rule.
     UnfulfilledExpectation { code: FindingCode },
-}
-
-/// An annotation that changes how a rule chooses its way.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Choosing {
-    Greedy,
-    FirstMatch,
-}
-
-impl Choosing {
-    /// Returns the annotation as written between `(*` and `*)`.
-    pub(crate) fn written(self) -> &'static str {
-        match self {
-            Self::Greedy => "greedy",
-            Self::FirstMatch => "match first",
-        }
-    }
 }
 
 impl FindingKind {

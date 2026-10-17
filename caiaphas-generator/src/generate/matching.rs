@@ -43,7 +43,6 @@ pub(crate) fn functions(
         committed,
         leaves,
         recursive,
-        ordered,
         settled,
     } = Decisions::new(facts, general, builds);
     let functions =
@@ -53,11 +52,7 @@ pub(crate) fn functions(
             .enumerate()
             .map(|(position, rule)| {
                 let rule_id = RuleId(position);
-                let writer = FunctionWriter {
-                    facts,
-                    builds,
-                    first_match: rule.first_match,
-                };
+                let writer = FunctionWriter { facts, builds };
                 if !general[position] {
                     return writer.function(
                         rule_id,
@@ -70,7 +65,6 @@ pub(crate) fn functions(
                 let writer = ExactWriter {
                     writer,
                     general,
-                    ordered: &ordered,
                     settled: &settled,
                     recursive: &recursive,
                 };
@@ -95,8 +89,6 @@ pub(in crate::generate) struct Decisions {
     pub(in crate::generate) leaves: Vec<bool>,
     /// Whether the rule can reach itself.
     pub(in crate::generate) recursive: Vec<bool>,
-    /// What [`exact::ordered_rules`] tells.
-    pub(in crate::generate) ordered: Vec<bool>,
     /// What [`exact::settled_rules`] tells.
     pub(in crate::generate) settled: Vec<bool>,
 }
@@ -139,7 +131,6 @@ impl Decisions {
             committed,
             leaves,
             recursive: grammar.recursive_rules(),
-            ordered: exact::ordered_rules(grammar, general),
             settled: exact::settled_rules(facts, general),
         }
     }
@@ -177,8 +168,6 @@ pub(super) struct FunctionWriter<'a> {
     pub(super) facts: &'a Facts<'a>,
     /// Which rules build a node, since a type reads it.
     pub(super) builds: &'a [bool],
-    /// Whether the rule's choices take their first alternative that matches.
-    pub(super) first_match: bool,
 }
 
 impl FunctionWriter<'_> {

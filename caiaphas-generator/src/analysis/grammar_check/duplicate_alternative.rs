@@ -5,8 +5,7 @@
 //! Unlike branches that only start the same way, duplicates are certainly
 //! ambiguous. Quotes and grouping do not count, so `'x'` and `("x")` are the
 //! same. The order of nested alternatives does, so `(b | c)` and `(c | b)` are
-//! not. A rule that takes the first match never takes a duplicate, so the
-//! unreachable alternative check reports it there instead.
+//! not.
 
 use crate::{
     analysis::{
@@ -24,9 +23,7 @@ pub(super) fn check(
     _facts: &Facts<'_>,
     findings: &mut Vec<Finding>,
 ) {
-    let longest_match =
-        grammar.syntax_rules.iter().filter(|rule| !rule.first_match);
-    for rule in longest_match {
+    for rule in &grammar.syntax_rules {
         rule.expression.visit(&mut |expression| {
             let ExpressionKind::DefinitionsList(alternatives) =
                 &expression.kind
@@ -72,11 +69,6 @@ mod tests {
             duplicates("a = 'x', b | 'y' | 'x', b; b = 'z';"),
             [(Span { start: 19, end: 25 }, Span { start: 4, end: 10 })]
         );
-    }
-
-    #[test]
-    fn leaves_a_rule_that_takes_the_first_match_to_another_check() {
-        assert_eq!(duplicates("(* match first *) a = 'x' | 'x';"), []);
     }
 
     #[test]

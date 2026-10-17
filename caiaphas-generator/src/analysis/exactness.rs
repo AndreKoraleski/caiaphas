@@ -1,11 +1,9 @@
 //! Exactness tells where a parser that takes one way through each choice as it
 //! comes to it can miss a match.
 //!
-//! Such a parser takes the alternative that matches the most, or the first in
-//! a rule that takes the first match, and takes or repeats a sequence whenever
-//! it can. It misses a match only where a way it leaves out ends sooner and
-//! the rest goes on from there, or where a first match leaves out a later
-//! alternative that goes on from where an earlier one ends.
+//! Such a parser takes the alternative that matches the most, and takes or
+//! repeats a sequence whenever it can. It misses a match only where a way it
+//! leaves out ends sooner and the rest goes on from there.
 
 use crate::{
     analysis::{
@@ -48,12 +46,8 @@ pub(crate) fn visit_rule_conflicts(
     rule_id: RuleId,
     visit: &mut impl FnMut(Conflict),
 ) {
-    let RuleId(position) = rule_id;
-    let first_match = facts.grammar().syntax_rules[position].first_match;
     facts.walk_rule(rule_id, &mut |expression, after| {
-        if let Some(conflict) =
-            conflict(facts, rule_id, first_match, expression, after)
-        {
+        if let Some(conflict) = conflict(facts, rule_id, expression, after) {
             visit(conflict);
         }
     });
@@ -86,7 +80,6 @@ pub(crate) fn general_rules(facts: &Facts<'_>) -> Vec<bool> {
 fn conflict(
     facts: &Facts<'_>,
     rule_id: RuleId,
-    first_match: bool,
     expression: &Expression,
     after: &Follow,
 ) -> Option<Conflict> {
@@ -105,32 +98,25 @@ fn conflict(
         | ExpressionKind::RepeatedSequence(sequence) => {
             conflict(expression.span, None, following(facts.first(sequence)))
         }
-        ExpressionKind::DefinitionsList(alternatives) => {
-            alternatives
-                .iter()
-                .enumerate()
-                .find_map(|(index, earlier)| {
-                    alternatives[index + 1..].iter().find_map(|later| {
-                        // A first match never takes a later alternative that
-                        // goes on from where an earlier one ends.
-                        let mut past_earlier = goes_on(facts, earlier, later);
-                        if !first_match {
-                            past_earlier = following(past_earlier);
-                        }
-                        conflict(later.span, Some(earlier.span), past_earlier)
-                            .or_else(|| {
-                                let past_later =
-                                    goes_on(facts, later, earlier);
-                                let characters = following(past_later);
-                                conflict(
-                                    earlier.span,
-                                    Some(later.span),
-                                    characters,
-                                )
-                            })
-                    })
+        ExpressionKind::DefinitionsList(alternatives) => alternatives
+            .iter()
+            .enumerate()
+            .find_map(|(index, earlier)| {
+                alternatives[index + 1..].iter().find_map(|later| {
+                    let past_earlier =
+                        following(goes_on(facts, earlier, later));
+                    conflict(later.span, Some(earlier.span), past_earlier)
+                        .or_else(|| {
+                            let past_later = goes_on(facts, later, earlier);
+                            let characters = following(past_later);
+                            conflict(
+                                earlier.span,
+                                Some(later.span),
+                                characters,
+                            )
+                        })
                 })
-        }
+            }),
         _ => None,
     }
 }
@@ -303,18 +289,5 @@ mod tests {
         assert_eq!(general(source), [true, true, false, false, false]);
         let source = "(* greedy *) s = a, 'x'; a = {'x'}, 'x';";
         assert_eq!(general(source), [false, true]);
-    }
-
-    #[test]
-    fn finds_an_earlier_alternative_that_a_first_match_takes_too_soon() {
-        assert_eq!(
-            general(
-                "items = item, {';', item}; \
-                 (* match first *) item = 'ab' | 'a', {'b'};"
-            ),
-            [true, true]
-        );
-        assert_eq!(general("(* match first *) s = 'xy' | 'x', 'z';"), [false]);
-        assert_eq!(general("(* match first *) s = 'x', 'y' | 'x';"), [false]);
     }
 }

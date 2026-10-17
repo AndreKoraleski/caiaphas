@@ -140,8 +140,8 @@ impl FindingKind {
                     parts.join(" | ")
                 )
             }
-            Self::IneffectiveAnnotation { annotation, .. } => {
-                format!("remove the `(* {} *)`", annotation.written())
+            Self::IneffectiveAnnotation { .. } => {
+                "remove the `(* greedy *)`".to_owned()
             }
             Self::SingleCharacterRule { meta_identifier } => format!(
                 "hide it with `(* hide *)` unless a type needs `{}`, since \

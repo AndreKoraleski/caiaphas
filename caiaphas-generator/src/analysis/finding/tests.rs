@@ -140,7 +140,7 @@ const CASES: &[Case] = &[
         help: "remove `a`, or reference it from a rule a parser uses",
     },
     Case {
-        source: "(* match first *) a = 'x' | 'x';",
+        source: "a = ? U+0061..U+007A ? | 'x';",
         code: FindingCode::UnreachableAlternative,
         severity: Severity::Warning,
         message: "an earlier alternative matches wherever this one would, \

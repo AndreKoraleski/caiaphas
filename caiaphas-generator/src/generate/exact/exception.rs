@@ -89,8 +89,7 @@ impl ExactWriter<'_> {
         let (pattern, expected) = self.writer.set_parts(run)?;
         // The place of the factor in the grammar tells this run from others.
         let site = Literal::usize_unsuffixed(factor.span.range().start);
-        // Only where the middle ends counts, so its ends come in any order.
-        let steps = middle.iter().map(|step| self.step(step, true));
+        let steps = middle.iter().map(|step| self.step(step));
         Some(quote! {
             parser.span_ends_before(
                 &RULE,

@@ -20,8 +20,6 @@ pub(crate) struct SyntaxRule {
     /// Whether a `(* hide *)` right before the rule leaves it out of the
     /// generated types.
     pub(crate) hidden: bool,
-    /// Whether a `(* match first *)` comes right before the rule.
-    pub(crate) first_match: bool,
     /// Whether a `(* greedy *)` comes right before the rule.
     pub(crate) greedy: bool,
     /// Whether a `(* recover *)` comes right before the rule.
@@ -61,7 +59,6 @@ impl SyntaxRule {
             definitions_list,
             expectations: Vec::new(),
             hidden: false,
-            first_match: false,
             greedy: false,
             recovers: false,
             inline: false,

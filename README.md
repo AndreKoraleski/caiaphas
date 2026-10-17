@@ -171,7 +171,6 @@ A comment right before a rule can tell caiaphas more about it.
 | `(* hide *)`                | no type and no field, as for whitespace        |
 | `(* inline *)`              | no type: rules that hold it hold what it holds |
 | `(* as u16 *)`              | the type is `u16`, read from the rule's text   |
-| `(* match first *)`         | how the rule chooses, see [Matching](#matching)|
 | `(* greedy *)`              | how the rule chooses, see [Matching](#matching)|
 | `(* recover *)`             | a parse goes on past it, see [Errors](#errors) |
 | `(* expect code: reason *)` | marks a warning or suggestion as intended      |
@@ -209,10 +208,8 @@ while the rest still matches, so the name takes `archive.tar` and leaves
 
 Most choices need no such care, since the next character tells which way goes
 on, and the parser takes those as it comes. caiaphas finds the few rules where
-that is not so, and only those try every way. `(* match first *)` makes a
-rule's choices take the first alternative after which the rest still matches,
-and `(* greedy *)` makes a rule take each way as it comes and never go back, as
-the `else` of a nested `if` does.
+that is not so, and only those try every way. `(* greedy *)` makes a rule take
+each way as it comes and never go back, as the `else` of a nested `if` does.
 
 ## Checks
 

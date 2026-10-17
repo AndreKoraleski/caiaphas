@@ -70,27 +70,23 @@ impl Program {
         if let Some(set) = &part.set {
             return Ends::of(single(parser, part, set, position));
         }
-        let first_match = self.plan_of(rule).first_match;
-        let keeps_order = !first_match && part.keeps_order;
         let ways = match &part.kind {
             Kind::Sequence(steps) => {
-                let unordered = !first_match && !keeps_order;
                 let mut ends = Ends::one(position);
                 for step in steps {
-                    ends = self.step(parser, rule, step, &ends, unordered);
+                    ends = self.step(parser, rule, step, &ends);
                 }
                 ends
             }
             Kind::Choice(alternatives) => {
                 let mut ends = Ends::none();
                 for alternative in alternatives {
-                    let found =
-                        self.ends_branch(parser, rule, alternative, position);
-                    if keeps_order {
-                        ends.merge(found);
-                    } else {
-                        ends.extend(found);
-                    }
+                    ends.extend(self.ends_branch(
+                        parser,
+                        rule,
+                        alternative,
+                        position,
+                    ));
                 }
                 ends
             }
@@ -151,11 +147,7 @@ impl Program {
             Kind::Empty => return Ends::one(position),
             _ => unreachable!("a plan holds no other part"),
         };
-        if first_match || keeps_order {
-            ways
-        } else {
-            ways.longest_first()
-        }
+        ways.longest_first()
     }
 
     /// Returns where the run of characters `factor` matches can end before the
@@ -185,7 +177,7 @@ impl Program {
             |within, position| {
                 let mut ends = Ends::one(position);
                 for step in middle {
-                    ends = self.step(within, rule, step, &ends, true);
+                    ends = self.step(within, rule, step, &ends);
                 }
                 ends
             },
@@ -242,7 +234,6 @@ impl Program {
         rule: usize,
         step: &'static Part,
         ends: &Ends,
-        unordered: bool,
     ) -> Ends {
         let Kind::Repeat(sequence) = &step.kind else {
             return parser.then(ends, |parser, position| {
@@ -253,13 +244,8 @@ impl Program {
             let expected = expected(&set.expected);
             return parser.then_span(ends, contains(&set.ranges), &expected);
         }
-        if unordered {
-            return parser.then_rounds(ends, |parser, position| {
-                self.ends_branch(parser, rule, sequence, position)
-            });
-        }
-        parser.then(ends, |parser, position| {
-            self.part_ends(parser, rule, step, position)
+        parser.then_rounds(ends, |parser, position| {
+            self.ends_branch(parser, rule, sequence, position)
         })
     }
 

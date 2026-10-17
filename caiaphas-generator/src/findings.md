@@ -159,11 +159,9 @@ for each kind: `? U+0041..U+005A ? | ? U+0061..U+007A ?`.
 
 ## ineffective-annotation
 
-Warning. A `(* greedy *)` or `(* match first *)` changes nothing in its rule.
-A greedy rule changes nothing when the next character already decides each of
-its choices and it reaches no rule that tries every way, and a first match
-changes nothing when no two of its alternatives can match at the same place.
-Remove the annotation.
+Warning. A `(* greedy *)` changes nothing in its rule, since the next
+character already decides each of its choices and it reaches no rule that
+tries every way. Remove the annotation.
 
 ## single-character-rule
 

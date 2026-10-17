@@ -3,10 +3,7 @@
 
 use std::fmt::{self, Display};
 
-use crate::{
-    analysis::finding::{Choosing, FindingKind},
-    diagnostic::Severity,
-};
+use crate::{analysis::finding::FindingKind, diagnostic::Severity};
 
 impl fmt::Display for FindingKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -136,27 +133,12 @@ impl fmt::Display for FindingKind {
                  though they are neither letters nor digits",
                 between.described()
             ),
-            Self::IneffectiveAnnotation {
-                meta_identifier,
-                annotation,
-            } => {
-                let name = meta_identifier.spaced();
-                let reason = match annotation {
-                    Choosing::Greedy => {
-                        "a parser can tell each way through it from the next \
-                         character"
-                    }
-                    Choosing::FirstMatch => {
-                        "no two of its alternatives can match at the same \
-                         place"
-                    }
-                };
-                write!(
-                    f,
-                    "`(* {} *)` changes nothing in `{name}`, since {reason}",
-                    annotation.written()
-                )
-            }
+            Self::IneffectiveAnnotation { meta_identifier } => write!(
+                f,
+                "`(* greedy *)` changes nothing in `{}`, since a parser can \
+                 tell each way through it from the next character",
+                meta_identifier.spaced()
+            ),
             Self::SingleCharacterRule { meta_identifier } => write!(
                 f,
                 "`{}` only ever matches one character, and a repetition reads \

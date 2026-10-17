@@ -40,8 +40,7 @@ pub(super) fn check(choice_point: &ChoicePoint, findings: &mut Vec<Finding>) {
                 },
                 FindingKind::DeadEndRepeatedSequence,
             ),
-            ChoicePointKind::DefinitionsList
-            | ChoicePointKind::FirstMatchDefinitionsList => return,
+            ChoicePointKind::DefinitionsList => return,
         };
     let [sequence, end] = choice_point.branches.as_slice() else {
         return;

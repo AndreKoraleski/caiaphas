@@ -96,7 +96,6 @@ fn give(
                 rule.expectations.push(expectation);
             }
             Annotation::Hide => rule.hidden = true,
-            Annotation::FirstMatch => rule.first_match = true,
             Annotation::Greedy => rule.greedy = true,
             Annotation::Recover => rule.recovers = true,
             Annotation::Inline => rule.inline = true,
@@ -171,34 +170,6 @@ mod tests {
         let hidden: Vec<bool> =
             syntax.syntax_rules.iter().map(|rule| rule.hidden).collect();
         assert_eq!(hidden, [false, true, false, false]);
-    }
-
-    #[test]
-    fn takes_the_first_match_in_the_rule_after_a_first_match() {
-        let syntax = parse_valid(
-            "s = a, b; (* match first *) a = 'x' | 'xy'; b = 'y';",
-        );
-        let first_match: Vec<bool> = syntax
-            .syntax_rules
-            .iter()
-            .map(|rule| rule.first_match)
-            .collect();
-        assert_eq!(first_match, [false, true, false]);
-    }
-
-    #[test]
-    fn rejects_a_malformed_first_match() {
-        let (syntax, errors) = parse("(* match first now *) a = 'x';");
-        assert!(!syntax.syntax_rules[0].first_match);
-        assert_eq!(
-            errors,
-            [ParseError {
-                kind: ParseErrorKind::Malformed(Malformed::NotAlone(
-                    "match first"
-                )),
-                span: Span { start: 0, end: 21 },
-            }]
-        );
     }
 
     #[test]

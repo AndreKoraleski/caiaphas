@@ -32,27 +32,6 @@ pub(super) fn is_nullable(expression: &Expression, rules: &[bool]) -> bool {
     }
 }
 
-pub(super) fn always_matches(expression: &Expression, rules: &[bool]) -> bool {
-    match &expression.kind {
-        ExpressionKind::SingleDefinition(expressions) => expressions
-            .iter()
-            .all(|expression| always_matches(expression, rules)),
-        ExpressionKind::DefinitionsList(expressions) => expressions
-            .iter()
-            .any(|expression| always_matches(expression, rules)),
-        ExpressionKind::OptionalSequence(_)
-        | ExpressionKind::RepeatedSequence(_)
-        | ExpressionKind::EmptySequence => true,
-        ExpressionKind::SyntacticFactor {
-            syntactic_primary, ..
-        } => always_matches(syntactic_primary, rules),
-        ExpressionKind::MetaIdentifier(RuleId(position)) => rules[*position],
-        ExpressionKind::SyntacticTerm { .. }
-        | ExpressionKind::TerminalString(_)
-        | ExpressionKind::SpecialSequence(_) => false,
-    }
-}
-
 pub(super) fn ends_once(
     expression: &Expression,
     rules: &[bool],

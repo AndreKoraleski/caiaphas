@@ -18,7 +18,7 @@ use crate::{
         code,
         matching::{self, FunctionWriter},
     },
-    ir::{Expression, ExpressionKind, Grammar, Rule, RuleId},
+    ir::{Expression, ExpressionKind, Rule, RuleId},
 };
 
 /// Returns the name of the function that tells where the matches of the rule
@@ -36,13 +36,10 @@ pub(crate) fn build_name(RuleId(position): RuleId) -> Ident {
 /// Writes the functions of one rule that tries every way through it.
 pub(super) struct ExactWriter<'a> {
     /// Writes the code of what only ever matches one character, and holds the
-    /// facts and first match of the rule.
+    /// facts of the grammar.
     pub(super) writer: FunctionWriter<'a>,
     /// Which rules try every way through them.
     pub(super) general: &'a [bool],
-    /// Which rules keep the order a rule that takes the first match gives its
-    /// ends, as [`ordered_rules`] tells.
-    pub(super) ordered: &'a [bool],
     /// Which rules end at the same places however much input follows, as
     /// [`settled_rules`] tells.
     pub(super) settled: &'a [bool],
@@ -85,37 +82,6 @@ pub(super) fn settled_rules(facts: &Facts<'_>, general: &[bool]) -> Vec<bool> {
         }
     }
     settled
-}
-
-/// Returns which rules keep the order a rule that takes the first match gives
-/// its ends: the rules that try every way and take the first match, and those
-/// that read one of them. A rule takes its first match wherever it is read.
-pub(super) fn ordered_rules(grammar: &Grammar, general: &[bool]) -> Vec<bool> {
-    let rules = &grammar.syntax_rules;
-    let mut ordered: Vec<bool> = rules
-        .iter()
-        .zip(general)
-        .map(|(rule, &general)| general && rule.first_match)
-        .collect();
-    let mut changed = true;
-    while changed {
-        changed = false;
-        for (position, rule) in rules.iter().enumerate() {
-            if ordered[position] || !general[position] {
-                continue;
-            }
-            let mut reads = false;
-            rule.expression
-                .visit_meta_identifiers(&mut |RuleId(read), _| {
-                    reads |= ordered[read];
-                });
-            if reads {
-                ordered[position] = true;
-                changed = true;
-            }
-        }
-    }
-    ordered
 }
 
 impl ExactWriter<'_> {
@@ -230,28 +196,16 @@ impl ExactWriter<'_> {
         }
     }
 
-    /// Returns the code that tells where `expression` can end.
-    ///
-    /// The ends of a rule that takes the first match come in the order of the
-    /// ways that end there, by the first branch each takes, then by what comes
-    /// after. Those of any other rule come with the end of the most text
-    /// first, unless they come through a rule that takes the first match. Its
-    /// order then holds, and of alternatives, the one that goes furthest still
-    /// comes first.
+    /// Returns the code that tells where `expression` can end, with the end of
+    /// the most text first.
     fn ends(&self, expression: &Expression) -> TokenStream {
         let ends = quote! { __caiaphas::Ends };
         if let Some(single) = self.writer.single(expression) {
             return quote! { #ends::of(#single) };
         }
-        let keeps_order =
-            !self.writer.first_match && self.keeps_order(expression);
         let ways = match &expression.kind {
             ExpressionKind::SingleDefinition(steps) => {
-                // The ends of a rule that keeps no order are sorted at the
-                // end, so a step can give its ends in any order.
-                let unordered = !self.writer.first_match && !keeps_order;
-                let steps =
-                    steps.iter().map(|step| self.step(step, unordered));
+                let steps = steps.iter().map(|step| self.step(step));
                 quote! {
                     {
                         let ends = #ends::one(position);
@@ -264,15 +218,10 @@ impl ExactWriter<'_> {
                 let alternatives = alternatives
                     .iter()
                     .map(|alternative| self.branch(alternative));
-                let add = if keeps_order {
-                    quote! { merge }
-                } else {
-                    quote! { extend }
-                };
                 quote! {
                     {
                         let mut ends = #ends::none();
-                        #(ends.#add(#alternatives);)*
+                        #(ends.extend(#alternatives);)*
                         ends
                     }
                 }
@@ -340,31 +289,14 @@ impl ExactWriter<'_> {
                 return quote! { #ends::one(position) };
             }
         };
-        if self.writer.first_match || keeps_order {
-            ways
-        } else {
-            quote! { #ways.longest_first() }
-        }
-    }
-
-    /// Returns whether the ends of `expression` keep the order of a rule that
-    /// takes the first match, since it reads one.
-    pub(in crate::generate) fn keeps_order(
-        &self,
-        expression: &Expression,
-    ) -> bool {
-        let mut keeps = false;
-        expression.visit_meta_identifiers(&mut |RuleId(read), _| {
-            keeps |= self.ordered[read];
-        });
-        keeps
+        quote! { #ways.longest_first() }
     }
 
     /// Returns the code that tells where `step` of a sequence can end after
-    /// each of `ends`, in any order when the sequence is `unordered`. A run of
-    /// characters from a set is read once for all of them, since the ends of a
-    /// run all reach its end.
-    fn step(&self, step: &Expression, unordered: bool) -> TokenStream {
+    /// each of `ends`, in any order, since the ends of an expression are
+    /// sorted once they are all found. A run of characters from a set is read
+    /// once for all of them, since the ends of a run all reach its end.
+    fn step(&self, step: &Expression) -> TokenStream {
         let ExpressionKind::RepeatedSequence(sequence) = &step.kind else {
             let part = self.part(step);
             return quote! { parser.then(&ends, #part) };
@@ -378,16 +310,12 @@ impl ExactWriter<'_> {
                 )
             };
         }
-        // Where the order of the ends does not count, the rounds from every
-        // end are followed together, so each place is read once.
-        if unordered {
-            let round = self.branch(sequence);
-            return quote! {
-                parser.then_rounds(&ends, |parser, position| #round)
-            };
+        // The rounds from every end are followed together, so each place is
+        // read once.
+        let round = self.branch(sequence);
+        quote! {
+            parser.then_rounds(&ends, |parser, position| #round)
         }
-        let part = self.part(step);
-        quote! { parser.then(&ends, #part) }
     }
 
     /// Returns the closure that tells where `expression` can end from the
