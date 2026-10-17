@@ -2,7 +2,10 @@
 
 use std::ops::RangeInclusive;
 
-use crate::{ir::RuleId, span::Span};
+use crate::{
+    ir::{Grammar, RuleId},
+    span::Span,
+};
 
 /// An expression is what a rule, or part of one, matches.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,6 +121,87 @@ impl Expression {
         });
     }
 
+    /// Returns the expression written in the syntax of the standard, with the
+    /// names of the rules of `grammar`, unless it holds a special sequence,
+    /// which lowering leaves unreadable.
+    pub(crate) fn written(&self, grammar: &Grammar) -> Option<String> {
+        self.written_at(grammar, Binding::Definitions)
+    }
+
+    /// Returns what [`written`](Self::written) does, in brackets when the
+    /// expression binds more loosely than `binding` allows.
+    fn written_at(
+        &self,
+        grammar: &Grammar,
+        binding: Binding,
+    ) -> Option<String> {
+        let all = |expressions: &[Self], binding, apart| {
+            let parts: Option<Vec<String>> = expressions
+                .iter()
+                .map(|expression| expression.written_at(grammar, binding))
+                .collect();
+            Some(parts?.join(apart))
+        };
+        let (text, binds) = match &self.kind {
+            ExpressionKind::DefinitionsList(alternatives) => (
+                all(alternatives, Binding::Definition, " | ")?,
+                Binding::Definitions,
+            ),
+            ExpressionKind::SingleDefinition(steps) => {
+                (all(steps, Binding::Term, ", ")?, Binding::Definition)
+            }
+            ExpressionKind::SyntacticTerm {
+                syntactic_factor,
+                syntactic_exception,
+            } => (
+                format!(
+                    "{} - {}",
+                    syntactic_factor.written_at(grammar, Binding::Factor)?,
+                    syntactic_exception
+                        .written_at(grammar, Binding::Factor)?
+                ),
+                Binding::Term,
+            ),
+            ExpressionKind::SyntacticFactor {
+                integer,
+                syntactic_primary,
+            } => (
+                format!(
+                    "{integer} * {}",
+                    syntactic_primary.written_at(grammar, Binding::Primary)?
+                ),
+                Binding::Factor,
+            ),
+            ExpressionKind::OptionalSequence(sequence) => (
+                format!("[{}]", sequence.written(grammar)?),
+                Binding::Primary,
+            ),
+            ExpressionKind::RepeatedSequence(sequence) => (
+                format!("{{{}}}", sequence.written(grammar)?),
+                Binding::Primary,
+            ),
+            ExpressionKind::MetaIdentifier(RuleId(position)) => (
+                grammar.syntax_rules[*position].meta_identifier.spaced(),
+                Binding::Primary,
+            ),
+            ExpressionKind::TerminalString(text) if text.contains('\'') => {
+                (format!("\"{text}\""), Binding::Primary)
+            }
+            ExpressionKind::TerminalString(text) => {
+                (format!("'{text}'"), Binding::Primary)
+            }
+            ExpressionKind::EmptySequence => (String::new(), Binding::Primary),
+            ExpressionKind::SpecialSequence(_) | ExpressionKind::Not(_) => {
+                return None;
+            }
+        };
+        Some(if binds < binding {
+            format!("({text})")
+        } else {
+            text
+        })
+    }
+
     /// Returns whether this expression is written the same way as `other`,
     /// wherever each is.
     pub(crate) fn is_written_like(&self, other: &Self) -> bool {
@@ -188,4 +272,16 @@ impl Expression {
             _ => false,
         }
     }
+}
+
+/// How tightly the parts of an expression bind, from the loosest, so the
+/// standard's syntax only needs brackets around a looser part in a tighter
+/// place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Binding {
+    Definitions,
+    Definition,
+    Term,
+    Factor,
+    Primary,
 }

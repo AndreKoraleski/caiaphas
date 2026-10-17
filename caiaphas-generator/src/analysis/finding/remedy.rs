@@ -7,7 +7,14 @@ impl FindingKind {
     /// Returns the usual remedy for this kind of problem.
     pub(super) fn remedy(&self) -> String {
         match self {
-            Self::LeftRecursion { meta_identifier } => {
+            Self::LeftRecursion {
+                rewrite: Some(rewrite),
+                ..
+            } => format!("rewrite the recursion as a repetition: `{rewrite}`"),
+            Self::LeftRecursion {
+                meta_identifier,
+                rewrite: None,
+            } => {
                 let name = meta_identifier.spaced();
                 format!(
                     "rewrite the recursion as a repetition, so `{name} = \

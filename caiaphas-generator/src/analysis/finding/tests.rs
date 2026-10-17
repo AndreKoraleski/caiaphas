@@ -20,8 +20,7 @@ const CASES: &[Case] = &[
         severity: Severity::Error,
         message: "`a` can reach itself before reading anything, so its \
                   parser would never end",
-        help: "rewrite the recursion as a repetition, so `a = a, x | y;` \
-               becomes `a = y, {x};`",
+        help: "rewrite the recursion as a repetition: `a = 'y', {'x'};`",
     },
     Case {
         source: "s = a; a = b, 'x' | 'y'; b = a, 'z' | 'w';",

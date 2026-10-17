@@ -136,7 +136,7 @@ fn finds_whitespace_that_two_rules_can_both_read_in_a_greedy_rule() {
 }
 
 #[test]
-fn finds_left_recursion_in_each_alternative_of_an_expression_grammar() {
+fn finds_left_recursion_in_each_alternative_of_an_expression_grammar_once() {
     let source = "
         grammar = expression;
         expression = expression, '+', expression
@@ -148,9 +148,9 @@ fn finds_left_recursion_in_each_alternative_of_an_expression_grammar() {
                    | 'n';";
     let left_recursion = format!(
         "expression: `expression` can reach itself before reading anything, \
-         so its parser would never end [{rule:?}]"
+         so its parser would never end [{rule:?}, \"expression\"]"
     );
-    assert_eq!(summary(source), [left_recursion.clone(), left_recursion]);
+    assert_eq!(summary(source), [left_recursion]);
 }
 
 #[test]

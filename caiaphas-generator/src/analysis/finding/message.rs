@@ -8,9 +8,9 @@ use crate::{analysis::finding::FindingKind, diagnostic::Severity};
 impl fmt::Display for FindingKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::LeftRecursion { meta_identifier } => {
-                f.write_str(&reaches_itself(&meta_identifier.spaced(), ""))
-            }
+            Self::LeftRecursion {
+                meta_identifier, ..
+            } => f.write_str(&reaches_itself(&meta_identifier.spaced(), "")),
             Self::IndirectLeftRecursion {
                 meta_identifier,
                 through,

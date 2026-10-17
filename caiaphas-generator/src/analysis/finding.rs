@@ -27,7 +27,11 @@ pub(crate) struct Finding {
 pub(crate) enum FindingKind {
     /// A rule can reach itself before reading anything, so its parser would
     /// never end.
-    LeftRecursion { meta_identifier: MetaIdentifier },
+    LeftRecursion {
+        meta_identifier: MetaIdentifier,
+        /// The rule written as a repetition, when it can be.
+        rewrite: Option<String>,
+    },
     /// A rule can reach itself through other rules before reading anything, so
     /// its parser would never end.
     IndirectLeftRecursion {

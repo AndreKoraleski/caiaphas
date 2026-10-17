@@ -18,6 +18,8 @@ module list the suggestions, and `caiaphas check` prints them.
 Error. A rule can reach itself before reading anything, as `expression` does
 in `expression = expression, '+', term | term;`, so its parser would never
 end. Write the recursion as a repetition: `expression = term, {'+', term};`.
+With several operators, a rule of their own keeps which one matched:
+`expression = term, {operator, term}; operator = '+' | '-';`.
 
 ## indirect-left-recursion
 
