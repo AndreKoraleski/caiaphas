@@ -142,6 +142,9 @@ impl fmt::Display for Malformed {
             Self::NotAlone("hide") => {
                 f.write_str("a rule is hidden with `(* hide *)` alone")
             }
+            Self::NotAlone("recover") => {
+                f.write_str("a rule recovers with `(* recover *)` alone")
+            }
             Self::NotAlone(name) => {
                 write!(f, "a rule is made {name} with `(* {name} *)` alone")
             }
