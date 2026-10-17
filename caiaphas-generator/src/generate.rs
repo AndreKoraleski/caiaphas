@@ -146,8 +146,8 @@ fn same_names(grammar: &Grammar, shapes: &[Option<Shape>]) -> Vec<Diagnostic> {
                 code: None,
                 message: format!(
                     "the types of `{}` and `{}` would both be named `{name}`",
-                    entry.get().meta_identifier.as_str(),
-                    rule.meta_identifier.as_str()
+                    entry.get().meta_identifier.spaced(),
+                    rule.meta_identifier.spaced()
                 ),
                 span: rule.span,
                 labels: vec![Label {
@@ -201,7 +201,7 @@ fn hidden_conversions(
             code: None,
             message: format!(
                 "`{first}` in `(* as {ty} *)` names the type of `{}`",
-                hiding.meta_identifier.as_str()
+                hiding.meta_identifier.spaced()
             ),
             span: rule.span,
             labels: vec![Label {

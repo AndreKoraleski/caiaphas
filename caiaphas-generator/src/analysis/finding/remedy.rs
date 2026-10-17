@@ -8,7 +8,7 @@ impl FindingKind {
     pub(super) fn remedy(&self) -> String {
         match self {
             Self::LeftRecursion { meta_identifier } => {
-                let name = meta_identifier.as_str();
+                let name = meta_identifier.spaced();
                 format!(
                     "rewrite the recursion as a repetition, so `{name} = \
                      {name}, x | y;` becomes `{name} = y, {{x}};`"
@@ -20,13 +20,13 @@ impl FindingKind {
             } => format!(
                 "replace `{}` in `{}` with its definition until the recursion \
                  is direct, then rewrite it as a repetition",
-                through.as_str(),
-                meta_identifier.as_str()
+                through.spaced(),
+                meta_identifier.spaced()
             ),
             Self::UnproductiveRule { meta_identifier } => format!(
                 "give `{}` an alternative that only reads characters, or make \
                  the recursive part optional with `[...]` or `{{...}}`",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             Self::NullableRepeatedSequence => {
                 "make what repeats always read something, as `{'x'}` does \
@@ -83,7 +83,7 @@ impl FindingKind {
             }
             Self::UnreachableRule { meta_identifier } => format!(
                 "remove `{}`, or reference it from a rule a parser uses",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             Self::UnreachableAlternative => {
                 "move it before the alternative that matches first, or remove \
@@ -105,7 +105,7 @@ impl FindingKind {
             Self::EmptyRule { meta_identifier } => format!(
                 "give `{}` something to read, or remove it and every \
                  reference to it",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             Self::ExhaustiveException => {
                 "remove this term, or narrow the exception so something is \
@@ -117,8 +117,8 @@ impl FindingKind {
                 other,
             } => format!(
                 "rename `{}` or `{}`, or merge them if they mean the same",
-                meta_identifier.as_str(),
-                other.as_str()
+                meta_identifier.spaced(),
+                other.spaced()
             ),
             Self::MixedClassRange { first, last, .. } => {
                 let kinds = [('0', '9'), ('A', 'Z'), ('a', 'z')];
@@ -146,7 +146,7 @@ impl FindingKind {
             Self::SingleCharacterRule { meta_identifier } => format!(
                 "hide it with `(* hide *)` unless a type needs `{}`, since \
                  the rules that read it keep its text",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             Self::SharedStart => {
                 "write the shared start once, before a choice of what follows \
@@ -168,7 +168,7 @@ impl FindingKind {
                     "write {} right before `{}` if it should take each way as \
                      it comes, which keeps its parser fast, or {}",
                     annotations.join(" and "),
-                    meta_identifier.as_str(),
+                    meta_identifier.spaced(),
                     start_differently("the choice")
                 )
             }
@@ -180,7 +180,7 @@ impl FindingKind {
                 "{} if `{}` should be fast, since taking each way as it comes \
                  would make it miss what it matches",
                 start_differently("the choice"),
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             Self::UnknownExpectation {
                 similar: Some(similar),

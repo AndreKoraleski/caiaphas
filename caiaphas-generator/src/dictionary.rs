@@ -170,13 +170,13 @@ impl fmt::Display for DictionaryError {
                 meta_identifier,
                 ..
             } => {
-                write!(f, "`{}` is already defined", meta_identifier.as_str())
+                write!(f, "`{}` is already defined", meta_identifier.spaced())
             }
             DictionaryErrorKind::UndefinedMetaIdentifier {
                 meta_identifier,
                 ..
             } => {
-                write!(f, "`{}` is not defined", meta_identifier.as_str())
+                write!(f, "`{}` is not defined", meta_identifier.spaced())
             }
             DictionaryErrorKind::RecursiveSyntacticException {
                 meta_identifier,
@@ -184,13 +184,13 @@ impl fmt::Display for DictionaryError {
                 f,
                 "`{}` is or references a recursive rule, so a syntactic \
                  exception cannot use it",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             DictionaryErrorKind::HiddenStartSyntaxRule { meta_identifier } => {
                 write!(
                     f,
                     "`{}` is a start rule, so it cannot be hidden",
-                    meta_identifier.as_str()
+                    meta_identifier.spaced()
                 )
             }
             DictionaryErrorKind::ConvertedStartSyntaxRule {
@@ -198,13 +198,13 @@ impl fmt::Display for DictionaryError {
             } => write!(
                 f,
                 "`{}` is a start rule, so its type cannot be another one",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             DictionaryErrorKind::InlineStartSyntaxRule { meta_identifier } => {
                 write!(
                     f,
                     "`{}` is a start rule, so it cannot be inline",
-                    meta_identifier.as_str()
+                    meta_identifier.spaced()
                 )
             }
             DictionaryErrorKind::RecursiveInlineSyntaxRule {
@@ -213,7 +213,7 @@ impl fmt::Display for DictionaryError {
                 f,
                 "`{}` holds itself through inline rules alone, so what it \
                  gives the rules that hold it would never end",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
         }
     }
@@ -250,8 +250,8 @@ impl DictionaryError {
             } => format!(
                 "correct its spelling to `{}`, or define `{}` with a syntax \
                  rule",
-                similar.as_str(),
-                meta_identifier.as_str()
+                similar.spaced(),
+                meta_identifier.spaced()
             ),
             DictionaryErrorKind::UndefinedMetaIdentifier {
                 meta_identifier,
@@ -260,7 +260,7 @@ impl DictionaryError {
             } => format!(
                 "define `{}` with a syntax rule; for a class of characters, \
                  as `[a-z]` is in a regular expression, write `? /[a-z]/ ?`",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             DictionaryErrorKind::UndefinedMetaIdentifier {
                 meta_identifier,
@@ -269,7 +269,7 @@ impl DictionaryError {
             } => {
                 format!(
                     "define `{}` with a syntax rule, or correct its spelling",
-                    meta_identifier.as_str()
+                    meta_identifier.spaced()
                 )
             }
             DictionaryErrorKind::RecursiveSyntacticException {
@@ -277,7 +277,7 @@ impl DictionaryError {
             } => format!(
                 "write the exception with terminal strings and special \
                  sequences instead of `{}`",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             DictionaryErrorKind::HiddenStartSyntaxRule { .. } => {
                 "remove the `(* hide *)` before it, since its parser returns \
@@ -485,6 +485,12 @@ pub(crate) mod tests {
                 "a = b;",
                 "`b` is not defined",
                 "define `b` with a syntax rule, or correct its spelling",
+            ),
+            (
+                "a = syntax  rule;",
+                "`syntax rule` is not defined",
+                "define `syntax rule` with a syntax rule, or correct its \
+                 spelling",
             ),
             (
                 "s = 'x' - b; b = 'y', [b];",

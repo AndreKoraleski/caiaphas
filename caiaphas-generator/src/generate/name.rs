@@ -26,7 +26,7 @@ const TAKEN: &[&str] = &["crate", "self", "Self", "super", "span"];
 /// Returns the name of `rule` as written, with single spaces between its
 /// words.
 pub(crate) fn spaced(rule: &Rule) -> String {
-    rule.meta_identifier.words().collect::<Vec<_>>().join(" ")
+    rule.meta_identifier.spaced()
 }
 
 /// Returns the name of a type or variant, such as `SyntaxRule` for

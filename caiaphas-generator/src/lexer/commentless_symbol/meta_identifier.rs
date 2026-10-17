@@ -38,6 +38,12 @@ impl MetaIdentifier {
         &self.written
     }
 
+    /// Returns the meta identifier with single spaces between its words, as a
+    /// message shows it.
+    pub(crate) fn spaced(&self) -> String {
+        self.words().collect::<Vec<_>>().join(" ")
+    }
+
     /// Returns the words that the gaps in the meta identifier separate.
     pub(crate) fn words(&self) -> impl Iterator<Item = &str> {
         self.written

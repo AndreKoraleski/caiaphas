@@ -12,20 +12,20 @@ impl fmt::Display for FindingKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LeftRecursion { meta_identifier } => {
-                f.write_str(&reaches_itself(meta_identifier.as_str(), ""))
+                f.write_str(&reaches_itself(&meta_identifier.spaced(), ""))
             }
             Self::IndirectLeftRecursion {
                 meta_identifier,
                 through,
             } => f.write_str(&reaches_itself(
-                meta_identifier.as_str(),
-                &format!(" through `{}`", through.as_str()),
+                &meta_identifier.spaced(),
+                &format!(" through `{}`", through.spaced()),
             )),
             Self::UnproductiveRule { meta_identifier } => write!(
                 f,
                 "`{}` can never finish matching, since every way through it \
                  needs a rule that cannot either",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             Self::NullableRepeatedSequence => f.write_str(
                 "this repeated sequence can match nothing, so it could repeat \
@@ -93,7 +93,7 @@ impl fmt::Display for FindingKind {
                 f,
                 "`{}` cannot be reached from any start rule, so no parser \
                  uses it",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             Self::UnreachableAlternative => f.write_str(
                 "an earlier alternative matches wherever this one would, so \
@@ -110,7 +110,7 @@ impl fmt::Display for FindingKind {
             Self::EmptyRule { meta_identifier } => write!(
                 f,
                 "`{}` can only match nothing, so it never reads any input",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             Self::ExhaustiveException => f.write_str(
                 "this term can never match, since the exception matches \
@@ -123,8 +123,8 @@ impl fmt::Display for FindingKind {
                 f,
                 "`{}` differs from `{}` only in case, which is easy to \
                  mistake",
-                meta_identifier.as_str(),
-                other.as_str()
+                meta_identifier.spaced(),
+                other.spaced()
             ),
             Self::MixedClassRange {
                 first,
@@ -140,7 +140,7 @@ impl fmt::Display for FindingKind {
                 meta_identifier,
                 annotation,
             } => {
-                let name = meta_identifier.as_str();
+                let name = meta_identifier.spaced();
                 let reason = match annotation {
                     Choosing::Greedy => {
                         "a parser can tell each way through it from the next \
@@ -161,7 +161,7 @@ impl fmt::Display for FindingKind {
                 f,
                 "`{}` only ever matches one character, and a repetition reads \
                  it, so every character it matches builds a value of its own",
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             Self::SharedStart => f.write_str(
                 "this alternative starts the same way as an earlier one, so a \
@@ -176,7 +176,7 @@ impl fmt::Display for FindingKind {
                 "a parser cannot tell from {} which way to take here, so `{}` \
                  and the rules that reach it try every way",
                 characters.described(),
-                meta_identifier.as_str()
+                meta_identifier.spaced()
             ),
             Self::UnknownExpectation { code, .. } => {
                 write!(f, "`{code}` is not the code of any finding")
