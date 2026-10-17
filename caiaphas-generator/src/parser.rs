@@ -90,7 +90,8 @@ pub(crate) fn parse(source: &str) -> (Syntax, Vec<ParseError>) {
 struct Parser<'a> {
     lexer: Lexer<'a>,
     next: Option<Token>,
-    /// Where the last token read ends.
+    /// Where the last token read starts and ends.
+    previous_start: usize,
     previous_end: usize,
     errors: Vec<ParseError>,
 }
@@ -100,6 +101,7 @@ impl<'a> Parser<'a> {
         let mut parser = Self {
             lexer: Lexer::new(source),
             next: None,
+            previous_start: 0,
             previous_end: 0,
             errors: Vec::new(),
         };
@@ -135,6 +137,7 @@ impl<'a> Parser<'a> {
     /// Moves past the next token, and returns it.
     fn bump(&mut self) -> Option<Token> {
         let token = self.next.take()?;
+        self.previous_start = token.span.start;
         self.previous_end = token.span.end;
         self.next = self.pull();
         Some(token)
@@ -204,6 +207,14 @@ impl<'a> Parser<'a> {
         let Some(token) = self.peek() else {
             return self.unexpected(Expected::TerminatorSymbol);
         };
+        if let Some(span) = self.name_across_lines(token) {
+            return ParseError {
+                kind: ParseErrorKind::UnexpectedToken(
+                    Expected::TerminatorSymbol,
+                ),
+                span,
+            };
+        }
         let after = self.lexer.source()[token.span.end..]
             .trim_start_matches(|c: char| c.is_ascii_whitespace());
         let next_rule =
@@ -233,9 +244,37 @@ impl<'a> Parser<'a> {
         } else if token.symbol == CommentlessSymbol::Symbol(Symbol::Repetition)
         {
             self.unexpected(Expected::SeparatorNotRepetition)
+        } else if token.symbol == CommentlessSymbol::Symbol(Symbol::Except) {
+            self.unexpected(Expected::TerminatorSymbolNotExcept)
+        } else if matches!(
+            token.symbol,
+            CommentlessSymbol::Symbol(
+                Symbol::EndGroup | Symbol::EndOption | Symbol::EndRepeat
+            )
+        ) {
+            self.unexpected(Expected::TerminatorSymbolNotClose)
         } else {
             self.unexpected(Expected::TerminatorSymbol)
         }
+    }
+
+    /// Returns where a rule lacks its `;` when the name before `token`, a `=`,
+    /// runs across a line break, as gaps let `b` and `c` in `a = b` and
+    /// `c = 'x';` on the next line make one name: at the end of the line
+    /// before the break.
+    fn name_across_lines(&self, token: &Token) -> Option<Span> {
+        if token.symbol != CommentlessSymbol::Symbol(Symbol::Defining) {
+            return None;
+        }
+        let source = self.lexer.source();
+        let name = &source[self.previous_start..self.previous_end];
+        if !name.starts_with(|c: char| c.is_ascii_alphabetic()) {
+            return None;
+        }
+        let line_break = self.previous_start + name.rfind('\n')?;
+        let end = self.previous_start
+            + source[self.previous_start..line_break].trim_end().len();
+        Some(Span { start: end, end })
     }
 
     /// Returns an empty span where the last token read ends.
@@ -510,6 +549,16 @@ pub(crate) mod tests {
             ParseErrorKind::UnexpectedToken(Expected::TerminatorSymbol)
         );
         assert_eq!(errors[0].span, Span { start: 7, end: 7 });
+    }
+
+    #[test]
+    fn ends_a_rule_where_a_name_runs_on_to_the_next_line() {
+        let (_, errors) = parse("a = b\nc = 'x';");
+        assert_eq!(
+            errors[0].kind,
+            ParseErrorKind::UnexpectedToken(Expected::TerminatorSymbol)
+        );
+        assert_eq!(errors[0].span, Span { start: 5, end: 5 });
     }
 
     #[test]

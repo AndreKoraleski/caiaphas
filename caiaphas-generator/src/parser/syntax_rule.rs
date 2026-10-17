@@ -50,7 +50,18 @@ impl SyntaxRule {
             return Err(parser.no_rule_name());
         };
         parser.bump();
-        parser.expect(Symbol::Defining, Expected::DefiningSymbol)?;
+        // A `-` inside a name reads as an exception, but one that starts `->`
+        // defines a rule in other notations.
+        let in_name = parser.peek().is_some_and(|token| {
+            token.symbol == CommentlessSymbol::Symbol(Symbol::Except)
+                && !parser.lexer.source()[token.span.end..].starts_with('>')
+        });
+        let expected = if in_name {
+            Expected::DefiningSymbolNotExcept
+        } else {
+            Expected::DefiningSymbol
+        };
+        parser.expect(Symbol::Defining, expected)?;
         let definitions_list = DefinitionsList::parse(parser)?;
         if parser.peek_symbol() != Some(Symbol::Terminator) {
             return Err(parser.unfinished());

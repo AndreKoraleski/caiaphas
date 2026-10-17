@@ -27,6 +27,12 @@ impl SyntacticFactor {
         if integer.is_some() {
             parser.bump();
             parser.expect(Symbol::Repetition, Expected::RepetitionSymbol)?;
+            // A primary cannot be a count, as one more `* x` would make it.
+            if parser.peek().is_some_and(|token| {
+                matches!(token.symbol, CommentlessSymbol::Integer(_))
+            }) {
+                return Err(parser.unexpected(Expected::PrimaryNotCount));
+            }
         }
         let primary = SyntacticPrimary::parse(parser)?;
         let span =

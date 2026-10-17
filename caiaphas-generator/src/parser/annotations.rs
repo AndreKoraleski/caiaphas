@@ -31,10 +31,11 @@ pub(super) fn attach(
                 continue;
             }
             Comment::Annotation(annotation) => {
-                if give(annotation, span, attempts, rules) {
-                    continue;
+                match give(annotation, span, attempts, rules) {
+                    Ok(true) => continue,
+                    Ok(false) => ParseErrorKind::AnnotationWithoutRule,
+                    Err(kind) => kind,
                 }
-                ParseErrorKind::AnnotationWithoutRule
             }
             // A word written almost as an annotation is likely a typo, which a
             // warning about the rule it touches tells of.
@@ -94,31 +95,42 @@ fn touched<'r>(
 }
 
 /// Gives `annotation`, written at `span`, to the rule right after it, and
-/// returns whether there is a rule right after it. A rule the parser could not
-/// read is left out with its annotations.
+/// returns whether there is a rule right after it, or the error when the rule
+/// already has an annotation it cannot have with this one. A rule the parser
+/// could not read is left out with its annotations.
 fn give(
     annotation: Annotation,
     span: Span,
     attempts: &[Span],
     rules: &mut [SyntaxRule],
-) -> bool {
+) -> Result<bool, ParseErrorKind> {
     let Some(next) = attempts.iter().find(|rule| rule.start >= span.end)
     else {
-        return false;
+        return Ok(false);
     };
-    if let Some(rule) = rules.iter_mut().find(|rule| rule.span == *next) {
-        match annotation {
-            Annotation::Expectation(expectation) => {
-                rule.expectations.push(expectation);
-            }
-            Annotation::Hide => rule.hidden = true,
-            Annotation::Greedy => rule.greedy = true,
-            Annotation::Recover => rule.recovers = true,
-            Annotation::Inline => rule.inline = true,
-            Annotation::Converts(ty) => rule.converts_to = Some(ty),
+    let Some(rule) = rules.iter_mut().find(|rule| rule.span == *next) else {
+        return Ok(true);
+    };
+    match annotation {
+        Annotation::Expectation(expectation) => {
+            rule.expectations.push(expectation);
         }
+        Annotation::Hide if rule.inline => {
+            return Err(ParseErrorKind::HiddenInline);
+        }
+        Annotation::Inline if rule.hidden => {
+            return Err(ParseErrorKind::HiddenInline);
+        }
+        Annotation::Converts(_) if rule.converts_to.is_some() => {
+            return Err(ParseErrorKind::SecondConversion);
+        }
+        Annotation::Hide => rule.hidden = true,
+        Annotation::Greedy => rule.greedy = true,
+        Annotation::Recover => rule.recovers = true,
+        Annotation::Inline => rule.inline = true,
+        Annotation::Converts(ty) => rule.converts_to = Some(ty),
     }
-    true
+    Ok(true)
 }
 
 #[cfg(test)]

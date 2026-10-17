@@ -96,6 +96,16 @@ impl SyntacticPrimary {
     ) -> Result<Self, ParseError> {
         parser.bump();
         let definitions = DefinitionsList::parse(parser)?;
+        // `/)` ends an optional sequence, though a `/` before a `)` reads as
+        // one.
+        let expected = if end == Symbol::EndGroup
+            && parser.peek().is_some_and(|token| {
+                parser.lexer.source()[token.span.range()] == *"/)"
+            }) {
+            Expected::EndGroupSymbolNotOption
+        } else {
+            expected
+        };
         let span = start.to(parser.expect(end, expected)?);
         Ok(Self {
             kind: kind(definitions),

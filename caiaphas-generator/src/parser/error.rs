@@ -33,6 +33,10 @@ pub(crate) enum ParseErrorKind {
     Malformed(Malformed),
     /// An annotation is not right before a syntax rule.
     AnnotationWithoutRule,
+    /// A second `(* as T *)` comes before a rule that already converts.
+    SecondConversion,
+    /// `(* hide *)` and `(* inline *)` come before the same rule.
+    HiddenInline,
 }
 
 /// What the syntax needs where a [`ParseError`] is.
@@ -44,13 +48,23 @@ pub(crate) enum Expected {
     /// The same, where `..` follows a rule as if it made a range.
     MetaIdentifierNotRange,
     DefiningSymbol,
+    /// The same, where a `-` follows a name, as in `my-rule`.
+    DefiningSymbolNotExcept,
     TerminatorSymbol,
+    /// The same, where a second `-` follows an exception.
+    TerminatorSymbolNotExcept,
+    /// The same, where a closing bracket closes nothing.
+    TerminatorSymbolNotClose,
     /// What can come between two items of a rule, or after its last.
     Separator,
     /// The same, where a `*` follows an item as in a regular expression.
     SeparatorNotRepetition,
     RepetitionSymbol,
+    /// What a count repeats, where a second count follows the first.
+    PrimaryNotCount,
     EndGroupSymbol,
+    /// The same, where `/)` ends an optional sequence instead.
+    EndGroupSymbolNotOption,
     EndOptionSymbol,
     EndRepeatSymbol,
 }
@@ -61,13 +75,16 @@ impl fmt::Display for Expected {
             Self::MetaIdentifier
             | Self::MetaIdentifierNotTerminator
             | Self::MetaIdentifierNotRange => "a rule name",
-            Self::DefiningSymbol => "`=`",
-            Self::TerminatorSymbol => "`;` or `.`",
+            Self::DefiningSymbol | Self::DefiningSymbolNotExcept => "`=`",
+            Self::TerminatorSymbol
+            | Self::TerminatorSymbolNotExcept
+            | Self::TerminatorSymbolNotClose => "`;` or `.`",
             Self::Separator | Self::SeparatorNotRepetition => {
                 "`,`, `|`, `;` or `.`"
             }
             Self::RepetitionSymbol => "`*` after the repetition count",
-            Self::EndGroupSymbol => "`)`",
+            Self::PrimaryNotCount => "what the count repeats",
+            Self::EndGroupSymbol | Self::EndGroupSymbolNotOption => "`)`",
             Self::EndOptionSymbol => "`]` or `/)`",
             Self::EndRepeatSymbol => "`}` or `:)`",
         })
@@ -91,6 +108,13 @@ impl fmt::Display for ParseError {
             ParseErrorKind::AnnotationWithoutRule => f.write_str(
                 "an `expect`, `hide`, `greedy`, `recover`, `inline` or `as` \
                  comment must come right before the syntax rule it is about",
+            ),
+            ParseErrorKind::SecondConversion => f.write_str(
+                "a rule converts to one type, and another `(* as ... *)` \
+                 already names one for this rule",
+            ),
+            ParseErrorKind::HiddenInline => f.write_str(
+                "`(* hide *)` and `(* inline *)` cannot both mark a rule",
             ),
         }
     }
@@ -135,6 +159,46 @@ impl From<ParseError> for Diagnostic {
             ParseErrorKind::UnexpectedToken(Expected::DefiningSymbol) => {
                 Some("define a rule with `=`, as in `a = 'x';`".to_owned())
             }
+            ParseErrorKind::UnexpectedToken(
+                Expected::DefiningSymbolNotExcept,
+            ) => Some(
+                "write the words of a name apart, as `my rule`, since `-` \
+                 writes an exception"
+                    .to_owned(),
+            ),
+            ParseErrorKind::UnexpectedToken(
+                Expected::TerminatorSymbolNotExcept,
+            ) => Some(
+                "a term takes one exception, so group what it takes away, as \
+                 `'a' - ('b' | 'c')`"
+                    .to_owned(),
+            ),
+            ParseErrorKind::UnexpectedToken(
+                Expected::TerminatorSymbolNotClose,
+            ) => {
+                Some("remove it, since nothing before it opens".to_owned())
+            }
+            ParseErrorKind::UnexpectedToken(Expected::PrimaryNotCount) => Some(
+                "a factor takes one count, so multiply them, as `6 * 'x'` \
+                 does for `2 * 3 * 'x'`"
+                    .to_owned(),
+            ),
+            ParseErrorKind::UnexpectedToken(
+                Expected::EndGroupSymbolNotOption,
+            ) => Some(
+                "`/)` ends an optional sequence that `(/` starts; write `/ )` \
+                 for a `/` between alternatives and then the `)`"
+                    .to_owned(),
+            ),
+            ParseErrorKind::SecondConversion => Some(
+                "keep the `(* as ... *)` that names the type it should have"
+                    .to_owned(),
+            ),
+            ParseErrorKind::HiddenInline => Some(
+                "keep one: `hide` leaves the rule out of the types, and \
+                 `inline` gives what it holds to the rules that hold it"
+                    .to_owned(),
+            ),
             ParseErrorKind::UnexpectedToken(
                 Expected::MetaIdentifierNotTerminator,
             ) => Some("remove it, since it ends no rule".to_owned()),
@@ -215,6 +279,43 @@ mod tests {
             helps("a -> 'x';").contains(
                 &"define a rule with `=`, as in `a = 'x';`".to_owned()
             )
+        );
+        assert_eq!(
+            helps("my-rule = 'x';"),
+            ["write the words of a name apart, as `my rule`, since `-` \
+                 writes an exception"]
+        );
+        assert_eq!(
+            helps("a = 'a' - 'b' - 'c';"),
+            [
+                "a term takes one exception, so group what it takes away, as \
+                 `'a' - ('b' | 'c')`"
+            ]
+        );
+        assert_eq!(
+            helps("a = 'a'];"),
+            ["remove it, since nothing before it opens"]
+        );
+        assert_eq!(
+            helps("a = 2 * 3 * 'x';"),
+            ["a factor takes one count, so multiply them, as `6 * 'x'` \
+                 does for `2 * 3 * 'x'`"]
+        );
+        assert_eq!(
+            helps("a = ('a' /);"),
+            [
+                "`/)` ends an optional sequence that `(/` starts; write `/ )` \
+                 for a `/` between alternatives and then the `)`"
+            ]
+        );
+        assert_eq!(
+            helps("(* as u8 *) (* as u16 *) a = '1'; b = a;"),
+            ["keep the `(* as ... *)` that names the type it should have"]
+        );
+        assert_eq!(
+            helps("(* hide *) (* inline *) a = 'x'; b = a;"),
+            ["keep one: `hide` leaves the rule out of the types, and \
+                 `inline` gives what it holds to the rules that hold it"]
         );
         assert_eq!(
             helps("a = 'x'; # a note"),
