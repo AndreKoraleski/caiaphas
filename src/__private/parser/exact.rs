@@ -132,6 +132,32 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
         ends
     }
 
+    /// Returns where `round`, taken any number of times one after another
+    /// after each of `ends`, can end, in no order. Each place is read once for
+    /// all of them, where following each end on its own would read the places
+    /// they share again for each.
+    pub fn then_rounds(
+        &mut self,
+        ends: &Ends,
+        mut round: impl FnMut(&mut Self, usize) -> Ends,
+    ) -> Ends {
+        let mut reached = Ends::none();
+        let mut pending: Vec<usize> = Vec::new();
+        for end in ends.iter() {
+            reached.add(end);
+            pending.push(end);
+        }
+        while let Some(start) = pending.pop() {
+            for next in round(self, start).iter() {
+                if !reached.contains(next) {
+                    reached.add(next);
+                    pending.push(next);
+                }
+            }
+        }
+        reached
+    }
+
     /// Returns where `round`, taken any number of times one after another from
     /// `position`, can end. Each way that takes one more round comes before
     /// stopping, and the analysis makes sure a round never matches nothing.
