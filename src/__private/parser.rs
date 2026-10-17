@@ -369,15 +369,15 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
     }
 
     /// Returns the node of `rule` that matched `range`, with the nodes matched
-    /// since `mark` as its children. A hidden rule has no node, so it drops
-    /// those nodes.
+    /// since `mark` as its children. A rule that builds no node drops those
+    /// nodes.
     fn node(
         &mut self,
         rule: &Rule,
         range: Range<usize>,
         mark: usize,
     ) -> Option<usize> {
-        if rule.hidden {
+        if !rule.builds {
             self.matched.truncate(mark);
             return None;
         }

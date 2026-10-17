@@ -55,7 +55,15 @@ pub(crate) fn module(
     };
     let facts = Facts::new(matched);
     let general = general_rules(&facts);
-    let functions = matching::functions(&facts, &general);
+    // Only a rule whose node a type reads builds one. An inline rule's node
+    // stands for its children, so it builds one too.
+    let builds: Vec<bool> = grammar
+        .syntax_rules
+        .iter()
+        .zip(shapes)
+        .map(|(rule, shape)| !rule.hidden && (shape.is_some() || rule.inline))
+        .collect();
+    let functions = matching::functions(&facts, &general, &builds);
     let written = Facts::new(grammar);
     let types = shapes.iter().enumerate().filter_map(|(position, shape)| {
         let shape = shape.as_ref()?;

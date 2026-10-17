@@ -41,6 +41,9 @@ pub struct Rule {
     /// Whether what the rule could not read goes unsaid, as for whitespace
     /// that can match nothing.
     pub quiet: bool,
+    /// Whether the rule builds a node, since a type reads it. A hidden rule,
+    /// and one that only a converted rule or no type holds, builds none.
+    pub builds: bool,
     /// Whether the rule's node stands for its children in the tree, so the
     /// rule around it holds them instead.
     pub inline: bool,

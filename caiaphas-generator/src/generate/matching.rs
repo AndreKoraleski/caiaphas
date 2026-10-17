@@ -30,8 +30,12 @@ use crate::{
 /// Every other rule that one of those reads remembers its matches, since it is
 /// read once to tell where it ends and again to build its node. A rule that
 /// tries every way also gets a function that takes one way when a greedy rule
-/// reads it.
-pub(crate) fn functions(facts: &Facts<'_>, general: &[bool]) -> TokenStream {
+/// reads it. Only the rules that `builds` marks build a node.
+pub(crate) fn functions(
+    facts: &Facts<'_>,
+    general: &[bool],
+    builds: &[bool],
+) -> TokenStream {
     let grammar: &Grammar = facts.grammar();
     let mut remembers = revisited_rules(facts);
     let mut committed = vec![false; general.len()];
@@ -56,6 +60,7 @@ pub(crate) fn functions(facts: &Facts<'_>, general: &[bool]) -> TokenStream {
                 let rule_id = RuleId(position);
                 let writer = FunctionWriter {
                     facts,
+                    builds,
                     first_match: rule.first_match,
                 };
                 if !general[position] {
@@ -87,6 +92,8 @@ pub(crate) fn function_name(RuleId(position): RuleId) -> Ident {
 /// Writes the function of one rule.
 pub(super) struct FunctionWriter<'a> {
     pub(super) facts: &'a Facts<'a>,
+    /// Which rules build a node, since a type reads it.
+    pub(super) builds: &'a [bool],
     /// Whether the rule's choices take their first alternative that matches.
     pub(super) first_match: bool,
 }
@@ -104,6 +111,7 @@ impl FunctionWriter<'_> {
         let number = Literal::usize_unsuffixed(position);
         let name = name::spaced(rule);
         let (hidden, inline) = (rule.hidden, rule.inline);
+        let builds = self.builds[position];
         let quiet = hidden && self.facts.is_nullable(&rule.expression);
         let start = self.facts.grammar().start_syntax_rules.contains(&rule_id);
         quote! {
@@ -111,6 +119,7 @@ impl FunctionWriter<'_> {
                 number: #number,
                 name: #name,
                 hidden: #hidden,
+                builds: #builds,
                 quiet: #quiet,
                 inline: #inline,
                 remembers: #remembers,
