@@ -68,7 +68,7 @@ pub fn parse(
 ) -> Result<Tree, Error> {
     let mut parser = Parser::new(input);
     match rule(&mut parser, 0) {
-        Some((end, node)) if end == input.len() => {
+        Some((end, node)) if end == input.len() && !parser.went_too_deep() => {
             Ok(parser.tree(node.expect("a start rule is never hidden")))
         }
         _ => {
@@ -101,7 +101,7 @@ pub fn parse_by_ends(
     explain: EndsFunction<true>,
 ) -> Result<Tree, Error> {
     let mut parser = Parser::new(input);
-    if ends(&mut parser, 0).contains(input.len()) {
+    if ends(&mut parser, 0).contains(input.len()) && !parser.went_too_deep() {
         let root = build(&mut parser, 0, input.len());
         return Ok(parser.tree(root.expect("a start rule is never hidden")));
     }

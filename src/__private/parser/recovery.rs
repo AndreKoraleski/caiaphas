@@ -184,7 +184,9 @@ pub(crate) fn recovering(
 ) -> (Option<Tree>, Vec<Error>) {
     let mut parser = Parser::new(input);
     if let Some(node) = root(&mut parser) {
-        return (Some(parser.tree(node)), Vec::new());
+        if !parser.went_too_deep() {
+            return (Some(parser.tree(node)), Vec::new());
+        }
     }
     let mut recoveries = Recoveries::default();
     let mut errors: Vec<Error> = Vec::new();
@@ -194,6 +196,11 @@ pub(crate) fn recovering(
         // builds the tree from the same places.
         let mut parser = Parser::recovering(input, recoveries);
         let ends = explain(&mut parser);
+        // An input that nests too deeply cannot be parsed further on either.
+        if parser.went_too_deep() {
+            errors.push(parser.error());
+            return (None, errors);
+        }
         if ends.contains(&input.len()) {
             let mut parser = Parser::recovering(input, parser.recoveries);
             let tree = root(&mut parser).map(|node| parser.tree(node));

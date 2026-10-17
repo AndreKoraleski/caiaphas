@@ -51,7 +51,17 @@ pub struct Parser<'i, const REPORTS: bool> {
     /// Whether the parser is looking for where a rule goes on from, so no rule
     /// recovers.
     scanning: bool,
+    /// How many matches of recursive rules are inside one another here.
+    depth: usize,
+    /// Where the matches of recursive rules first nested more deeply than
+    /// [`DEPTH`], if they did.
+    too_deep: Option<usize>,
 }
+
+/// How many matches of recursive rules a parser follows inside one another.
+/// Each takes some stack, and this many fit in the smallest stack a program
+/// usually has, even in a build that is not optimized.
+const DEPTH: usize = 512;
 
 /// What a rule matched at a position, and whether the rule was noted as
 /// expected there.
@@ -88,11 +98,46 @@ impl<'i, const REPORTS: bool> Parser<'i, REPORTS> {
             recoveries: Recoveries::default(),
             candidates: Vec::new(),
             scanning: false,
+            depth: 0,
+            too_deep: None,
         }
     }
 
     pub(super) fn error(self) -> Error {
-        Error::new(self.input, self.furthest, self.expected, self.rejected)
+        match self.too_deep {
+            Some(offset) => Error::too_deep(self.input, offset),
+            None => Error::new(
+                self.input,
+                self.furthest,
+                self.expected,
+                self.rejected,
+            ),
+        }
+    }
+
+    /// Returns whether matches nested too deeply, so that no match counts.
+    pub(super) fn went_too_deep(&self) -> bool {
+        self.too_deep.is_some()
+    }
+
+    /// Starts a match of a recursive rule at `position`, unless the matches
+    /// nest too deeply there or did so before. Each start that goes through
+    /// needs a [`leave`](Self::leave).
+    pub fn enter(&mut self, position: usize) -> bool {
+        if self.too_deep.is_some() {
+            return false;
+        }
+        if self.depth == DEPTH {
+            self.too_deep = Some(position);
+            return false;
+        }
+        self.depth += 1;
+        true
+    }
+
+    /// Finishes a match of a recursive rule.
+    pub fn leave(&mut self) {
+        self.depth -= 1;
     }
 
     /// Returns the tree of the nodes built, from the node `root`.

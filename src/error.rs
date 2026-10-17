@@ -13,6 +13,7 @@ pub struct Error {
     column: usize,
     expected: Vec<Expected>,
     found: Option<String>,
+    too_deep: bool,
 }
 
 /// What a parser could have read where an [`Error`] is.
@@ -62,7 +63,25 @@ impl Error {
             column,
             expected,
             found,
+            too_deep: false,
         }
+    }
+
+    /// Returns the error of an input whose matches nest more deeply at
+    /// `offset` than a parser follows.
+    pub(crate) fn too_deep(input: &str, offset: usize) -> Self {
+        Self {
+            too_deep: true,
+            ..Self::new(input, offset, Vec::new(), None)
+        }
+    }
+
+    /// Returns whether the input nests more deeply than a parser follows, as
+    /// brackets inside brackets can, instead of not matching. A parser stops
+    /// there so that it never runs out of stack.
+    #[must_use]
+    pub fn is_too_deep(&self) -> bool {
+        self.too_deep
     }
 
     /// Returns the byte offset in the input where the error is.
@@ -151,6 +170,13 @@ impl fmt::Display for Shown<'_> {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.too_deep {
+            return write!(
+                f,
+                "the input nests too deeply to parse at line {}, column {}",
+                self.line, self.column
+            );
+        }
         if !self.expected.is_empty() {
             f.write_str("expected ")?;
             let parts = described(&self.expected);
